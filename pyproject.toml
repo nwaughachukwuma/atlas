@@ -40,9 +40,10 @@ dependencies = [
     "pydantic>=2.0.0",
     "google-genai>=1.0.0",
     "groq>=0.4.0",
+    "zvec>=0.2.0",
     "rich>=13.0.0",
     "httpx>=0.25.0",
-    "zvec>=0.2.0",
+    "numpy>=1.20.0",
 ]
 
 [project.optional-dependencies]
@@ -70,10 +71,20 @@ include = ["src/atlas", "README.md", "LICENSE"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py312"
+include = ["*.py", "*.pyi", "**/pyproject.toml"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W"]
+# select = ["E", "F", "I", "N", "W"]
+select = ["D102", "F401"]
+
+[tool.ruff.lint.isort]
+case-sensitive = true
+relative-imports-order = "closest-to-furthest"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
 
 [tool.mypy]
 python_version = "3.10"

@@ -19,7 +19,7 @@ class GeminiClient:
 
     @classmethod
     def get_client(cls) -> genai.Client:
-        """Get or create Gemini client"""
+        """Get Gemini client"""
         if cls._client is None:
             api_key = os.environ.get("GEMINI_API_KEY")
             if not api_key:
@@ -43,17 +43,31 @@ class GeminiMediaEngine:
     @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))
     async def upload_file_async(self, file_path: str) -> types.File:
         """Upload a file to Gemini asynchronously"""
-        return await asyncio.to_thread(
-            self.client.files.upload,
-            file_path,
-        )
+        return await asyncio.to_thread(self.client.files.upload, file=file_path)
+
+
+    @process_time()
+    @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))
+    async def fetch_file_part(self, file_path: str, mime_type: str) -> types.Part:
+        """Upload and retrieve a file part"""
+        file = await self.upload_file_async(file_path)
+        if not file.uri:
+            raise Exception("Couldn't retrieve file uri")
+        return types.Part.from_uri(file_uri=file.uri, mime_type=mime_type)
+    
 
     @process_time()
     @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))
     async def get_file_part(self, file_path: str, mime_type: str) -> types.Part:
-        """Get a file part for Gemini API"""
-        file = await self.upload_file_async(file_path)
-        return types.Part.from_uri(file_uri=file.uri, mime_type=mime_type)
+        """
+        Get file part from bytes
+        """
+        def handler():
+            with open(file_path, "rb") as f:
+                data = f.read()
+            return types.Part.from_bytes(data=data, mime_type=mime_type)
+        return await asyncio.to_thread(handler)
+
 
     @process_time()
     async def describe_media_from_file(
@@ -79,7 +93,6 @@ class GeminiMediaEngine:
             if not response.text:
                 raise ValueError("Error describing media using Gemini")
             return response.text
-
         try:
             return await asyncio.to_thread(_handler, "gemini-2.5-flash-lite")
         except Exception as e:

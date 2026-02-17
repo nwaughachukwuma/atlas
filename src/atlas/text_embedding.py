@@ -2,6 +2,7 @@
 Text embedding using Gemini API
 """
 
+import asyncio
 import os
 from typing import Optional
 
@@ -9,6 +10,7 @@ from google import genai
 from google.genai import types
 
 from .utils import logger
+from .gemini_client import GeminiClient
 
 
 class TextEmbedding:
@@ -16,17 +18,7 @@ class TextEmbedding:
 
     def __init__(self, content: str):
         self.content = content
-        self._client: Optional[genai.Client] = None
-
-    @property
-    def client(self) -> genai.Client:
-        """Get Gemini client"""
-        if self._client is None:
-            api_key = os.environ.get("GEMINI_API_KEY")
-            if not api_key:
-                raise ValueError("GEMINI_API_KEY environment variable is required")
-            self._client = genai.Client(api_key=api_key)
-        return self._client
+        self.client = GeminiClient.get_client()
 
     def get_embedding(self, dimensionality: int = 768) -> list[float]:
         """Get text embedding using Gemini embedding model
@@ -57,7 +49,6 @@ class TextEmbedding:
 
     async def get_embedding_async(self, dimensionality: int = 768) -> list[float]:
         """Get text embedding asynchronously"""
-        import asyncio
 
         return await asyncio.to_thread(self.get_embedding, dimensionality)
 

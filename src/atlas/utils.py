@@ -3,16 +3,21 @@ Core utilities for Atlas
 """
 
 import asyncio
-import functools
+import json
 import logging
 import os
+import shutil
 import subprocess
 import tempfile
-import time
+from dataclasses import dataclass
+from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Literal, Optional, TypeVar
+from time import sleep, time
+from typing import Any, Literal, Optional, TypeVar
 
 from pydantic import BaseModel
+
+from .logger import logger
 
 # Configure logging
 logging.basicConfig(
@@ -24,80 +29,112 @@ logger = logging.getLogger("atlas")
 T = TypeVar("T")
 
 
-def process_time() -> Callable[[Callable[..., T]], Callable[..., T]]:
-    """Decorator to log process time"""
+def process_time():
+    """Print process execution time for a given function"""
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
-        @functools.wraps(func)
-        async def async_wrapper(*args: Any, **kwargs: Any) -> T:
-            start = time.perf_counter()
-            try:
-                return await func(*args, **kwargs)
-            finally:
-                elapsed = time.perf_counter() - start
-                logger.info(f"{func.__name__} completed in {elapsed:.2f}s")
-
-        @functools.wraps(func)
-        def sync_wrapper(*args: Any, **kwargs: Any) -> T:
-            start = time.perf_counter()
-            try:
-                return func(*args, **kwargs)
-            finally:
-                elapsed = time.perf_counter() - start
-                logger.info(f"{func.__name__} completed in {elapsed:.2f}s")
-
+    def decorator(func):
         if asyncio.iscoroutinefunction(func):
+
+            @wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                start_time = time()
+                response = await func(*args, **kwargs)
+
+                time_diff = f"{(time() - start_time):.2f}s"
+                logger.info(f"Execution time for {func.__name__}: {time_diff}")
+
+                return response
+
             return async_wrapper
-        return sync_wrapper
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            start_time = time()
+            response = func(*args, **kwargs)
+
+            time_diff = f"{(time() - start_time):.2f}s"
+            logger.info(f"Execution time for {func.__name__}: {time_diff}")
+
+            return response
+
+        return wrapper
 
     return decorator
 
 
-class RetryConfig(BaseModel):
-    """Retry configuration"""
-
+@dataclass
+class RetryConfig:
     max_retries: int = 3
     delay: float = 1.0
-    backoff: float = 2.0
+    backoff: Optional[float] = None
 
 
-def retry(config: RetryConfig) -> Callable[[Callable[..., T]], Callable[..., T]]:
-    """Retry decorator with exponential backoff"""
+def retry(retry_config: RetryConfig | None, default_return: Any = None):
+    """
+    Retry logic for async functions with exponential backoff.
+    """
+    config = retry_config or RetryConfig()
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
-        @functools.wraps(func)
-        async def async_wrapper(*args: Any, **kwargs: Any) -> T:
-            last_exception: Optional[Exception] = None
-            delay = config.delay
-            for attempt in range(config.max_retries):
-                try:
-                    return await func(*args, **kwargs)
-                except Exception as e:
-                    last_exception = e
-                    if attempt < config.max_retries - 1:
-                        logger.warning(f"{func.__name__} failed (attempt {attempt + 1}/{config.max_retries}): {e}")
-                        await asyncio.sleep(delay)
-                        delay *= config.backoff
-            raise last_exception
-
-        @functools.wraps(func)
-        def sync_wrapper(*args: Any, **kwargs: Any) -> T:
-            last_exception: Optional[Exception] = None
-            delay = config.delay
-            for attempt in range(config.max_retries):
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    last_exception = e
-                    if attempt < config.max_retries - 1:
-                        logger.warning(f"{func.__name__} failed (attempt {attempt + 1}/{config.max_retries}): {e}")
-                        time.sleep(delay)
-                        delay *= config.backoff
-            raise last_exception
-
+    def decorator(func):
         if asyncio.iscoroutinefunction(func):
+
+            @wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                async def _async_retry():
+                    delay = config.delay
+                    last_exception = None
+                    for attempt in range(config.max_retries + 1):
+                        try:
+                            return await func(*args, **kwargs)
+                        except Exception as e:
+                            last_exception = e
+                            if attempt == 0:
+                                logger.warning(f"Request Failed: {e}. Retrying...")
+                            else:
+                                logger.warning(f"Retry attempt {attempt}/{config.max_retries} failed: {e}")
+
+                            if attempt < config.max_retries:  # Don't sleep after last attempt
+                                await asyncio.sleep(delay)
+                                if config.backoff:
+                                    delay *= config.backoff
+
+                    # If default_return is None and we have an exception, re-raise it
+                    if default_return is None and last_exception:
+                        raise last_exception
+                    return default_return
+
+                return await _async_retry()
+
             return async_wrapper
-        return sync_wrapper
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            def _sync_retry():
+                delay = config.delay
+                last_exception = None
+                for attempt in range(config.max_retries + 1):
+                    try:
+                        return func(*args, **kwargs)
+                    except Exception as e:
+                        last_exception = e
+                        if attempt == 0:
+                            logger.warning(f"Request Failed: {e}. Retrying...")
+                        else:
+                            logger.warning(f"Retry attempt {attempt}/{config.max_retries} failed: {e}")
+
+                        if attempt < config.max_retries:  # Don't sleep after last attempt
+                            sleep(delay)
+                            if config.backoff:
+                                delay *= config.backoff
+
+                # If default_return is None and we have an exception, re-raise it
+                if default_return is None and last_exception:
+                    raise last_exception
+                return default_return
+
+            return _sync_retry()
+
+        return wrapper
 
     return decorator
 
@@ -125,8 +162,6 @@ class TempPath:
     def cleanup(cls) -> None:
         """Clean up temporary directory"""
         if cls._temp_dir and os.path.exists(cls._temp_dir):
-            import shutil
-
             shutil.rmtree(cls._temp_dir, ignore_errors=True)
             cls._temp_dir = None
 
@@ -211,7 +246,6 @@ class MediaFileManager:
                 self.file_path,
             ]
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            import json
 
             data = json.loads(result.stdout)
 

@@ -140,10 +140,11 @@ class VideoProcessor(MediaFileManager, GeminiMediaEngine):
         return clean_results
 
     @process_time()
-    async def _get_transcript(self) -> str:
+    async def get_transcript(self):
         """Get transcript for the entire video"""
-        async with ProcessTranscript(self.video_path, return_value="text") as processor:
-            return await processor.process()
+        async with ProcessTranscript(self.video_path, return_value="text") as proc:
+            return await proc.process()
+
 
     async def _analyze_video_content(self, file_part, file_path: str) -> list[VideoAttrAnalysis]:
         """Analyze video content and extract features"""
@@ -152,8 +153,6 @@ class VideoProcessor(MediaFileManager, GeminiMediaEngine):
             try:
                 if video_prompt.attr == "transcript":
                     # Use local transcription via Groq
-                    from .transcript import ProcessTranscript
-
                     async with ProcessTranscript(file_path, return_value="text") as proc:
                         description = await proc.process()
                 else:
@@ -211,9 +210,8 @@ async def extract_video_insights(
         overlap=overlap,
         description_attrs=description_attrs,
     )
-
-    async with VideoProcessor(config) as processor:
-        return await processor.process()
+    async with VideoProcessor(config) as proc:
+        return await proc.process()
 
 
 async def extract_transcript(video_path: str, format: str = "text") -> str:
@@ -227,5 +225,5 @@ async def extract_transcript(video_path: str, format: str = "text") -> str:
         Transcript in the specified format
     """
     return_value = format if format in ("text", "vtt", "srt") else "text"
-    async with ProcessTranscript(video_path, return_value=return_value) as processor:
-        return await processor.process()
+    async with ProcessTranscript(video_path, return_value=return_value) as proc:
+        return await proc.process()

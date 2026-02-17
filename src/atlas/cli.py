@@ -7,7 +7,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import click
 from rich.console import Console
@@ -99,7 +99,7 @@ def extract(
     video_path: str,
     chunk_duration: str,
     overlap: str,
-    attrs: tuple[str, ...],
+    attrs: List[DescriptionAttr],
     output: Optional[str],
     format: str,
 ):
@@ -119,7 +119,7 @@ def extract(
     overlap_sec = parse_duration(overlap)
 
     # Parse attributes
-    description_attrs: list[DescriptionAttr] = list(attrs) if attrs else DEFAULT_DESCRIPTION_ATTRS
+    description_attrs: List[DescriptionAttr] = list(attrs) if attrs else DEFAULT_DESCRIPTION_ATTRS
 
     # Validate attributes
     valid_attrs = set(DEFAULT_DESCRIPTION_ATTRS)
