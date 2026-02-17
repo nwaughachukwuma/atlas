@@ -44,6 +44,7 @@ dependencies = [
     "rich>=13.0.0",
     "httpx>=0.25.0",
     "numpy>=1.20.0",
+    "python-dotenv"
 ]
 
 [project.optional-dependencies]
@@ -72,10 +73,9 @@ include = ["src/atlas", "README.md", "LICENSE"]
 [tool.ruff]
 line-length = 120
 target-version = "py312"
-include = ["*.py", "*.pyi", "**/pyproject.toml"]
+include = ["*.py", "*.pyi", ".pyproject.toml"]
 
 [tool.ruff.lint]
-# select = ["E", "F", "I", "N", "W"]
 select = ["D102", "F401"]
 
 [tool.ruff.lint.isort]
@@ -86,6 +86,10 @@ relative-imports-order = "closest-to-furthest"
 quote-style = "double"
 indent-style = "space"
 
+[tool.pylint]
+max-line-length = 120
+
 [tool.mypy]
+ignore_missing_imports = false
 python_version = "3.12"
 strict = true

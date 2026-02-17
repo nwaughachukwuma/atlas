@@ -2,6 +2,11 @@
 Atlas - A multimodal insights engine for video understanding
 """
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
 __version__ = "0.1.0"
 
 from .text_embedding import TextEmbedding
