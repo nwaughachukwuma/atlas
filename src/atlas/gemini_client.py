@@ -45,7 +45,6 @@ class GeminiMediaEngine:
         """Upload a file to Gemini asynchronously"""
         return await asyncio.to_thread(self.client.files.upload, file=file_path)
 
-
     @process_time()
     @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))
     async def fetch_file_part(self, file_path: str, mime_type: str) -> types.Part:
@@ -54,7 +53,6 @@ class GeminiMediaEngine:
         if not file.uri:
             raise Exception("Couldn't retrieve file uri")
         return types.Part.from_uri(file_uri=file.uri, mime_type=mime_type)
-    
 
     @process_time()
     @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))
@@ -62,12 +60,13 @@ class GeminiMediaEngine:
         """
         Get file part from bytes
         """
+
         def handler():
             with open(file_path, "rb") as f:
                 data = f.read()
             return types.Part.from_bytes(data=data, mime_type=mime_type)
-        return await asyncio.to_thread(handler)
 
+        return await asyncio.to_thread(handler)
 
     @process_time()
     async def describe_media_from_file(
@@ -93,6 +92,7 @@ class GeminiMediaEngine:
             if not response.text:
                 raise ValueError("Error describing media using Gemini")
             return response.text
+
         try:
             return await asyncio.to_thread(_handler, "gemini-2.5-flash-lite")
         except Exception as e:

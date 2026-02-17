@@ -3,10 +3,7 @@ Text embedding using Gemini API
 """
 
 import asyncio
-import os
-from typing import Optional
 
-from google import genai
 from google.genai import types
 
 from .utils import logger

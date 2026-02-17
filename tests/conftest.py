@@ -58,7 +58,6 @@ def temp_store_path(tmp_path):
 def sample_video_attr_analysis():
     """Create sample VideoAttrAnalysis objects"""
 
-
     return [
         VideoAttrAnalysis(attr="visual_cues", value="A person walking in a park"),
         VideoAttrAnalysis(attr="audio_analysis", value="Birds chirping in background"),
@@ -72,7 +71,6 @@ def sample_video_attr_analysis():
 def sample_video_description(sample_video_attr_analysis):
     """Create a sample VideoDescription"""
 
-
     return VideoDescription(
         start=0.0,
         end=10.0,
@@ -84,7 +82,6 @@ def sample_video_description(sample_video_attr_analysis):
 @pytest.fixture
 def sample_video_processor_result(sample_video_description):
     """Create a sample VideoProcessorResult"""
-
 
     return VideoProcessorResult(
         video_path="/tmp/test_video.mp4",

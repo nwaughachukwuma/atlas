@@ -10,6 +10,7 @@ from .utils import DescriptionAttr
 @dataclass
 class VideoPrompt:
     """Video analysis prompt"""
+
     value: str
     attr: DescriptionAttr
 

@@ -2,7 +2,6 @@
 Unit tests for atlas.prompts module
 """
 
-
 from atlas.prompts import (
     VideoPrompt,
     summarize_descriptions_prompt,
@@ -105,18 +104,14 @@ class TestVideoAnalysisPrompts:
 
     def test_visual_cues_prompt_content(self):
         """Test visual_cues prompt has expected content"""
-        visual_prompt = next(
-            (p for p in video_analysis_prompts if p.attr == "visual_cues"), None
-        )
+        visual_prompt = next((p for p in video_analysis_prompts if p.attr == "visual_cues"), None)
         assert visual_prompt is not None
         assert "visual" in visual_prompt.value.lower()
         assert "people" in visual_prompt.value.lower() or "object" in visual_prompt.value.lower()
 
     def test_transcript_prompt_content(self):
         """Test transcript prompt has expected content"""
-        transcript_prompt = next(
-            (p for p in video_analysis_prompts if p.attr == "transcript"), None
-        )
+        transcript_prompt = next((p for p in video_analysis_prompts if p.attr == "transcript"), None)
         assert transcript_prompt is not None
         assert "transcript" in transcript_prompt.value.lower()
         assert "speech" in transcript_prompt.value.lower()

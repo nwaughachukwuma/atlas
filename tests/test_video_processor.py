@@ -2,7 +2,6 @@
 Unit tests for atlas.video_processor module
 """
 
-
 import pytest
 
 from atlas.utils import VideoAttrAnalysis

@@ -146,6 +146,7 @@ class TempPath:
 
     @classmethod
     def get_temp_dir(cls) -> str:
+        """Get temp directory"""
         if cls._temp_dir is None:
             cls._temp_dir = tempfile.mkdtemp(prefix="atlas_")
         return cls._temp_dir

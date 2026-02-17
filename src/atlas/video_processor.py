@@ -145,7 +145,6 @@ class VideoProcessor(MediaFileManager, GeminiMediaEngine):
         async with ProcessTranscript(self.video_path, return_value="text") as proc:
             return await proc.process()
 
-
     async def _analyze_video_content(self, file_part, file_path: str) -> list[VideoAttrAnalysis]:
         """Analyze video content and extract features"""
 

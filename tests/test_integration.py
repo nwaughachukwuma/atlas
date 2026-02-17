@@ -83,7 +83,6 @@ class TestVideoProcessorIntegration:
     async def test_processor_config_flow(self, sample_video_path):
         """Test VideoProcessor with configuration"""
 
-
         config = VideoProcessorConfig(
             video_path=sample_video_path,
             chunk_duration=5,
@@ -102,7 +101,6 @@ class TestVideoProcessorIntegration:
     @pytest.mark.asyncio
     async def test_chunk_slicing_with_overlap(self, sample_video_path):
         """Test that chunk slicing works with overlap"""
-
 
         config = VideoProcessorConfig(
             video_path=sample_video_path,
@@ -126,12 +124,10 @@ class TestCLIIntegration:
     def test_cli_import(self):
         """Test that CLI module can be imported"""
 
-
         assert callable(main)
 
     def test_cli_parse_duration(self):
         """Test CLI duration parsing"""
-
 
         assert parse_duration("15s") == 15
         assert parse_duration("1m") == 60
@@ -141,7 +137,6 @@ class TestCLIIntegration:
 
     def test_cli_validate_video_path(self, tmp_path):
         """Test CLI video path validation"""
-
 
         # Valid path
         video_path = tmp_path / "test.mp4"

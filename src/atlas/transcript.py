@@ -225,5 +225,3 @@ class ProcessTranscript(MediaFileManager):
             srt += f"{i + 1}\n{start} --> {end}\n{text.strip()}\n\n"
 
         return srt.strip()
-
-
