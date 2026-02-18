@@ -77,6 +77,7 @@ include = ["*.py", "*.pyi", ".pyproject.toml"]
 
 [tool.ruff.lint]
 select = ["D102", "F401"]
+ignore = ["D103"]
 
 [tool.ruff.lint.isort]
 case-sensitive = true
@@ -85,6 +86,8 @@ relative-imports-order = "closest-to-furthest"
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.ruff.lint.pydocstyle]
 
 [tool.mypy]
 ignore_missing_imports = false

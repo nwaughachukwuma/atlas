@@ -25,7 +25,7 @@ class TestVideoProcessorConfig:
         assert config.chunk_duration == 10
         assert config.overlap == 0
         assert config.description_attrs is None
-        assert config.include_summary is False
+        assert config.include_summary is True
 
     def test_custom_values(self):
         """Test custom config values"""

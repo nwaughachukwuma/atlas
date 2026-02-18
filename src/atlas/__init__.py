@@ -5,17 +5,21 @@ Atlas - A multimodal insights engine for video understanding
 __version__ = "0.1.0"
 
 
-# Lazy imports to avoid loading heavy dependencies at import time
-# These are only loaded when actually needed (e.g., when running CLI commands)
+# Lazy imports to avoid loading heavy dependencies at import time.
+# These are only resolved when actually used (e.g. when a CLI command runs).
 def __getattr__(name):
     if name == "TextEmbedding":
         from .text_embedding import TextEmbedding
 
         return TextEmbedding
-    elif name == "VectorStore":
-        from .vector_store import VectorStore
+    elif name == "VideoIndex":
+        from .vector_store import VideoIndex
 
-        return VectorStore
+        return VideoIndex
+    elif name == "VideoChat":
+        from .vector_store import VideoChat
+
+        return VideoChat
     elif name == "VideoProcessor":
         from .video_processor import VideoProcessor
 

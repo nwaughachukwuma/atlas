@@ -3,7 +3,7 @@ Video processor for multimodal analysis
 """
 
 import asyncio
-from typing import Optional
+from typing import Callable, Optional
 
 from pydantic import BaseModel
 
@@ -33,7 +33,7 @@ class VideoProcessorConfig(BaseModel):
     chunk_duration: int = 10  # seconds
     overlap: int = 0  # seconds
     description_attrs: Optional[list[DescriptionAttr]] = None
-    include_summary: bool = False
+    include_summary: bool = True
 
 
 class VideoDescription(BaseModel):
@@ -145,20 +145,21 @@ class VideoProcessor(MediaFileManager, GeminiMediaEngine):
         async with ProcessTranscript(self.video_path, return_value="text") as proc:
             return await proc.process()
 
-    async def _analyze_video_content(self, file_part, file_path: str) -> list[VideoAttrAnalysis]:
-        """Analyze video content and extract features"""
+    async def _analyze_video_content(self, file_part) -> list[VideoAttrAnalysis]:
+        """Analyze video content and extract features.
+
+        All attributes — including transcript — are handled by Gemini so that
+        all five analysis calls run concurrently via asyncio.gather within each
+        chunk.  Groq Whisper is reserved for the standalone ``transcribe`` command
+        which produces a high-quality transcript of the full video.
+        """
 
         async def handler(video_prompt: VideoPrompt) -> VideoAttrAnalysis:
             try:
-                if video_prompt.attr == "transcript":
-                    # Use local transcription via Groq
-                    async with ProcessTranscript(file_path, return_value="text") as proc:
-                        description = await proc.process()
-                else:
-                    description = await self.describe_media_from_file(
-                        file_part,
-                        video_system_prompt(video_prompt.value, video_prompt.attr),
-                    )
+                description = await self.describe_media_from_file(
+                    file_part,
+                    video_system_prompt(video_prompt.value, video_prompt.attr),
+                )
             except Exception as e:
                 logger.error(f"Error getting video chunk analysis: {e}")
                 description = ""
@@ -169,12 +170,65 @@ class VideoProcessor(MediaFileManager, GeminiMediaEngine):
         )
 
     @process_time()
+    async def process_realtime(
+        self,
+        on_segment: Callable[[VideoDescription], None],
+    ) -> VideoProcessorResult:
+        """Process video and call *on_segment* for each segment as soon as it completes.
+
+        Segments are delivered in completion order (not necessarily chronological),
+        but the final VideoProcessorResult contains them sorted by start time.
+
+        Args:
+            on_segment: Callback invoked synchronously with each VideoDescription as
+                        it completes.  The callback runs in the event loop thread.
+
+        Returns:
+            VideoProcessorResult with all descriptions sorted by start time.
+        """
+        logger.info(f"Processing video (realtime): {self.video_path}")
+        semaphore = asyncio.Semaphore(self.concurrency)
+
+        @retry(RetryConfig(max_retries=1, delay=5, backoff=1.5))
+        async def __process_handler(video_chunk: MediaChunk) -> VideoDescription:
+            async with semaphore:
+                try:
+                    return await self._analyze_video_chunk(video_chunk)
+                finally:
+                    delete_tmp_files([video_chunk.path])
+
+        video_chunks = await self._get_video_chunks()
+
+        # Wrap each task so we invoke the callback as each one settles
+        async def _tracked(chunk: MediaChunk) -> VideoDescription:
+            desc = await __process_handler(chunk)
+            on_segment(desc)
+            return desc
+
+        tasks_results = await asyncio.gather(
+            *[_tracked(vc) for vc in video_chunks],
+            return_exceptions=True,
+        )
+
+        sorted_results = sorted(
+            (r for r in tasks_results if isinstance(r, VideoDescription)),
+            key=lambda v: v.start,
+        )
+
+        return VideoProcessorResult(
+            video_path=self.video_path,
+            duration=self.duration,
+            transcript="",
+            video_descriptions=sorted_results,
+        )
+
+    @process_time()
     async def _analyze_video_chunk(self, chunk: MediaChunk) -> VideoDescription:
         """Analyze video chunk and extract features"""
         logger.info(f"Analyzing video chunk: {chunk.path}")
         try:
             file_part = await self.get_file_part(chunk.path, "video/mp4")
-            result = await self._analyze_video_content(file_part, chunk.path)
+            result = await self._analyze_video_content(file_part)
         except Exception as e:
             logger.error(f"Error analyzing video chunk: {e}")
             result = []
@@ -186,43 +240,47 @@ class VideoProcessor(MediaFileManager, GeminiMediaEngine):
         )
 
 
-async def extract_video_insights(
-    video_path: str,
-    chunk_duration: int = 10,
-    overlap: int = 0,
-    description_attrs: Optional[list[DescriptionAttr]] = None,
-) -> VideoProcessorResult:
-    """Convenience function to extract insights from a video
-
-    Args:
-        video_path: Path to the video file
-        chunk_duration: Duration of each chunk in seconds
-        overlap: Overlap between chunks in seconds
-        description_attrs: List of attributes to extract
-
-    Returns:
-        VideoProcessorResult with multimodal insights
-    """
-    config = VideoProcessorConfig(
-        video_path=video_path,
-        chunk_duration=chunk_duration,
-        overlap=overlap,
-        description_attrs=description_attrs,
-    )
-    async with VideoProcessor(config) as proc:
-        return await proc.process()
-
-
 async def extract_transcript(video_path: str, format: str = "text") -> str:
-    """Extract transcript from a video file
+    """Extract transcript from a video file.
 
     Args:
-        video_path: Path to the video file
-        format: Output format ('text', 'vtt', or 'srt')
+        video_path: Path to the video file.
+        format: Output format ('text', 'vtt', or 'srt').
 
     Returns:
-        Transcript in the specified format
+        Transcript in the specified format.
     """
     return_value = format if format in ("text", "vtt", "srt") else "text"
     async with ProcessTranscript(video_path, return_value=return_value) as proc:
         return await proc.process()
+
+
+async def extract_transcript_realtime(
+    video_path: str,
+    format: str = "text",
+    on_chunk: Optional[Callable[[str], None]] = None,
+) -> str:
+    """Extract transcript from a video file, invoking *on_chunk* with text as it arrives.
+
+    Because the underlying Groq Whisper call returns the full result in one shot,
+    the callback is invoked once with the complete transcript.  The function still
+    provides a uniform real-time API that callers can rely on for future streaming
+    back-ends.
+
+    Args:
+        video_path: Path to the video or audio file.
+        format: Output format ('text', 'vtt', or 'srt').
+        on_chunk: Optional callback called with each text chunk as it becomes
+                  available.  Currently called once with the full transcript.
+
+    Returns:
+        The full transcript string.
+    """
+    return_value = format if format in ("text", "vtt", "srt") else "text"
+    async with ProcessTranscript(video_path, return_value=return_value) as proc:
+        result = await proc.process()
+
+    text = result or ""
+    if on_chunk and text:
+        on_chunk(text)
+    return text

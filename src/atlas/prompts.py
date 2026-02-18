@@ -80,6 +80,55 @@ Provide no preambles, just the summary.
 """
 
 
+def chat_system_prompt(
+    video_context: list[str],
+    chat_history: list[dict],
+    extra_context: list[str],
+) -> str:
+    """System prompt for the video chat command.
+
+    Args:
+        video_context: Top-k multimodal insight snippets from video_index.
+        chat_history: Ordered list of past messages (dicts with role/content).
+        extra_context: Semantically similar chat entries, deduped from history.
+
+    Returns:
+        A fully formatted system instruction string.
+    """
+    video_ctx_block = "\n\n".join(f"- {s}" for s in video_context) if video_context else "(none)"
+
+    history_lines: list[str] = []
+    for msg in chat_history:
+        role = msg.get("role", "user").capitalize()
+        content = msg.get("content", "")
+        history_lines.append(f"{role}: {content}")
+    history_block = "\n".join(history_lines) if history_lines else "(no prior conversation)"
+
+    extra_block = "\n\n".join(f"- {s}" for s in extra_context) if extra_context else "(none)"
+
+    return f"""You are Atlas, an intelligent video assistant. You help users understand and explore
+the content of a video based on multimodal analysis that has already been performed on it.
+
+You have access to the following context:
+
+## Relevant Video Content (semantic search results)
+{video_ctx_block}
+
+## Conversation History (most recent 20 messages)
+{history_block}
+
+## Additional Related Context (semantic chat search, new only)
+{extra_block}
+
+## Instructions
+- Answer the user's question based strictly on the video context provided above.
+- Cite specific timestamps or observations when available.
+- If the context doesn't contain enough information to answer, say so honestly.
+- Keep responses concise and focused. Do not hallucinate details.
+- Refer to the conversation history to maintain continuity.
+"""
+
+
 video_analysis_prompts: list[VideoPrompt] = [
     VideoPrompt(
         """Describe key visual elements and every visible entity (people, objects,

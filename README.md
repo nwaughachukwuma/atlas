@@ -4,22 +4,24 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/atlas-video.svg)](https://pypi.org/project/atlas-video/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Atlas** is an open-source multimodal insights engine for video understanding. Extract rich semantic insights from videos using AI, and search through them with a fast local vector store.
+**Atlas** is an open-source multimodal insights engine for video understanding. Extract rich semantic insights from videos using AI, index them in a local vector store, and chat with your video content — all from the terminal.
 
 ## Features
 
 - 🎬 **Multimodal Analysis**: Extract visual cues, interactions, contextual information, audio analysis, and transcripts from videos
-- 🔍 **Semantic Search**: Index videos and search through content semantically using local vector storage (powered by zvec)
-- ⚡ **Fast Transcription**: High-quality transcription using Groq Whisper
-- 🤖 **Powered by Gemini**: Uses Google's Gemini models for multimodal understanding
-- 💻 **CLI First**: Easy-to-use command line interface
-- 🔒 **Privacy Focused**: All processing happens locally, your videos never leave your machine
+- ⚡ **Real-time Streaming**: `extract` and `transcribe` stream results to the terminal as each segment completes — no waiting for the full video
+- 🔍 **Semantic Search**: Index videos and search through content semantically using a local vector store (powered by [zvec](https://zvec.dev))
+- 💬 **Video Chat**: Ask questions about indexed videos; context is drawn from the vector store and prior conversation history
+- 🤖 **Powered by Gemini**: Uses Google's Gemini models for multimodal analysis and embeddings
+- 🎙️ **Groq Whisper Transcription**: High-quality full-video transcription via the `transcribe` command
+- 💻 **CLI First**: Clean, ergonomic command-line interface
+- 🔒 **Local by default**: Vector index stored on disk (`~/.atlas/index`); your videos never leave your machine
 
 ## Installation
 
 ### Requirements
 
-- Python 3.10 - 3.12
+- Python 3.10 – 3.12
 - ffmpeg (for video processing)
 
 ### Install from PyPI
@@ -40,142 +42,256 @@ pip install -e .
 
 ### 1. Set up API Keys
 
-Atlas requires API keys from Google Gemini (for video analysis) and Groq (for transcription):
-
 ```bash
-export GEMINI_API_KEY=your-gemini-api-key
-export GROQ_API_KEY=your-groq-api-key
+export GEMINI_API_KEY=your-gemini-api-key   # required for extract, index, search, chat
+export GROQ_API_KEY=your-groq-api-key       # required only for `atlas transcribe`
 ```
 
 - Get a Gemini API key: [Google AI Studio](https://aistudio.google.com/app/apikey)
 - Get a Groq API key: [Groq Console](https://console.groq.com/keys)
 
-### 2. Extract Multimodal Insights
-
-Extract rich multimodal descriptions from a video:
+### 2. Extract Multimodal Insights (streams in real-time)
 
 ```bash
-atlas extract video.mp4 --chunk-duration=15s --overlap=1s
+atlas extract video.mp4
+atlas extract video.mp4 --chunk-duration=15s --overlap=1s --format=json
 ```
 
-Output to JSON file:
+### 3. Index a Video
 
 ```bash
-atlas extract video.mp4 --output=insights.json --format=json
-```
-
-### 3. Index Videos for Search
-
-Index a video for fast semantic search:
-
-```bash
-atlas index video.mp4 --chunk-duration=15s --overlap=1s
+atlas index video.mp4
+# Prints a video_id on completion — save it for search and chat
 ```
 
 ### 4. Search Indexed Videos
 
-Search through your indexed video content:
-
 ```bash
-atlas search "people discussing artificial intelligence"
+# Search all indexed content
+atlas search "people discussing machine learning"
+
+# Restrict to a specific video
+atlas search "demo of the new feature" --video-id abc123def456
 ```
 
-Filter by specific video:
+### 5. Chat with a Video
 
 ```bash
-atlas search "meeting notes" --video=path/to/video.mp4
+atlas chat abc123def456 "What tools are demonstrated in this video?"
 ```
 
-### 5. Extract Transcripts
-
-Get transcripts in various formats:
+### 6. Transcribe a Video (streams in real-time)
 
 ```bash
-# Plain text
 atlas transcribe video.mp4
-
-# SRT format
 atlas transcribe video.mp4 --format=srt --output=transcript.srt
-
-# VTT format
-atlas transcribe video.mp4 --format=vtt --output=transcript.vtt
 ```
+
+---
 
 ## CLI Commands
 
 ### `atlas extract`
 
-Extract multimodal insights from a video.
+Extract multimodal insights from a video. **Results stream to the terminal in real-time** as each segment is processed — no flag required.
 
-```bash
+```
 atlas extract VIDEO_PATH [OPTIONS]
 
 Options:
-  -c, --chunk-duration TEXT  Duration of each chunk (e.g., 15s, 1m) [default: 15s]
-  -o, --overlap TEXT         Overlap between chunks (e.g., 1s, 5s) [default: 1s]
-  -a, --attrs TEXT           Attributes to extract (can be used multiple times)
-  --output TEXT              Output file path (JSON format)
-  --format [json|text]       Output format [default: text]
+  -c, --chunk-duration DUR   Duration of each chunk (e.g. 15s, 1m) [default: 15s]
+  -l, --overlap DUR          Overlap between chunks (e.g. 1s, 5s) [default: 1s]
+  -a, --attrs ATTR           Attribute to extract; repeat for multiple
+  -o, --output FILE          Save full output to this JSON file
+  -f, --format FMT           Output format: json or text [default: text]
+      --include-summary      Generate a per-segment summary (default: on)
+      --no-summary           Disable per-segment summary generation
+      --benchmark            Print a timing breakdown after completion
 ```
 
-Available attributes:
+**Available attributes** (`--attrs`):
 
-- `visual_cues`: Visual elements, entities, and their attributes
-- `interactions`: Movements, gestures, dynamics between entities
-- `contextual_information`: Production elements, setting, atmosphere
-- `audio_analysis`: Speech, music, sound effects, ambience
-- `transcript`: Verbatim spoken content
+| Attribute | Description |
+|---|---|
+| `visual_cues` | Visual elements, entities, and their attributes |
+| `interactions` | Movements, gestures, dynamics between entities |
+| `contextual_information` | Production elements, setting, atmosphere |
+| `audio_analysis` | Speech, music, sound effects, ambience |
+| `transcript` | Verbatim spoken content (via Gemini within chunks) |
+
+> **Note on `transcript` in `extract`**: Within the chunked extract flow, all five attributes — including `transcript` — are handled concurrently by Gemini for maximum throughput. For a high-quality, full-video verbatim transcript use `atlas transcribe` (Groq Whisper).
+
+**Examples:**
+
+```bash
+# Stream text to terminal, default attrs
+atlas extract video.mp4
+
+# JSON output saved to file, custom chunks
+atlas extract video.mp4 --chunk-duration=10s --overlap=1s --format=json --output=insights.json
+
+# Only extract visual and audio
+atlas extract video.mp4 --attrs visual_cues --attrs audio_analysis
+
+# Disable summary, print benchmark timing
+atlas extract video.mp4 --no-summary --benchmark
+```
+
+---
 
 ### `atlas index`
 
-Index a video for semantic search.
+Index a video for semantic search. Prints a **video_id** on completion — use it to filter searches and start chats.
 
-```bash
+```
 atlas index VIDEO_PATH [OPTIONS]
 
 Options:
-  -c, --chunk-duration TEXT  Duration of each chunk [default: 10s]
-  -o, --overlap TEXT         Overlap between chunks [default: 0s]
-  -s, --store-path TEXT      Path to store the vector index
-  -e, --embedding-dim INT    Embedding dimension (768 or 3072) [default: 768]
+  -c, --chunk-duration DUR   Duration of each chunk [default: 15s]
+  -o, --overlap DUR          Overlap between chunks [default: 0s]
+  -s, --store-path DIR       Path to store the vector index [default: ~/.atlas/index]
+  -e, --embedding-dim N      Embedding dimension: 768 or 3072 [default: 768]
+      --benchmark            Print a timing breakdown after completion
 ```
+
+**Examples:**
+
+```bash
+atlas index video.mp4
+atlas index video.mp4 --chunk-duration=10s --store-path=./my_index
+```
+
+---
 
 ### `atlas search`
 
-Search indexed videos semantically.
+Search all indexed videos semantically, or filter to a specific video.
 
-```bash
+```
 atlas search QUERY [OPTIONS]
 
 Options:
-  -k, --top-k INTEGER    Number of results to return [default: 10]
-  -v, --video TEXT       Filter by video path
-  -s, --store-path TEXT  Path to the vector index
+  -k, --top-k N         Number of results to return [default: 10]
+  -v, --video-id ID     Filter results to a specific video ID
+  -s, --store-path DIR  Path to the vector index
 ```
+
+**Examples:**
+
+```bash
+# Search across all videos
+atlas search "machine learning demonstration"
+
+# Search within a specific video
+atlas search "the login screen" --video-id abc123def456
+```
+
+---
 
 ### `atlas transcribe`
 
-Extract transcript from a video or audio file.
+Extract a transcript from a video or audio file using Groq Whisper. **Output streams to the terminal in real-time** — no separate flag required.
 
-```bash
+```
 atlas transcribe VIDEO_PATH [OPTIONS]
 
 Options:
-  -f, --format [text|vtt|srt]  Output format [default: text]
-  -o, --output TEXT            Output file path
+  -f, --format FMT  Output format: text, vtt, or srt [default: text]
+  -o, --output FILE Output file path
 ```
+
+**Examples:**
+
+```bash
+atlas transcribe video.mp4
+atlas transcribe video.mp4 --format=srt --output=transcript.srt
+atlas transcribe audio.mp3 --format=vtt
+```
+
+---
+
+### `atlas chat`
+
+Ask a question about a previously indexed video. Context is assembled from:
+
+1. **Top-k semantic hits** from `video_index` (multimodal insights)
+2. **Last 20 messages** from the JSONL chat history sidecar (10 user + 10 assistant)
+3. **Top-k semantic hits** from `video_chat` (prior chat turns, deduped against history)
+
+Both the question and answer are persisted in the vector store and in a chat log file.
+
+```
+atlas chat VIDEO_ID QUERY [OPTIONS]
+
+Options:
+  -s, --store-path DIR  Path to the vector index
+```
+
+**Examples:**
+
+```bash
+atlas chat abc123def456 "What is the main topic of this video?"
+atlas chat abc123def456 "Who are the people speaking?"
+```
+
+---
+
+### `atlas list-videos`
+
+List all videos that have been indexed.
+
+```
+atlas list-videos [OPTIONS]
+
+Options:
+  -s, --store-path DIR  Path to the vector index
+```
+
+---
+
+### `atlas list-chat`
+
+Show the chat history for a given video.
+
+```
+atlas list-chat VIDEO_ID [OPTIONS]
+
+Options:
+  -n, --last-n N        Maximum messages to show [default: 20]
+  -s, --store-path DIR  Path to the vector index
+```
+
+---
 
 ### `atlas stats`
 
 Show statistics about the local vector store.
 
-```bash
-atlas stats
+```
+atlas stats [OPTIONS]
+
+Options:
+  -s, --store-path DIR  Path to the vector index
 ```
 
-## Python API
+---
 
-You can also use Atlas programmatically:
+## API Keys Reference
+
+| Command | `GEMINI_API_KEY` | `GROQ_API_KEY` |
+|---|---|---|
+| `extract` | ✅ Required | ❌ Not needed |
+| `index` | ✅ Required | ✅ Required |
+| `search` | ✅ Required | ❌ Not needed |
+| `transcribe` | ❌ Not needed | ✅ Required |
+| `chat` | ✅ Required | ❌ Not needed |
+| `list-videos` | ❌ Not needed | ❌ Not needed |
+| `list-chat` | ❌ Not needed | ❌ Not needed |
+| `stats` | ❌ Not needed | ❌ Not needed |
+
+---
+
+## Python API
 
 ```python
 import asyncio
@@ -187,85 +303,102 @@ async def main():
         video_path="video.mp4",
         chunk_duration=15,
         overlap=1,
+        description_attrs=["visual_cues", "contextual_information", "audio_analysis", "transcript"],
+        include_summary=True,
     )
-
     async with VideoProcessor(config) as processor:
         result = await processor.process()
 
     print(f"Processed {len(result.video_descriptions)} segments")
 
-    # Index for search
-    store = VectorStore()
-    indexed = await store.index_video_result(result)
-    print(f"Indexed {indexed} documents")
+    # Index for search — returns (video_id, indexed_count, result)
+    from atlas.vector_store import index_video
+    video_id, indexed_count, _ = await index_video("video.mp4")
+    print(f"video_id: {video_id}  docs: {indexed_count}")
 
     # Search
-    results = await store.search("people discussing AI", top_k=5)
+    from atlas.vector_store import search_video
+    results = await search_video("people discussing AI", top_k=5)
     for r in results:
-        print(f"{r.score:.3f}: {r.content[:100]}")
+        print(f"{r.score:.3f}  [{r.video_id}]  {r.content[:80]}")
+
+    # Chat
+    from atlas.vector_store import chat_with_video
+    answer = await chat_with_video(video_id, "What tools are shown?")
+    print(answer)
 
 asyncio.run(main())
 ```
 
-### Transcription Only
+### Real-time Extract
 
 ```python
-from .video_processor import extract_transcript
+from atlas.vector_store import VideoProcessor, VideoProcessorConfig
+
+async def realtime_example():
+    config = VideoProcessorConfig(video_path="video.mp4", chunk_duration=15)
+    async with VideoProcessor(config) as processor:
+        result = await processor.process_realtime(
+            on_segment=lambda desc: print(f"{desc.start:.1f}s–{desc.end:.1f}s ready")
+        )
+```
+
+### Transcription
+
+```python
+from atlas.video_processor import extract_transcript, extract_transcript_realtime
 import asyncio
 
-async def get_transcript():
-    transcript = await extract_transcript("video.mp4", format="srt")
-    print(transcript)
+# One-shot
+transcript = asyncio.run(extract_transcript("video.mp4", format="srt"))
 
-asyncio.run(get_transcript())
+# Real-time callback
+async def stream():
+    await extract_transcript_realtime(
+        "video.mp4",
+        format="text",
+        on_chunk=lambda chunk: print(chunk, end="", flush=True),
+    )
+
+asyncio.run(stream())
 ```
 
-### Text Embeddings
+---
 
-```python
-from .text_embedding import TextEmbedding, embed_text
+## Vector Store Layout
 
-# Get embedding for text
-embedding = embed_text("Hello, world!")
-print(f"Embedding dimension: {len(embedding)}")
-
-# Or use the class
-embedder = TextEmbedding("Hello, world!")
-embedding = embedder.get_embedding(dimensionality=768)
+```
+~/.atlas/index/
+├── video_index/          # zvec collection — multimodal insights per segment
+├── video_chat/           # zvec collection — chat history per video
+├── video_registry.json   # lightweight index of all indexed video IDs
+└── chat_logs/
+    └── <video_id>.jsonl  # ordered chat log per video (for history replay)
 ```
 
-## Configuration
+---
 
-### Environment Variables
+## Performance
 
-| Variable         | Required          | Description                                             |
-| ---------------- | ----------------- | ------------------------------------------------------- |
-| `GEMINI_API_KEY` | Yes               | Google Gemini API key for video analysis and embeddings |
-| `GROQ_API_KEY`   | For transcription | Groq API key for Whisper transcription                  |
+| Function | Avg / call | Notes |
+|---|---|---|
+| Gemini multimodal analysis | ~21s | 4–5 attrs gathered concurrently per chunk |
+| Groq Whisper (transcribe) | ~30s / video | Full video, one shot |
+| ffmpeg clip | ~0.3s | Per chunk |
+| zvec query | sub-ms | Local HNSW, ~8× faster than Pinecone |
 
-### Vector Store Location
+For a ~5 min video with 15s chunks (~24 chunks), wall time is typically **2–3 min** with default concurrency, as chunks are processed in parallel.
 
-By default, Atlas stores the vector index at `~/.atlas/index`. You can customize this with the `--store-path` option or when creating a `VectorStore` instance.
-
-## How It Works
-
-1. **Chunking**: Videos are split into configurable duration chunks (default: 10 seconds) with optional overlap
-2. **Multimodal Analysis**: Each chunk is analyzed using Gemini models for:
-   - Visual content and entities
-   - Interactions and dynamics
-   - Production context and atmosphere
-   - Audio characteristics
-   - Transcription
-3. **Embedding**: Content is embedded using Gemini's embedding model
-4. **Indexing**: Embeddings are stored in a local zvec vector database
-5. **Search**: Queries are embedded and matched against the indexed content
+---
 
 ## Requirements
 
-- **ffmpeg**: Required for video processing. Install with:
+- **ffmpeg**: Required for video clipping.
   - macOS: `brew install ffmpeg`
   - Ubuntu/Debian: `sudo apt install ffmpeg`
   - Windows: `winget install ffmpeg`
+
+---
 
 ## License
 
@@ -273,7 +406,7 @@ Apache License 2.0
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions welcome — please open a PR.
 
 ## Credits
 

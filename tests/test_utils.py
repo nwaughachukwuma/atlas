@@ -9,10 +9,10 @@ from unittest.mock import patch
 
 import pytest
 
+from src.atlas.media_manager import MediaFileManager
 from src.atlas.utils import (
     ChunkSlot,
     MediaChunk,
-    MediaFileManager,
     RetryConfig,
     TempPath,
     VideoAttrAnalysis,
