@@ -36,7 +36,6 @@ classifiers = [
     "Topic :: Text Processing :: Linguistic",
 ]
 dependencies = [
-    "click>=8.0.0",
     "pydantic>=2.0.0",
     "google-genai>=1.0.0",
     "groq>=0.4.0",
@@ -60,10 +59,10 @@ dev = [
 atlas = "atlas.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/veedoai/atlas"
-Documentation = "https://github.com/veedoai/atlas#readme"
-Repository = "https://github.com/veedoai/atlas"
-Issues = "https://github.com/veedoai/atlas/issues"
+Homepage = "https://github.com/nwaughachukwuma/atlas"
+Documentation = "https://github.com/nwaughachukwuma/atlas#readme"
+Repository = "https://github.com/nwaughachukwuma/atlas"
+Issues = "https://github.com/nwaughachukwuma/atlas/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/atlas"]
@@ -86,9 +85,6 @@ relative-imports-order = "closest-to-furthest"
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
-
-[tool.pylint]
-max-line-length = 120
 
 [tool.mypy]
 ignore_missing_imports = false

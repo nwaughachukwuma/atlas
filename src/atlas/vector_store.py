@@ -2,20 +2,100 @@
 Vector store using zvec for local vector search
 """
 
+from __future__ import annotations
+
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional, List
+from typing import TYPE_CHECKING, Any, List, Optional
 
-import zvec
-from zvec import Collection
 from pydantic import BaseModel
 
-from .text_embedding import embed_text_async
 from .utils import logger
-from .video_processor import VideoDescription, VideoProcessorResult
 from .uuid import uuid
-from .video_processor import VideoProcessor, VideoProcessorConfig
+
+if TYPE_CHECKING:
+    from zvec import Collection
+
+    from .video_processor import VideoDescription, VideoProcessorResult
+
+
+# ---------------------------------------------------------------------------
+# Helpers — zvec symbols resolved lazily so the heavy C-extension is only
+# imported when an actual index operation (not --help / --version) runs.
+# ---------------------------------------------------------------------------
+
+
+def _open_collection(path: str) -> "Collection":
+    import zvec
+
+    return zvec.open(path=path)  # type: ignore[attr-defined]
+
+
+def _create_collection(path: str, schema) -> "Collection":
+    import zvec
+
+    return zvec.create_and_open(path=path, schema=schema)
+
+
+def _make_schema(collection_name: str, embedding_dim: int):
+    from zvec import (
+        CollectionSchema,
+        DataType,
+        FieldSchema,
+        HnswIndexParam,
+        InvertIndexParam,
+        MetricType,
+        VectorSchema,
+    )
+
+    return CollectionSchema(
+        name=collection_name,
+        vectors=VectorSchema(
+            name="embedding",
+            data_type=DataType.VECTOR_FP32,
+            dimension=embedding_dim,
+            index_param=HnswIndexParam(metric_type=MetricType.COSINE),
+        ),
+        fields=[
+            FieldSchema(
+                "video_path",
+                DataType.STRING,
+                index_param=InvertIndexParam(enable_extended_wildcard=False),
+            ),
+            FieldSchema("start", DataType.FLOAT),
+            FieldSchema("end", DataType.FLOAT),
+            FieldSchema("content", DataType.STRING),
+            FieldSchema("metadata", DataType.STRING),
+        ],
+    )
+
+
+def _make_doc(doc_id: str, embedding: list, video_path: str, start: float, end: float, content: str, metadata: dict):
+    from zvec import Doc
+
+    return Doc(
+        id=doc_id,
+        vectors={"embedding": embedding},
+        fields={
+            "video_path": video_path,
+            "start": start,
+            "end": end,
+            "content": content,
+            "metadata": json.dumps(metadata),
+        },
+    )
+
+
+def _make_vector_query(embedding: list):
+    from zvec import VectorQuery
+
+    return VectorQuery("embedding", vector=embedding)
+
+
+# ---------------------------------------------------------------------------
+# Models
+# ---------------------------------------------------------------------------
 
 
 class IndexDocument(BaseModel):
@@ -42,6 +122,11 @@ class SearchResult(BaseModel):
     metadata: dict[str, Any] = {}
 
 
+# ---------------------------------------------------------------------------
+# VectorStore
+# ---------------------------------------------------------------------------
+
+
 class VectorStore:
     """Local vector store using zvec"""
 
@@ -56,50 +141,32 @@ class VectorStore:
         """
         self.store_path = Path(store_path or Path.home() / ".atlas" / "index")
         self.embedding_dim = embedding_dim
-        self._collection: Optional[Collection] = None
+        self._collection: Optional["Collection"] = None
 
     @property
-    def collection(self) -> Collection:
+    def collection(self) -> "Collection":
         """Get or create the zvec collection"""
         if self._collection is None:
-            self._ensure_store_path()
+            self.store_path.parent.mkdir(parents=True, exist_ok=True)
             self._collection = self.get_collection()
         return self._collection
 
-    def _ensure_store_path(self) -> None:
-        """Ensure store directory exists"""
-        self.store_path.parent.mkdir(parents=True, exist_ok=True)
-
-    def get_collection(self) -> Collection:
+    def get_collection(self) -> "Collection":
         """Create or open zvec collection"""
-        schema = zvec.CollectionSchema(
-            name=self.COLLECTION_NAME,
-            vectors=zvec.VectorSchema(
-                name="embedding",
-                data_type=zvec.DataType.VECTOR_FP32,
-                dimension=self.embedding_dim,
-                index_param=zvec.HnswIndexParam(metric_type=zvec.MetricType.COSINE),
-            ),
-            fields=[
-                zvec.FieldSchema("video_path", zvec.DataType.STRING, index_param=zvec.InvertIndexParam(enable_extended_wildcard=False),),
-                zvec.FieldSchema("start", zvec.DataType.FLOAT),
-                zvec.FieldSchema("end", zvec.DataType.FLOAT),
-                zvec.FieldSchema("content", zvec.DataType.STRING),
-                zvec.FieldSchema("metadata", zvec.DataType.STRING),
-            ],
-        )
         if self.store_path.exists():
             try:
-                return zvec.open(path=str(self.store_path))
+                return _open_collection(str(self.store_path))
             except Exception:
                 pass
-        return zvec.create_and_open(path=str(self.store_path), schema=schema)
+
+        schema = _make_schema(self.COLLECTION_NAME, self.embedding_dim)
+        return _create_collection(str(self.store_path), schema)
 
     def _doc_id(self) -> str:
         """Create a unique document ID"""
         return uuid(16)
 
-    def _create_searchable_content(self, description: VideoDescription) -> str:
+    def _create_searchable_content(self, description: "VideoDescription") -> str:
         """Create searchable content from video description"""
         parts = []
         for analysis in description.video_analysis:
@@ -109,7 +176,7 @@ class VectorStore:
 
     async def index_video_result(
         self,
-        result: VideoProcessorResult,
+        result: "VideoProcessorResult",
         batch_size=10,
     ) -> int:
         """Index video processor result
@@ -119,6 +186,8 @@ class VectorStore:
         Returns:
             Number of documents indexed
         """
+        from .text_embedding import embed_text_async
+
         documents: list[IndexDocument] = []
         video_path = result.video_path
         for desc in result.video_descriptions:
@@ -169,16 +238,14 @@ class VectorStore:
         for i in range(0, len(documents), batch_size):
             batch = documents[i : i + batch_size]
             zvec_docs = [
-                zvec.Doc(
-                    id=doc.id,
-                    vectors={"embedding": doc.embedding},
-                    fields={
-                        "video_path": doc.video_path,
-                        "start": doc.start,
-                        "end": doc.end,
-                        "content": doc.content,
-                        "metadata": json.dumps(doc.metadata),
-                    },
+                _make_doc(
+                    doc.id,
+                    doc.embedding,
+                    doc.video_path,
+                    doc.start,
+                    doc.end,
+                    doc.content,
+                    doc.metadata,
                 )
                 for doc in batch
             ]
@@ -205,11 +272,12 @@ class VectorStore:
         Returns:
             List of search results
         """
+        from .text_embedding import embed_text_async
+
         query_embedding = await embed_text_async(query, self.embedding_dim)
         try:
-            vector_query = zvec.VectorQuery("embedding", vector=query_embedding)
+            vector_query = _make_vector_query(query_embedding)
             if video_filter:
-                # Apply video filter if specified
                 results = self.collection.query(vector_query, topk=top_k, filter=f"video_path == {video_filter}")
             else:
                 results = self.collection.query(vector_query, topk=top_k)
@@ -257,7 +325,13 @@ class VectorStore:
             "store_path": str(self.store_path),
             "embedding_dim": self.embedding_dim,
             "collection_name": self.COLLECTION_NAME,
+            "col_stats": self.collection.stats,
         }
+
+
+# ---------------------------------------------------------------------------
+# Convenience functions
+# ---------------------------------------------------------------------------
 
 
 async def index_video(
@@ -265,7 +339,7 @@ async def index_video(
     chunk_duration: int = 10,
     overlap: int = 0,
     store_path: Optional[str] = None,
-) -> tuple[int, VideoProcessorResult]:
+) -> tuple[int, "VideoProcessorResult"]:
     """Process and index a video
     Args:
         video_path: Path to the video file
@@ -275,6 +349,8 @@ async def index_video(
     Returns:
         Tuple of (number of documents indexed, processing result)
     """
+    from .video_processor import VideoProcessor, VideoProcessorConfig
+
     config = VideoProcessorConfig(
         video_path=video_path,
         chunk_duration=chunk_duration,

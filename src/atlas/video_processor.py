@@ -8,6 +8,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 from .gemini_client import GeminiMediaEngine
+from .media_manager import MediaFileManager
 from .prompts import VideoPrompt, video_analysis_prompts, video_system_prompt
 from .transcript import ProcessTranscript
 from .utils import (
@@ -15,7 +16,6 @@ from .utils import (
     ChunkSlot,
     DescriptionAttr,
     MediaChunk,
-    MediaFileManager,
     RetryConfig,
     TempPath,
     VideoAttrAnalysis,

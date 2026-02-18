@@ -2,25 +2,30 @@
 Gemini API client for video analysis
 """
 
+from __future__ import annotations
+
 import asyncio
 import os
-from typing import Optional
-
-from google import genai
-from google.genai import types
+from typing import TYPE_CHECKING, Optional
 
 from .utils import RetryConfig, logger, process_time, retry
+
+if TYPE_CHECKING:
+    from google import genai
+    from google.genai import types as genai_types
 
 
 class GeminiClient:
     """Client for Google Gemini API"""
 
-    _client: Optional[genai.Client] = None
+    _client: Optional["genai.Client"] = None
 
     @classmethod
-    def get_client(cls) -> genai.Client:
-        """Get Gemini client"""
+    def get_client(cls) -> "genai.Client":
+        """Get Gemini client (lazy-initialised on first use)."""
         if cls._client is None:
+            from google import genai
+
             api_key = os.environ.get("GEMINI_API_KEY")
             if not api_key:
                 raise ValueError("GEMINI_API_KEY environment variable is required")
@@ -41,27 +46,31 @@ class GeminiMediaEngine:
 
     @process_time()
     @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))
-    async def upload_file_async(self, file_path: str) -> types.File:
+    async def upload_file_async(self, file_path: str) -> "genai_types.File":
         """Upload a file to Gemini asynchronously"""
         return await asyncio.to_thread(self.client.files.upload, file=file_path)
 
     @process_time()
     @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))
-    async def fetch_file_part(self, file_path: str, mime_type: str) -> types.Part:
+    async def fetch_file_part(self, file_path: str, mime_type: str) -> "genai_types.Part":
         """Upload and retrieve a file part"""
         file = await self.upload_file_async(file_path)
         if not file.uri:
             raise Exception("Couldn't retrieve file uri")
+        from google.genai import types
+
         return types.Part.from_uri(file_uri=file.uri, mime_type=mime_type)
 
     @process_time()
     @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))
-    async def get_file_part(self, file_path: str, mime_type: str) -> types.Part:
+    async def get_file_part(self, file_path: str, mime_type: str) -> "genai_types.Part":
         """
         Get file part from bytes
         """
 
         def handler():
+            from google.genai import types
+
             with open(file_path, "rb") as f:
                 data = f.read()
             return types.Part.from_bytes(data=data, mime_type=mime_type)
@@ -71,11 +80,12 @@ class GeminiMediaEngine:
     @process_time()
     async def describe_media_from_file(
         self,
-        file_part: types.Part,
+        file_part: "genai_types.Part",
         system_prompt: str,
         prompt: str = "Now, describe the video.",
     ) -> str:
         """Describe audio/video media file using Gemini"""
+        from google.genai import types
 
         @retry(RetryConfig(max_retries=1, delay=3, backoff=1.5))
         def _handler(model_name: str) -> str:
@@ -107,6 +117,7 @@ class GeminiMediaEngine:
         model: str = "gemini-2.5-flash-lite",
     ) -> str:
         """Generate text using Gemini"""
+        from google.genai import types
 
         @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))
         def _handler() -> str:

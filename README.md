@@ -111,8 +111,8 @@ Extract multimodal insights from a video.
 atlas extract VIDEO_PATH [OPTIONS]
 
 Options:
-  -c, --chunk-duration TEXT  Duration of each chunk (e.g., 15s, 1m) [default: 10s]
-  -o, --overlap TEXT         Overlap between chunks (e.g., 1s, 5s) [default: 0s]
+  -c, --chunk-duration TEXT  Duration of each chunk (e.g., 15s, 1m) [default: 15s]
+  -o, --overlap TEXT         Overlap between chunks (e.g., 1s, 5s) [default: 1s]
   -a, --attrs TEXT           Attributes to extract (can be used multiple times)
   --output TEXT              Output file path (JSON format)
   --format [json|text]       Output format [default: text]

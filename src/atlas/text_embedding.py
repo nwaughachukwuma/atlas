@@ -2,12 +2,11 @@
 Text embedding using Gemini API
 """
 
+from __future__ import annotations
+
 import asyncio
 
-from google.genai import types
-
 from .utils import logger
-from .gemini_client import GeminiClient
 
 
 class TextEmbedding:
@@ -15,7 +14,18 @@ class TextEmbedding:
 
     def __init__(self, content: str):
         self.content = content
-        self.client = GeminiClient.get_client()
+        self._client = None
+
+    @property
+    def client(self):
+        """
+        Get Gemini client
+        """
+        if self._client is None:
+            from .gemini_client import GeminiClient
+
+            self._client = GeminiClient.get_client()
+        return self._client
 
     def get_embedding(self, dimensionality: int = 768) -> list[float]:
         """Get text embedding using Gemini embedding model
@@ -24,6 +34,8 @@ class TextEmbedding:
         Returns:
             List of embedding values
         """
+        from google.genai import types
+
         try:
             result = self.client.models.embed_content(
                 model="gemini-embedding-001",
