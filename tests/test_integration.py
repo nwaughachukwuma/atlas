@@ -21,7 +21,7 @@ class TestVideoIndexIntegration:
     """Integration tests for VideoIndex with zvec"""
 
     @pytest.fixture
-    def temp_index_path(self, tmp_path):
+    def temp_col_path(self, tmp_path):
         return tmp_path / "video_index"
 
     @pytest.fixture
@@ -40,21 +40,21 @@ class TestVideoIndexIntegration:
             video_descriptions=[desc],
         )
 
-    def test_initialization(self, temp_index_path):
-        vi = VideoIndex(index_path=temp_index_path)
+    def test_initialization(self, temp_col_path):
+        vi = VideoIndex(col_path=temp_col_path)
         assert vi.embedding_dim == 768
-        # index_path is not created until first collection access
-        assert not temp_index_path.exists()
+        # col_path is not created until first collection access
+        assert not temp_col_path.exists()
 
-    def test_registry_starts_empty(self, temp_index_path):
-        vi = VideoIndex(index_path=temp_index_path)
+    def test_registry_starts_empty(self, temp_col_path):
+        vi = VideoIndex(col_path=temp_col_path)
         assert vi.list_videos() == []
 
     @pytest.mark.asyncio
-    async def test_index_and_search_flow(self, temp_index_path, sample_video_result: VideoProcessorResult, monkeypatch):
+    async def test_index_and_search_flow(self, temp_col_path, sample_video_result: VideoProcessorResult, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
 
-        vi = VideoIndex(index_path=temp_index_path)
+        vi = VideoIndex(col_path=temp_col_path)
         video_id = "test_video_id_001"
         mock_embedding = [0.1] * 768
 

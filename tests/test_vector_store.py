@@ -160,26 +160,26 @@ class TestVideoIndex:
     """Tests for VideoIndex collection class"""
 
     def test_initialization(self, tmp_path):
-        vi = VideoIndex(index_path=tmp_path / "video_index")
+        vi = VideoIndex(col_path=tmp_path / "video_index")
         assert vi.embedding_dim == 768
-        assert vi.index_path == tmp_path / "video_index"
+        assert vi.col_path == tmp_path / "video_index"
 
     def test_custom_embedding_dim(self, tmp_path):
-        vi = VideoIndex(index_path=tmp_path / "vi", embedding_dim=3072)
+        vi = VideoIndex(col_path=tmp_path / "vi", embedding_dim=3072)
         assert vi.embedding_dim == 3072
 
     def test_registry_path(self, tmp_path):
-        vi = VideoIndex(index_path=tmp_path / "video_index")
+        vi = VideoIndex(col_path=tmp_path / "video_index")
         assert vi._registry_path == tmp_path / "video_index" / "registry.json"
 
     def test_uuid(self, tmp_path):
-        vi = VideoIndex(index_path=tmp_path / "video_index")
+        vi = VideoIndex(col_path=tmp_path / "video_index")
         doc_id = vi._uuid()
         assert isinstance(doc_id, str)
         assert len(doc_id) == 16
 
     def test_create_searchable_content(self, tmp_path):
-        vi = VideoIndex(index_path=tmp_path / "video_index")
+        vi = VideoIndex(col_path=tmp_path / "video_index")
         analysis1 = VideoAttrAnalysis(attr="visual_cues", value="A person walking")
         analysis2 = VideoAttrAnalysis(attr="audio_analysis", value="Background music")
         desc = VideoDescription(
@@ -192,12 +192,12 @@ class TestVideoIndex:
         assert "AUDIO ANALYSIS: Background music" in content
 
     def test_list_videos_empty(self, tmp_path):
-        vi = VideoIndex(index_path=tmp_path / "video_index")
+        vi = VideoIndex(col_path=tmp_path / "video_index")
         assert vi.list_videos() == []
 
     def test_register_and_list(self, tmp_path):
-        vi = VideoIndex(index_path=tmp_path / "video_index")
-        vi.index_path.mkdir(parents=True, exist_ok=True)
+        vi = VideoIndex(col_path=tmp_path / "video_index")
+        vi.col_path.mkdir(parents=True, exist_ok=True)
         vi.register("vid_001")
         vi.register("vid_002")
         # Duplicate should be ignored
@@ -210,8 +210,8 @@ class TestVideoIndex:
         assert ids.count("vid_001") == 1
 
     def test_unregister(self, tmp_path):
-        vi = VideoIndex(index_path=tmp_path / "video_index")
-        vi.index_path.mkdir(parents=True, exist_ok=True)
+        vi = VideoIndex(col_path=tmp_path / "video_index")
+        vi.col_path.mkdir(parents=True, exist_ok=True)
         vi.register("vid_001")
         vi.register("vid_002")
         vi.unregister("vid_001")
@@ -222,7 +222,7 @@ class TestVideoIndex:
 
     def testdefault_video_index_helper(self, tmp_path):
         vi = default_video_index(store_path=str(tmp_path))
-        assert vi.index_path == tmp_path / "video_index"
+        assert vi.col_path == tmp_path / "video_index"
         assert vi.embedding_dim == 768
 
 
@@ -235,18 +235,18 @@ class TestVideoChat:
     """Tests for VideoChat collection class"""
 
     def test_initialization(self, tmp_path):
-        vc = VideoChat(index_path=tmp_path / "video_chat")
+        vc = VideoChat(col_path=tmp_path / "video_chat")
         assert vc.embedding_dim == 768
-        assert vc.index_path == tmp_path / "video_chat"
+        assert vc.col_path == tmp_path / "video_chat"
 
     def test_sidecar_path(self, tmp_path):
-        vc = VideoChat(index_path=tmp_path / "video_chat")
-        vc.index_path.mkdir(parents=True, exist_ok=True)
+        vc = VideoChat(col_path=tmp_path / "video_chat")
+        vc.col_path.mkdir(parents=True, exist_ok=True)
         path = vc._sidecar_path("vid_xyz")
         assert path == tmp_path / "video_chat" / "logs" / "vid_xyz.jsonl"
 
     def test_append_and_get_history(self, tmp_path):
-        vc = VideoChat(index_path=tmp_path / "video_chat")
+        vc = VideoChat(col_path=tmp_path / "video_chat")
         vc.append_to_history("vid_xyz", "user", "Hello, what is this video?")
         vc.append_to_history("vid_xyz", "assistant", "This video shows a park scene.")
 
@@ -257,12 +257,12 @@ class TestVideoChat:
         assert "park" in history[1]["content"]
 
     def test_get_history_empty(self, tmp_path):
-        vc = VideoChat(index_path=tmp_path / "video_chat")
+        vc = VideoChat(col_path=tmp_path / "video_chat")
         history = vc.get_history("nonexistent_video")
         assert history == []
 
     def test_get_history_last_n(self, tmp_path):
-        vc = VideoChat(index_path=tmp_path / "video_chat")
+        vc = VideoChat(col_path=tmp_path / "video_chat")
         for i in range(10):
             vc.append_to_history("vid_xyz", "user", f"Question {i}")
             vc.append_to_history("vid_xyz", "assistant", f"Answer {i}")
@@ -272,11 +272,11 @@ class TestVideoChat:
 
     def testdefault_video_chat_helper(self, tmp_path):
         vc = default_video_chat(store_path=str(tmp_path))
-        assert vc.index_path == tmp_path / "video_chat"
+        assert vc.col_path == tmp_path / "video_chat"
         assert vc.embedding_dim == 768
 
     def test_uuid(self, tmp_path):
-        vc = VideoChat(index_path=tmp_path / "video_chat")
+        vc = VideoChat(col_path=tmp_path / "video_chat")
         doc_id = vc._uuid()
         assert isinstance(doc_id, str)
         assert len(doc_id) == 16

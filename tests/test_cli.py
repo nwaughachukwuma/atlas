@@ -548,12 +548,12 @@ class TestCmdStats:
 
     def test_success(self):
         mock_vi = MagicMock()
-        mock_vi.index_path = Path("/tmp/vi")
+        mock_vi.col_path = Path("/tmp/vi")
         mock_vi.stats = {"count": 10}
         mock_vi.list_videos.return_value = []
 
         mock_vc = MagicMock()
-        mock_vc.index_path = Path("/tmp/vc")
+        mock_vc.col_path = Path("/tmp/vc")
         mock_vc.stats = {"count": 5}
 
         with (
@@ -565,12 +565,12 @@ class TestCmdStats:
     def test_stats_exception_handled_gracefully(self):
         """If .stats raises (e.g. zvec not available), the command still completes."""
         mock_vi = MagicMock()
-        mock_vi.index_path = Path("/tmp/vi")
+        mock_vi.col_path = Path("/tmp/vi")
         type(mock_vi).stats = property(lambda self: (_ for _ in ()).throw(RuntimeError("zvec unavail")))
         mock_vi.list_videos.return_value = []
 
         mock_vc = MagicMock()
-        mock_vc.index_path = Path("/tmp/vc")
+        mock_vc.col_path = Path("/tmp/vc")
         type(mock_vc).stats = property(lambda self: (_ for _ in ()).throw(RuntimeError("zvec unavail")))
 
         with (

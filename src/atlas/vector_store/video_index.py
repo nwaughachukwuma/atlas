@@ -79,14 +79,14 @@ class VideoIndex(BaseCollection):
     registry sidecar that tracks which video_ids have been indexed.
 
     Args:
-        index_path: Directory for this collection (e.g. ~/.atlas/index/video_index).
+        col_path: Directory for this collection (e.g. ~/.atlas/index/video_index).
         embedding_dim: Embedding dimension — 768 or 3072.
     """
 
     # Registry lives inside the collection directory
     @property
     def _registry_path(self) -> Path:
-        return self.index_path / "registry.json"
+        return self.col_path / "registry.json"
 
     # ------------------------------------------------------------------
     # Schema
@@ -346,7 +346,7 @@ DEFAULT_STORE_ROOT = Path.home() / ".atlas" / "index"
 def default_video_index(store_path: Optional[str] = None, embedding_dim: int = 768) -> VideoIndex:
     """Return a VideoIndex pointed at *store_path*/video_index (or the default root)."""
     root = Path(store_path) if store_path else DEFAULT_STORE_ROOT
-    return VideoIndex(index_path=root / "video_index", embedding_dim=embedding_dim)
+    return VideoIndex(col_path=root / "video_index", embedding_dim=embedding_dim)
 
 
 async def index_video(
@@ -380,7 +380,7 @@ async def index_video(
 
     vi = default_video_index(store_path, embedding_dim)
     video_id = uuid(16)
-    vi.index_path.mkdir(parents=True, exist_ok=True)
+    vi.col_path.mkdir(parents=True, exist_ok=True)
     indexed = await vi.index_video_result(result, video_id=video_id)
     vi.register(video_id)
     return video_id, indexed, result

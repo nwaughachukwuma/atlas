@@ -85,12 +85,12 @@ class BaseCollection(ABC):
     zvec CollectionSchema appropriate for their collection.
 
     Args:
-        index_path: Directory path for this collection.
+        col_path: Directory path for this collection.
         embedding_dim: Embedding dimension — 768 or 3072.
     """
 
-    def __init__(self, index_path: Path, embedding_dim=768) -> None:
-        self.index_path = index_path
+    def __init__(self, col_path: Path, embedding_dim=768) -> None:
+        self.col_path = col_path
         self.embedding_dim = embedding_dim
         self._collection: Optional["Collection"] = None
 
@@ -110,9 +110,9 @@ class BaseCollection(ABC):
     def collection(self) -> "Collection":
         """Lazily open or create the zvec collection on first access."""
         if self._collection is None:
-            self.index_path.mkdir(parents=True, exist_ok=True)
+            self.col_path.mkdir(parents=True, exist_ok=True)
             self._collection = get_or_create_collection(
-                str(self.index_path),
+                str(self.col_path),
                 self._build_schema(),
             )
         return self._collection

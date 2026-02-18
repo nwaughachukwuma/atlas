@@ -50,8 +50,8 @@ async def chat_with_video(
     # Derive per-collection paths from a shared root when provided
     if store_path:
         root = Path(store_path)
-        vi = VideoIndex(index_path=root / "video_index", embedding_dim=embedding_dim)
-        vc = VideoChat(index_path=root / "video_chat", embedding_dim=embedding_dim)
+        vi = VideoIndex(col_path=root / "video_index", embedding_dim=embedding_dim)
+        vc = VideoChat(col_path=root / "video_chat", embedding_dim=embedding_dim)
     else:
         vi = default_video_index(embedding_dim=embedding_dim)
         vc = default_video_chat(embedding_dim=embedding_dim)

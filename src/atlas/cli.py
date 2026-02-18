@@ -521,22 +521,11 @@ def _cmd_stats(args: argparse.Namespace) -> None:
     vi = default_video_index(store_path=store_path)
     vc = default_video_chat(store_path=store_path)
 
-    video_stats: object
-    chat_stats: object
-    try:
-        video_stats = vi.stats
-    except Exception as e:
-        video_stats = f"unavailable ({e})"
-    try:
-        chat_stats = vc.stats
-    except Exception as e:
-        chat_stats = f"unavailable ({e})"
-
     stats_data = {
-        "video_index_path": str(vi.index_path),
-        "video_index_stats": str(video_stats),
-        "chat_index_path": str(vc.index_path),
-        "chat_index_stats": str(chat_stats),
+        "video_col_path": str(vi.col_path),
+        "video_index_stats": str(vi.stats),
+        "chat_col_path": str(vc.col_path),
+        "chat_index_stats": str(vc.stats),
         "videos_indexed": str(len(vi.list_videos())),
     }
 
