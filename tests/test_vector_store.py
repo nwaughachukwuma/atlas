@@ -172,9 +172,9 @@ class TestVideoIndex:
         vi = VideoIndex(index_path=tmp_path / "video_index")
         assert vi._registry_path == tmp_path / "video_index" / "registry.json"
 
-    def test_new_id(self, tmp_path):
+    def test_uuid(self, tmp_path):
         vi = VideoIndex(index_path=tmp_path / "video_index")
-        doc_id = vi._new_id()
+        doc_id = vi._uuid()
         assert isinstance(doc_id, str)
         assert len(doc_id) == 16
 
@@ -275,8 +275,8 @@ class TestVideoChat:
         assert vc.index_path == tmp_path / "video_chat"
         assert vc.embedding_dim == 768
 
-    def test_new_id(self, tmp_path):
+    def test_uuid(self, tmp_path):
         vc = VideoChat(index_path=tmp_path / "video_chat")
-        doc_id = vc._new_id()
+        doc_id = vc._uuid()
         assert isinstance(doc_id, str)
         assert len(doc_id) == 16

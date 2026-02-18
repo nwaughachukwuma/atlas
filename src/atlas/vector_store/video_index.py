@@ -218,7 +218,7 @@ class VideoIndex(BaseCollection):
             embedding = await embed_text_async(content, self.embedding_dim)
             documents.append(
                 IndexDocument(
-                    id=self._new_id(),
+                    id=self._uuid(),
                     video_id=video_id,
                     start=desc.start,
                     end=desc.end,
@@ -238,7 +238,7 @@ class VideoIndex(BaseCollection):
                 analysis_embedding = await embed_text_async(analysis.value, self.embedding_dim)
                 documents.append(
                     IndexDocument(
-                        id=self._new_id(),
+                        id=self._uuid(),
                         video_id=video_id,
                         start=desc.start,
                         end=desc.end,

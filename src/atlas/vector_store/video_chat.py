@@ -203,7 +203,7 @@ class VideoChat(BaseCollection):
         from ..text_embedding import embed_text_async
 
         embedding = await embed_text_async(content, self.embedding_dim)
-        doc_id = self._new_id()
+        doc_id = self._uuid()
         metadata = {"timestamp": datetime.now().isoformat()}
         zvec_doc = self._make_doc(doc_id, embedding, video_id, role, content, metadata)
         self.collection.insert([zvec_doc])

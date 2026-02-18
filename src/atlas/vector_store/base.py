@@ -3,7 +3,7 @@ BaseCollection — shared zvec collection lifecycle and helpers.
 
 Subclasses (VideoIndex, VideoChat) inherit:
   • Lazy collection open/create via the ``collection`` property
-  • _new_id(), stats property
+  • _uuid(), stats property
   • Module-level zvec factory helpers (_open_collection, _create_collection,
     _get_or_create, _make_vector_query)
 
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 def _open_collection(path: str) -> "Collection":
     import zvec
 
-    return zvec.open(path=path)  # type: ignore[attr-defined]
+    return zvec.open(path=path)
 
 
 def _create_collection(path: str, schema) -> "Collection":
@@ -89,7 +89,7 @@ class BaseCollection(ABC):
         embedding_dim: Embedding dimension — 768 or 3072.
     """
 
-    def __init__(self, index_path: Path, embedding_dim: int = 768) -> None:
+    def __init__(self, index_path: Path, embedding_dim=768) -> None:
         self.index_path = index_path
         self.embedding_dim = embedding_dim
         self._collection: Optional["Collection"] = None
@@ -121,7 +121,7 @@ class BaseCollection(ABC):
     # Shared utilities
     # ------------------------------------------------------------------
 
-    def _new_id(self) -> str:
+    def _uuid(self) -> str:
         """Generate a random 16-character document ID."""
         return uuid(16)
 

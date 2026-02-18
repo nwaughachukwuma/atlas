@@ -510,6 +510,7 @@ def _cmd_list_chat(args: argparse.Namespace) -> None:
 
 
 def _cmd_stats(args: argparse.Namespace) -> None:
+    from rich import markup
     from rich.table import Table
 
     from .vector_store.video_chat import default_video_chat
@@ -544,7 +545,7 @@ def _cmd_stats(args: argparse.Namespace) -> None:
     table.add_column("Property", style="cyan")
     table.add_column("Value", style="green")
     for key, value in stats_data.items():
-        table.add_row(key, value)
+        table.add_row(key, markup.escape(value))
     console.print(table)
     _print_benchmark_summary()
 
