@@ -72,7 +72,7 @@ import zvec
 # Define collection schema
 schema = zvec.CollectionSchema(
     name="example",
-    vectors=zvec.VectorSchema("embedding", zvec.DataType.VECTOR_FP32, 4),
+    vectors=[zvec.VectorSchema("embedding", zvec.DataType.VECTOR_FP32, 4)]
 )
 
 # Create collection

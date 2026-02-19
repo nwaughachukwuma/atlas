@@ -70,6 +70,6 @@ def embed_text(content: str, dimensionality: int = 768) -> list[float]:
     return TextEmbedding(content).get_embedding(dimensionality)
 
 
-async def embed_text_async(content: str, dimensionality: int = 768) -> list[float]:
+async def embed_text_async(content: str, dimensionality=768) -> list[float]:
     """Convenience function to get text embedding asynchronously"""
     return await TextEmbedding(content).get_embedding_async(dimensionality)

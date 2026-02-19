@@ -188,11 +188,13 @@ def _cmd_extract(args: argparse.Namespace) -> None:
     overlap_sec = parse_duration(args.overlap)
     fmt: str = args.format
 
-    description_attrs: List[DescriptionAttr] = list(args.attrs) if args.attrs else DEFAULT_DESCRIPTION_ATTRS
-    valid_attrs: set = set(DEFAULT_DESCRIPTION_ATTRS)
-    for attr in description_attrs:
-        if attr not in valid_attrs:
-            _err(f"Invalid attribute: {attr!r} — valid: {', '.join(sorted(valid_attrs))}")
+    if args.attrs:
+        for attr in list(args.attrs):
+            if attr not in DEFAULT_DESCRIPTION_ATTRS:
+                _err(f"Invalid attribute: {attr!r} — valid: {', '.join(sorted(DEFAULT_DESCRIPTION_ATTRS))}")
+        description_attrs: List[DescriptionAttr] = list(args.attrs)
+    else:
+        description_attrs = DEFAULT_DESCRIPTION_ATTRS
 
     if fmt not in ("json", "text"):
         _err("--format must be 'json' or 'text'")
@@ -285,10 +287,19 @@ def _cmd_index(args: argparse.Namespace) -> None:
     async def _run():
         with _make_progress() as progress:
             task = progress.add_task("Processing and indexing video…", total=None)
+            from .utils import DEFAULT_DESCRIPTION_ATTRS
+
+            if description_attrs := list(args.attrs) if args.attrs else None:
+                for attr in description_attrs:
+                    if attr not in DEFAULT_DESCRIPTION_ATTRS:
+                        _err(f"Invalid attribute: {attr!r} — valid: {', '.join(sorted(DEFAULT_DESCRIPTION_ATTRS))}")
+
             video_id, indexed_count, result = await index_video(
                 video_path=video_path,
                 chunk_duration=chunk_sec,
                 overlap=overlap_sec,
+                description_attrs=description_attrs,
+                include_summary=args.include_summary,
                 store_path=args.store_path,
             )
             progress.update(task, completed=True)
@@ -658,6 +669,26 @@ def _build_parser() -> argparse.ArgumentParser:
         default=768,
         metavar="N",
         help="Embedding dimension: 768 or 3072 (default: 768).",
+    )
+    p_index.add_argument(
+        "--attrs",
+        "-a",
+        action="append",
+        metavar="ATTR",
+        help="Attribute to extract; repeat for multiple (visual_cues, interactions, contextual_information, audio_analysis, transcript).",
+    )
+    p_index.add_argument(
+        "--include-summary",
+        action="store_true",
+        default=True,
+        dest="include_summary",
+        help="Generate a summary for each segment (default: enabled).",
+    )
+    p_index.add_argument(
+        "--no-summary",
+        action="store_false",
+        dest="include_summary",
+        help="Disable per-segment summary generation.",
     )
     p_index.set_defaults(func=_cmd_index)
 

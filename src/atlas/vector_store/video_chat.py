@@ -18,12 +18,18 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel
 
 from .base import BaseCollection, build_base_vector_schema, make_vector_query
 from ..utils import logger
+
+# ---------------------------------------------------------------------------
+# Module-level convenience helper
+# ---------------------------------------------------------------------------
+
+DEFAULT_STORE_ROOT = Path.home() / ".atlas" / "index"
 
 COLLECTION_NAME = "video_chat"
 
@@ -42,7 +48,7 @@ class ChatDocument(BaseModel):
     video_id: str
     role: ChatRole
     content: str
-    embedding: list[float]
+    embedding: List[float]
     metadata: dict[str, Any] = {}
 
 
@@ -94,7 +100,7 @@ class VideoChat(BaseCollection):
 
         return CollectionSchema(
             name=COLLECTION_NAME,
-            vectors=build_base_vector_schema(self.embedding_dim),
+            vectors=[build_base_vector_schema(self.embedding_dim)],
             fields=[
                 FieldSchema(
                     "video_id",
@@ -119,11 +125,11 @@ class VideoChat(BaseCollection):
     def _make_doc(
         self,
         doc_id: str,
-        embedding: list,
+        embedding: List[float],
         video_id: str,
         role: str,
         content: str,
-        metadata: dict,
+        metadata: Dict,
     ):
         from zvec import Doc
 
@@ -154,7 +160,7 @@ class VideoChat(BaseCollection):
         with self._sidecar_path(video_id).open("a") as f:
             f.write(entry + "\n")
 
-    def get_history(self, video_id: str, last_n: int = 20) -> List[dict]:
+    def get_history(self, video_id: str, last_n=20) -> List[Dict]:
         """Return the *last_n* most recent messages in chronological order.
 
         Uses the JSONL sidecar for O(last_n) tail read rather than a full
@@ -205,7 +211,14 @@ class VideoChat(BaseCollection):
         embedding = await embed_text_async(content, self.embedding_dim)
         doc_id = self._uuid()
         metadata = {"timestamp": datetime.now().isoformat()}
-        zvec_doc = self._make_doc(doc_id, embedding, video_id, role, content, metadata)
+        zvec_doc = self._make_doc(
+            doc_id,
+            embedding,
+            video_id,
+            role,
+            content,
+            metadata,
+        )
         self.collection.insert([zvec_doc])
         self.collection.flush()
         return doc_id
@@ -254,8 +267,12 @@ class VideoChat(BaseCollection):
         query_embedding = await embed_text_async(query, self.embedding_dim)
         try:
             vector_query = make_vector_query(query_embedding)
-            filt = f"video_id == {video_id} AND role == {role}" if role else f"video_id == {video_id}"
-            results = self.collection.query(vector_query, topk=top_k, filter=filt)
+            filter = f"video_id == {video_id} AND role == {role}" if role else f"video_id == {video_id}"
+            results = self.collection.query(
+                vector_query,
+                topk=top_k,
+                filter=filter,
+            )
         except Exception as e:
             logger.error(f"Error querying video_chat: {e}")
             return []
@@ -273,14 +290,7 @@ class VideoChat(BaseCollection):
         ]
 
 
-# ---------------------------------------------------------------------------
-# Module-level convenience helper
-# ---------------------------------------------------------------------------
-
-DEFAULT_STORE_ROOT = Path.home() / ".atlas" / "index"
-
-
-def default_video_chat(store_path: Optional[str] = None, embedding_dim: int = 768) -> VideoChat:
+def default_video_chat(store_path: Optional[str] = None, embedding_dim=768) -> VideoChat:
     """Return a VideoChat pointed at *store_path*/video_chat (or the default root)."""
     root = Path(store_path) if store_path else DEFAULT_STORE_ROOT
-    return VideoChat(col_path=root / "video_chat", embedding_dim=embedding_dim)
+    return VideoChat(col_path=root / COLLECTION_NAME, embedding_dim=embedding_dim)
