@@ -232,7 +232,7 @@ def _cmd_extract(args: argparse.Namespace) -> None:
             include_summary=args.include_summary,
         )
         async with VideoProcessor(config) as processor:
-            result = await processor.process_realtime(_on_segment)
+            result = await processor.process(_on_segment)
         return result
 
     try:
@@ -359,11 +359,12 @@ def _cmd_search(args: argparse.Namespace) -> None:
 
 def _cmd_transcribe(args: argparse.Namespace) -> None:
     """Transcribe a video, streaming output to the terminal in real-time."""
+    from .transcript import ReturnValue
     from .utils import TempPath
-    from .video_processor import extract_transcript_realtime
+    from .video_processor import get_video_transcript
 
     console = get_console()
-    fmt: str = args.format
+    fmt: ReturnValue = args.format
     if fmt not in ("text", "vtt", "srt"):
         _err("--format must be 'text', 'vtt', or 'srt'")
 
@@ -374,19 +375,26 @@ def _cmd_transcribe(args: argparse.Namespace) -> None:
     console.print(f"[dim]Output format: {fmt}[/dim]\n")
 
     output_lines: list[str] = []
-    spinner_active = [True]
 
     def _on_chunk(text: str) -> None:
         """Called in real-time as each transcript chunk arrives."""
         output_lines.append(text)
         if not args.output:
-            print(text, end="", flush=True)
+            get_logger().info("transcribe._on_chunk: %s", text)
 
     async def _run():
-        return await extract_transcript_realtime(video_path, format=fmt, on_chunk=_on_chunk)
+        return await get_video_transcript(
+            video_path,
+            format=fmt,
+            on_chunk=_on_chunk,
+        )
 
     try:
-        final_result = asyncio.run(_run())
+        with _make_progress() as progress:
+            task = progress.add_task("Transcribing...", total=None)
+            final_result = asyncio.run(_run())
+            progress.update(task, completed=True)
+
         full_text = final_result or "".join(output_lines)
 
         if not full_text.strip():
@@ -447,8 +455,11 @@ def _cmd_list_videos(args: argparse.Namespace) -> None:
     from .vector_store.video_index import default_video_index
 
     console = get_console()
-    vi = default_video_index(store_path=args.store_path)
-    videos = vi.list_videos()
+    with _make_progress() as progress:
+        task = progress.add_task("Loading videos...", total=None)
+        vi = default_video_index(store_path=args.store_path)
+        videos = vi.list_videos()
+        progress.update(task, completed=True)
 
     if not videos:
         console.print("[yellow]No videos indexed yet.[/yellow]")
@@ -476,8 +487,11 @@ def _cmd_list_chat(args: argparse.Namespace) -> None:
 
     console = get_console()
     video_id: str = args.video_id
-    vc = default_video_chat(store_path=args.store_path)
-    history = vc.get_history(video_id, last_n=args.last_n)
+    with _make_progress() as progress:
+        task = progress.add_task("Loading chat history...", total=None)
+        vc = default_video_chat(store_path=args.store_path)
+        history = vc.get_history(video_id, last_n=args.last_n)
+        progress.update(task, completed=True)
 
     if not history:
         console.print(f"[yellow]No chat history for video_id=[/yellow][cyan]{video_id}[/cyan]")
@@ -511,8 +525,11 @@ def _cmd_stats(args: argparse.Namespace) -> None:
 
     console = get_console()
     store_path = getattr(args, "store_path", None)
-    vi = default_video_index(store_path=store_path)
-    vc = default_video_chat(store_path=store_path)
+    with _make_progress() as progress:
+        task = progress.add_task("Loading stats...", total=None)
+        vi = default_video_index(store_path=store_path)
+        vc = default_video_chat(store_path=store_path)
+        progress.update(task, completed=True)
 
     stats_data = {
         "video_col_path": str(vi.col_path),

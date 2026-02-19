@@ -7,7 +7,7 @@ from __future__ import annotations
 import asyncio
 import os
 from dataclasses import dataclass
-from typing import Literal, TypedDict
+from typing import Callable, Literal, Optional, TypedDict
 
 from .media_manager import MediaFileManager
 from .utils import (
@@ -45,6 +45,13 @@ class ProcessTranscriptResult:
     start: float
     end: float
     transcript: str
+
+    def __repr__(self):
+        return f"""
+        {self.start} -> {self.end}
+
+        {self.transcript}
+        """
 
 
 ReturnValue = Literal["text", "vtt", "srt"]
@@ -113,7 +120,10 @@ class ProcessTranscript(MediaFileManager):
 
         return clean_results
 
-    async def process(self) -> str:
+    async def process(
+        self,
+        on_chunk: Optional[Callable[[str], None]] = None,
+    ) -> str:
         """
         Extract transcript from media file with controlled concurrency
         """
@@ -125,7 +135,10 @@ class ProcessTranscript(MediaFileManager):
             async with semaphore:
                 try:
                     transcript = await self._get_transcript(chunk.path, chunk.start)
-                    return ProcessTranscriptResult(chunk.start, chunk.end, transcript)
+                    result = ProcessTranscriptResult(chunk.start, chunk.end, transcript)
+                    if on_chunk:
+                        on_chunk(str(result))
+                    return result
                 except Exception as e:
                     logger.error(f"Error processing chunk: {e}")
                     raise e
@@ -141,14 +154,13 @@ class ProcessTranscript(MediaFileManager):
             *[_process_chunk(c) for c in sorted_results],
             return_exceptions=True,
         )
-        valid_gathered_results = [u for u in gathered_results if isinstance(u, ProcessTranscriptResult)]
-
-        if len(valid_gathered_results) != len(sorted_results):
+        valid_results = [u for u in gathered_results if isinstance(u, ProcessTranscriptResult)]
+        if len(valid_results) != len(sorted_results):
             raise Exception("Error occurred getting transcript for media file")
 
         # Sort results by start time and combine transcripts
-        valid_gathered_results = sorted(valid_gathered_results, key=lambda v: v.start)
-        transcript = " ".join(v.transcript for v in valid_gathered_results).strip()
+        valid_results = sorted(valid_results, key=lambda v: v.start)
+        transcript = " ".join(v.transcript for v in valid_results).strip()
         if not transcript:
             raise Exception("No transcript content generated")
 
@@ -194,25 +206,35 @@ class ProcessTranscript(MediaFileManager):
 
         return await asyncio.to_thread(_transcribe)
 
-    async def _get_transcript(self, file_path: str, time_offset: float = 0.0) -> str:
+    async def _get_transcript(self, file_path: str, time_offset=0.0) -> str:
         """
         Get transcript for a media file chunk
         """
-        transcription = await self._run_transcription_groq("whisper-large-v3-turbo", file_path)
-        result = transcription.model_dump()
+        transcription = await self._run_transcription_groq(
+            "whisper-large-v3-turbo",
+            file_path,
+            response_format="text" if self.return_value == "text" else "verbose_json",
+        )
 
         if self.return_value == "text":
-            if transcription.text:
+            if isinstance(transcription, str) and transcription:
+                return transcription
+            elif transcription.text:
                 return transcription.text
             raise Exception("text field is None in transcription result")
 
+        result = transcription.model_dump()
         segments = result.get("segments")
         if not segments:
             raise Exception("No segments returned")
 
         return self._segment_to_vtt(segments, time_offset)
 
-    def _segment_to_vtt(self, segments: list[TranscriptSegment], time_offset: float = 0.0) -> str:
+    def _segment_to_vtt(
+        self,
+        segments: list[TranscriptSegment],
+        time_offset=0.0,
+    ) -> str:
         """Convert segments to VTT format"""
         vtt = "" if time_offset > 0.0 else "WEBVTT\n\n"
         for segment in segments:

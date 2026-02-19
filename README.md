@@ -111,13 +111,13 @@ Options:
 
 **Available attributes** (`--attrs`):
 
-| Attribute | Description |
-|---|---|
-| `visual_cues` | Visual elements, entities, and their attributes |
-| `interactions` | Movements, gestures, dynamics between entities |
-| `contextual_information` | Production elements, setting, atmosphere |
-| `audio_analysis` | Speech, music, sound effects, ambience |
-| `transcript` | Verbatim spoken content (via Gemini within chunks) |
+| Attribute                | Description                                        |
+| ------------------------ | -------------------------------------------------- |
+| `visual_cues`            | Visual elements, entities, and their attributes    |
+| `interactions`           | Movements, gestures, dynamics between entities     |
+| `contextual_information` | Production elements, setting, atmosphere           |
+| `audio_analysis`         | Speech, music, sound effects, ambience             |
+| `transcript`             | Verbatim spoken content (via Gemini within chunks) |
 
 > **Note on `transcript` in `extract`**: Within the chunked extract flow, all five attributes — including `transcript` — are handled concurrently by Gemini for maximum throughput. For a high-quality, full-video verbatim transcript use `atlas transcribe` (Groq Whisper).
 
@@ -278,16 +278,16 @@ Options:
 
 ## API Keys Reference
 
-| Command | `GEMINI_API_KEY` | `GROQ_API_KEY` |
-|---|---|---|
-| `extract` | ✅ Required | ❌ Not needed |
-| `index` | ✅ Required | ✅ Required |
-| `search` | ✅ Required | ❌ Not needed |
-| `transcribe` | ❌ Not needed | ✅ Required |
-| `chat` | ✅ Required | ❌ Not needed |
-| `list-videos` | ❌ Not needed | ❌ Not needed |
-| `list-chat` | ❌ Not needed | ❌ Not needed |
-| `stats` | ❌ Not needed | ❌ Not needed |
+| Command       | `GEMINI_API_KEY` | `GROQ_API_KEY` |
+| ------------- | ---------------- | -------------- |
+| `extract`     | ✅ Required      | ❌ Not needed  |
+| `index`       | ✅ Required      | ✅ Required    |
+| `search`      | ✅ Required      | ❌ Not needed  |
+| `transcribe`  | ❌ Not needed    | ✅ Required    |
+| `chat`        | ✅ Required      | ❌ Not needed  |
+| `list-videos` | ❌ Not needed    | ❌ Not needed  |
+| `list-chat`   | ❌ Not needed    | ❌ Not needed  |
+| `stats`       | ❌ Not needed    | ❌ Not needed  |
 
 ---
 
@@ -332,13 +332,15 @@ asyncio.run(main())
 
 ### Real-time Extract
 
+Pass on_segment to receive the results as they get processed
+
 ```python
 from atlas.vector_store import VideoProcessor, VideoProcessorConfig
 
 async def realtime_example():
     config = VideoProcessorConfig(video_path="video.mp4", chunk_duration=15)
     async with VideoProcessor(config) as processor:
-        result = await processor.process_realtime(
+        result = await processor.process(
             on_segment=lambda desc: print(f"{desc.start:.1f}s–{desc.end:.1f}s ready")
         )
 ```
@@ -346,15 +348,15 @@ async def realtime_example():
 ### Transcription
 
 ```python
-from atlas.video_processor import extract_transcript, extract_transcript_realtime
+from atlas.video_processor import extract_transcript
 import asyncio
 
 # One-shot
 transcript = asyncio.run(extract_transcript("video.mp4", format="srt"))
 
-# Real-time callback
+# Real-time callback -> pass on_chunk
 async def stream():
-    await extract_transcript_realtime(
+    await extract_transcript(
         "video.mp4",
         format="text",
         on_chunk=lambda chunk: print(chunk, end="", flush=True),
@@ -380,12 +382,12 @@ asyncio.run(stream())
 
 ## Performance
 
-| Function | Avg / call | Notes |
-|---|---|---|
-| Gemini multimodal analysis | ~21s | 4–5 attrs gathered concurrently per chunk |
-| Groq Whisper (transcribe) | ~30s / video | Full video, one shot |
-| ffmpeg clip | ~0.3s | Per chunk |
-| zvec query | sub-ms | Local HNSW, ~8× faster than Pinecone |
+| Function                   | Avg / call   | Notes                                     |
+| -------------------------- | ------------ | ----------------------------------------- |
+| Gemini multimodal analysis | ~21s         | 4–5 attrs gathered concurrently per chunk |
+| Groq Whisper (transcribe)  | ~30s / video | Full video, one shot                      |
+| ffmpeg clip                | ~0.3s        | Per chunk                                 |
+| zvec query                 | sub-ms       | Local HNSW, ~8× faster than Pinecone      |
 
 For a ~5 min video with 15s chunks (~24 chunks), wall time is typically **2–3 min** with default concurrency, as chunks are processed in parallel.
 

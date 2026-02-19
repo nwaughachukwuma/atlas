@@ -183,7 +183,7 @@ class TestEndToEnd:
         return str(video_path)
 
     @pytest.mark.asyncio
-    async def test_extract_transcript_workflow(self, sample_video, mock_env_vars):
+    async def test_get_video_transcript_workflow(self, sample_video, mock_env_vars):
         with patch("atlas.video_processor.ProcessTranscript") as mock_transcript:
             mock_instance = MagicMock()
             mock_instance.process = AsyncMock(return_value="Test transcript content")
@@ -191,9 +191,9 @@ class TestEndToEnd:
             mock_instance.__aexit__ = AsyncMock(return_value=True)
             mock_transcript.return_value = mock_instance
 
-            from atlas.video_processor import extract_transcript
+            from atlas.video_processor import get_video_transcript
 
-            result = await extract_transcript(sample_video)
+            result = await get_video_transcript(sample_video)
             assert isinstance(result, str)
 
     def test_package_imports(self, mock_env_vars):
