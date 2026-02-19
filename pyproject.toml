@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "A multimodal insights engine for video understanding"
 readme = "README.md"
 license = "Apache-2.0"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 authors = [
     { name = "VeedoAI", email = "hello@veedoai.com" }
 ]
@@ -36,19 +36,22 @@ classifiers = [
     "Topic :: Text Processing :: Linguistic",
 ]
 dependencies = [
-    "click>=8.0.0",
     "pydantic>=2.0.0",
     "google-genai>=1.0.0",
     "groq>=0.4.0",
+    "zvec>=0.2.0",
     "rich>=13.0.0",
     "httpx>=0.25.0",
-    "zvec>=0.2.0",
+    "python-dotenv",
+    "nanoid"
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
+    "pytest-cov",
+    "pytest-timeout",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
 ]
@@ -57,10 +60,10 @@ dev = [
 atlas = "atlas.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/veedoai/atlas"
-Documentation = "https://github.com/veedoai/atlas#readme"
-Repository = "https://github.com/veedoai/atlas"
-Issues = "https://github.com/veedoai/atlas/issues"
+Homepage = "https://github.com/nwaughachukwuma/atlas"
+Documentation = "https://github.com/nwaughachukwuma/atlas#readme"
+Repository = "https://github.com/nwaughachukwuma/atlas"
+Issues = "https://github.com/nwaughachukwuma/atlas/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/atlas"]
@@ -70,14 +73,21 @@ include = ["src/atlas", "README.md", "LICENSE"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py312"
+include = ["*.py", "*.pyi", ".pyproject.toml"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W"]
+select = ["D102", "F401"]
+
+[tool.ruff.lint.isort]
+case-sensitive = true
+relative-imports-order = "closest-to-furthest"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
 
 [tool.mypy]
-python_version = "3.10"
+ignore_missing_imports = false
+python_version = "3.12"
 strict = true
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"

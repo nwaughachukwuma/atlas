@@ -2,15 +2,17 @@
 Transcript processing using Groq Whisper API
 """
 
+from __future__ import annotations
+
 import asyncio
-from typing import Literal, TypedDict
+import os
+from dataclasses import dataclass
+from typing import Callable, Literal, Optional, TypedDict
 
-from groq import Groq
-
+from .media_manager import MediaFileManager
 from .utils import (
     ChunkSlot,
     MediaChunk,
-    MediaFileManager,
     RetryConfig,
     TempPath,
     delete_tmp_files,
@@ -36,32 +38,51 @@ class TranscriptSegment(TypedDict):
     tokens: list[int]
 
 
-class ProcessTranscriptResult(dict):
+@dataclass(frozen=True)
+class ProcessTranscriptResult:
     """Transcript result with timing"""
 
     start: float
     end: float
     transcript: str
 
+    def __repr__(self):
+        return f"""
+        {self.start} -> {self.end}
 
-ReturnValue = Literal["text", "vtt", "srt", None]
+        {self.transcript}
+        """
 
-WhisperModels = Literal["whisper-large-v3-turbo", "whisper-large-v3"]
+
+ReturnValue = Literal["text", "vtt", "srt"]
+WhisperModel = Literal["whisper-large-v3-turbo", "whisper-large-v3"]
+
+
+def get_groq_api_key() -> str:
+    """Get Groq API key from environment"""
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("GROQ_API_KEY environment variable is required for transcription")
+    return api_key
 
 
 class ProcessTranscript(MediaFileManager):
     """Process transcripts from media files using Groq Whisper"""
 
-    chunk_duration = 60 * 10  # 10 minutes
-    return_value: ReturnValue
+    chunk_duration = 60 * 3  # 3 minutes
+    return_value: ReturnValue | None
 
     def __init__(self, file_path: str, return_value: ReturnValue = "text"):
         super().__init__(file_path)
-        api_key = _get_groq_api_key()
+
+        from groq import Groq
+
+        api_key = get_groq_api_key()
         self.groq_client = Groq(api_key=api_key)
         self.return_value = return_value
+
         self.concurrency = self.max_workers
-        self.ffmpeg_concurrency = min(5, self.max_workers // 2)
+        self.ffmpeg_concurrency = min(4, self.max_workers // 2)
 
     async def __aenter__(self) -> "ProcessTranscript":
         return self
@@ -76,7 +97,7 @@ class ProcessTranscript(MediaFileManager):
 
         semaphore = asyncio.Semaphore(self.ffmpeg_concurrency)
 
-        async def __handler(slot: ChunkSlot) -> MediaChunk:
+        async def _handler(slot: ChunkSlot) -> MediaChunk:
             async with semaphore:
                 file_path = TempPath.get_path(ext=self.file_ext)
                 chunk_path = await self._clip_media_async(
@@ -89,7 +110,7 @@ class ProcessTranscript(MediaFileManager):
 
         slices = self._slice_media_file(self.chunk_duration)
         results = await asyncio.gather(
-            *[__handler(s) for s in slices],
+            *[_handler(s) for s in slices],
             return_exceptions=True,
         )
 
@@ -99,8 +120,13 @@ class ProcessTranscript(MediaFileManager):
 
         return clean_results
 
-    async def process(self) -> str:
-        """Extract transcript from media file with controlled concurrency"""
+    async def process(
+        self,
+        on_chunk: Optional[Callable[[str], None]] = None,
+    ) -> str:
+        """
+        Extract transcript from media file with controlled concurrency
+        """
         logger.info(f"Processing transcript for {self.file_path}")
 
         semaphore = asyncio.Semaphore(self.concurrency)
@@ -109,11 +135,10 @@ class ProcessTranscript(MediaFileManager):
             async with semaphore:
                 try:
                     transcript = await self._get_transcript(chunk.path, chunk.start)
-                    return ProcessTranscriptResult(
-                        start=chunk.start,
-                        end=chunk.end,
-                        transcript=transcript,
-                    )
+                    result = ProcessTranscriptResult(chunk.start, chunk.end, transcript)
+                    if on_chunk:
+                        on_chunk(str(result))
+                    return result
                 except Exception as e:
                     logger.error(f"Error processing chunk: {e}")
                     raise e
@@ -129,15 +154,15 @@ class ProcessTranscript(MediaFileManager):
             *[_process_chunk(c) for c in sorted_results],
             return_exceptions=True,
         )
-        valid_gathered_results = [u for u in gathered_results if isinstance(u, ProcessTranscriptResult)]
-
-        if len(valid_gathered_results) != len(sorted_results):
+        valid_results = [u for u in gathered_results if isinstance(u, ProcessTranscriptResult)]
+        if len(valid_results) != len(sorted_results):
             raise Exception("Error occurred getting transcript for media file")
 
         # Sort results by start time and combine transcripts
-        sorted_gathered_results = sorted(valid_gathered_results, key=lambda v: v.start)
-
-        transcript = " ".join(v["transcript"] for v in sorted_gathered_results)
+        valid_results = sorted(valid_results, key=lambda v: v.start)
+        transcript = " ".join(v.transcript for v in valid_results).strip()
+        if not transcript:
+            raise Exception("No transcript content generated")
 
         if self.return_value == "srt":
             return self._vtt_to_srt(transcript)
@@ -147,11 +172,13 @@ class ProcessTranscript(MediaFileManager):
     @process_time()
     async def _run_transcription_groq(
         self,
-        model: WhisperModels,
+        model: WhisperModel,
         file_path: str,
         response_format: Literal["text", "json", "verbose_json"] = "verbose_json",
     ):
-        """Run transcription using Groq Whisper API"""
+        """
+        Run transcription using Groq Whisper API
+        """
 
         def _read_audio_file_sync(fp: str) -> tuple[str, bytes]:
             with open(fp, "rb") as audio_file:
@@ -179,17 +206,35 @@ class ProcessTranscript(MediaFileManager):
 
         return await asyncio.to_thread(_transcribe)
 
-    async def _get_transcript(self, file_path: str, time_offset: float = 0.0) -> str:
-        """Get transcript for a media file chunk"""
-        transcription = await self._run_transcription_groq("whisper-large-v3-turbo", file_path)
-        result = transcription.model_dump()
+    async def _get_transcript(self, file_path: str, time_offset=0.0) -> str:
+        """
+        Get transcript for a media file chunk
+        """
+        transcription = await self._run_transcription_groq(
+            "whisper-large-v3-turbo",
+            file_path,
+            response_format="text" if self.return_value == "text" else "verbose_json",
+        )
 
         if self.return_value == "text":
-            return result["text"]
+            if isinstance(transcription, str) and transcription:
+                return transcription
+            elif transcription.text:
+                return transcription.text
+            raise Exception("text field is None in transcription result")
 
-        return self._segment_to_vtt(result["segments"], time_offset)
+        result = transcription.model_dump()
+        segments = result.get("segments")
+        if not segments:
+            raise Exception("No segments returned")
 
-    def _segment_to_vtt(self, segments: list[TranscriptSegment], time_offset: float = 0.0) -> str:
+        return self._segment_to_vtt(segments, time_offset)
+
+    def _segment_to_vtt(
+        self,
+        segments: list[TranscriptSegment],
+        time_offset=0.0,
+    ) -> str:
         """Convert segments to VTT format"""
         vtt = "" if time_offset > 0.0 else "WEBVTT\n\n"
         for segment in segments:
@@ -218,11 +263,23 @@ class ProcessTranscript(MediaFileManager):
         return srt.strip()
 
 
-def _get_groq_api_key() -> str:
-    """Get Groq API key from environment"""
-    import os
+@process_time()
+async def get_video_transcript(
+    video_path: str,
+    format: ReturnValue = "text",
+    on_chunk: Optional[Callable[[str], None]] = None,
+) -> str:
+    """Extract transcript from a video file, with option to invoke *on_chunk* with text as it arrives.
 
-    api_key = os.environ.get("GROQ_API_KEY")
-    if not api_key:
-        raise ValueError("GROQ_API_KEY environment variable is required for transcription")
-    return api_key
+    Args:
+        video_path: Path to the video or audio file.
+        format: Output format ('text', 'vtt', or 'srt').
+        on_chunk: Optional callback called with each text chunk as it becomes available.
+
+    Returns:
+        The full transcript string.
+    """
+    return_value = format if format in ("text", "vtt", "srt") else "text"
+    async with ProcessTranscript(video_path, return_value) as proc:
+        result = await proc.process(on_chunk)
+    return result or ""
