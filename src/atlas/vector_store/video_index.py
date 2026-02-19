@@ -241,25 +241,23 @@ class VideoIndex(BaseCollection):
 
         semaphore = asyncio.Semaphore(DEFAULT_EMBEDDING_CONCURRENCY)
 
-        async def _embed_description(desc: VideoDescription):
+        async def _guarded_embed(content: str) -> List[float]:
             async with semaphore:
-                content = self._create_searchable_content(desc).strip()
-                embedding = await embed_text_async(content, self.embedding_dim)
-                docs = [_make_index_doc(desc, content, embedding)]
+                return await embed_text_async(content, self.embedding_dim)
 
-                # Granular per-attribute documents for targeted retrieval
-                analysis_items = [a for a in desc.video_analysis if a.value.strip()]
-                analysis_embeddings = await asyncio.gather(
-                    *[embed_text_async(a.value, self.embedding_dim) for a in analysis_items]
-                )
-                docs.extend(
-                    [
-                        _make_index_doc(desc, f"{a.attr}: {a.value}", emb, a.attr)
-                        for a, emb in zip(analysis_items, analysis_embeddings)
-                    ],
-                )
+        async def _embed_description(desc: VideoDescription):
+            content = self._create_searchable_content(desc).strip()
+            embedding = await _guarded_embed(content)
+            docs = [_make_index_doc(desc, content, embedding)]
 
-                return docs
+            # Granular per-attribute documents for targeted retrieval
+            analysis_items = [a for a in desc.video_analysis if a.value.strip()]
+            analysis_embeddings = await asyncio.gather(*[_guarded_embed(a.value) for a in analysis_items])
+            docs.extend(
+                _make_index_doc(desc, f"{a.attr}: {a.value}", emb, a.attr)
+                for a, emb in zip(analysis_items, analysis_embeddings)
+            )
+            return docs
 
         descriptions = [d for d in result.video_descriptions if self._create_searchable_content(d).strip()]
         results = await asyncio.gather(*[_embed_description(d) for d in descriptions])
