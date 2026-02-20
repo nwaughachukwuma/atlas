@@ -88,7 +88,7 @@ class ProcessTranscript(MediaFileManager):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:
-        return True
+        return False
 
     async def _split_media_file_to_chunks(self) -> list[MediaChunk]:
         """Split media file into chunks for processing"""
@@ -114,9 +114,18 @@ class ProcessTranscript(MediaFileManager):
             return_exceptions=True,
         )
 
-        clean_results = [r for r in results if isinstance(r, MediaChunk)]
+        clean_results: list[MediaChunk] = []
+        errors: list[BaseException] = []
+        for r in results:
+            if isinstance(r, MediaChunk):
+                clean_results.append(r)
+            elif isinstance(r, BaseException):
+                errors.append(r)
+                logger.error("Chunk split failed: %s", r)
+
         if len(slices) != len(clean_results):
-            raise Exception("Error occurred splitting media file into chunks")
+            detail = "; ".join(str(e) for e in errors) if errors else "unknown"
+            raise Exception(f"Failed to split media into chunks: {detail}")
 
         return clean_results
 
@@ -154,9 +163,17 @@ class ProcessTranscript(MediaFileManager):
             *[_process_chunk(c) for c in sorted_results],
             return_exceptions=True,
         )
-        valid_results = [u for u in gathered_results if isinstance(u, ProcessTranscriptResult)]
+        valid_results: list[ProcessTranscriptResult] = []
+        chunk_errors: list[BaseException] = []
+        for r in gathered_results:
+            if isinstance(r, ProcessTranscriptResult):
+                valid_results.append(r)
+            elif isinstance(r, BaseException):
+                chunk_errors.append(r)
+
         if len(valid_results) != len(sorted_results):
-            raise Exception("Error occurred getting transcript for media file")
+            detail = "; ".join(str(e) for e in chunk_errors) if chunk_errors else "unknown"
+            raise Exception(f"Transcript extraction failed for {len(chunk_errors)} chunk(s): {detail}")
 
         # Sort results by start time and combine transcripts
         valid_results = sorted(valid_results, key=lambda v: v.start)
@@ -281,5 +298,5 @@ async def get_video_transcript(
     """
     return_value = format if format in ("text", "vtt", "srt") else "text"
     async with ProcessTranscript(video_path, return_value) as proc:
-        result = await proc.process(on_chunk)
-    return result or ""
+        return await proc.process(on_chunk)
+    return ""
