@@ -118,11 +118,13 @@ def _cmd_list_videos(args: argparse.Namespace) -> None:
     for i, entry in enumerate(videos, 1):
         table.add_row(str(i), entry.video_id, entry.indexed_at)
     console.print(table)
-    console.print("\n[dim]Use[/dim] [bold]atlas search <VIDEO_ID> '...'[/bold] [dim]to search a specific video.[/dim]")
+    console.print(
+        "\n[dim]Use[/dim] [bold]atlas search <VIDEO_ID> '<Query>'[/bold] [dim]to search a specific video.[/dim]"
+    )
     console.print(
         "\n[dim]Use[/dim] [bold]atlas get-video <VIDEO_ID>[/bold] [dim]to retrieve all indexed data for a video.[/dim]"
     )
-    console.print("\n[dim]Use[/dim] [bold]atlas chat <VIDEO_ID> '<query>'[/bold] [dim]to chat with your video.[/dim]")
+    console.print("\n[dim]Use[/dim] [bold]atlas chat <VIDEO_ID> '<Query>'[/bold] [dim]to chat with your video.[/dim]")
 
 
 # ── list-chat ─────────────────────────────────────────────────────────────────
