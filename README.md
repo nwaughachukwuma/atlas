@@ -33,7 +33,7 @@ pip install atlas-video
 ### Install from Source
 
 ```bash
-git clone https://github.com/veedoai/atlas.git
+git clone https://github.com/nwaughachukwuma/atlas.git
 cd atlas
 pip install -e .
 ```
@@ -70,8 +70,8 @@ atlas index video.mp4
 # Search all indexed content
 atlas search "people discussing machine learning"
 
-# Restrict to a specific video
-atlas search "demo of the new feature" --video-id abc123def456
+# Restrict to a specific video (video_id as first positional arg)
+atlas search abc123def456 "demo of the new feature"
 ```
 
 ### 5. Chat with a Video
@@ -80,7 +80,14 @@ atlas search "demo of the new feature" --video-id abc123def456
 atlas chat abc123def456 "What tools are demonstrated in this video?"
 ```
 
-### 6. Transcribe a Video (streams in real-time)
+### 6. Get All Indexed Data for a Video
+
+```bash
+atlas get-video abc123def456
+atlas get-video abc123def456 --output data.json
+```
+
+### 7. Transcribe a Video (streams in real-time)
 
 ```bash
 atlas transcribe video.mp4
@@ -93,14 +100,14 @@ atlas transcribe video.mp4 --format=srt --output=transcript.srt
 
 ### `atlas extract`
 
-Extract multimodal insights from a video. **Results stream to the terminal in real-time** as each segment is processed — no flag required.
+Extract multimodal insights from a video. **Results stream to the terminal in real-time** as each segment is processed.
 
 ```
 atlas extract VIDEO_PATH [OPTIONS]
 
 Options:
   -c, --chunk-duration DUR   Duration of each chunk (e.g. 15s, 1m) [default: 15s]
-  -l, --overlap DUR          Overlap between chunks (e.g. 1s, 5s) [default: 1s]
+  -l, --overlap DUR          Overlap between chunks [default: 1s]
   -a, --attrs ATTR           Attribute to extract; repeat for multiple
   -o, --output FILE          Save full output to this JSON file
   -f, --format FMT           Output format: json or text [default: text]
@@ -141,7 +148,7 @@ atlas extract video.mp4 --no-summary --benchmark
 
 ### `atlas index`
 
-Index a video for semantic search. Prints a **video_id** on completion — use it to filter searches and start chats.
+Index a video for semantic search. Prints a **video_id** on completion — use it to filter searches, start chats, or retrieve data with `get-video`.
 
 ```
 atlas index VIDEO_PATH [OPTIONS]
@@ -149,8 +156,10 @@ atlas index VIDEO_PATH [OPTIONS]
 Options:
   -c, --chunk-duration DUR   Duration of each chunk [default: 15s]
   -o, --overlap DUR          Overlap between chunks [default: 0s]
-  -s, --store-path DIR       Path to store the vector index [default: ~/.atlas/index]
   -e, --embedding-dim N      Embedding dimension: 768 or 3072 [default: 768]
+  -a, --attrs ATTR           Attribute to extract; repeat for multiple
+      --include-summary      Generate a per-segment summary (default: on)
+      --no-summary           Disable per-segment summary generation
       --benchmark            Print a timing breakdown after completion
 ```
 
@@ -158,46 +167,48 @@ Options:
 
 ```bash
 atlas index video.mp4
-atlas index video.mp4 --chunk-duration=10s --store-path=./my_index
+atlas index video.mp4 --chunk-duration=10s --embedding-dim=3072
 ```
 
 ---
 
 ### `atlas search`
 
-Search all indexed videos semantically, or filter to a specific video.
+Search all indexed videos semantically. Pass a video ID as the first argument to scope the search to a single video.
 
 ```
-atlas search QUERY [OPTIONS]
+atlas search [VIDEO_ID] QUERY [OPTIONS]
+
+Arguments:
+  VIDEO_ID   (optional) Video ID to restrict search to — returned by 'atlas index'
+  QUERY      Natural-language search query
 
 Options:
-  -k, --top-k N         Number of results to return [default: 10]
-  -v, --video-id ID     Filter results to a specific video ID
-  -s, --store-path DIR  Path to the vector index
+  -k, --top-k N   Number of results to return [default: 10]
 ```
 
 **Examples:**
 
 ```bash
-# Search across all videos
+# Search across all indexed videos
 atlas search "machine learning demonstration"
 
 # Search within a specific video
-atlas search "the login screen" --video-id abc123def456
+atlas search abc123def456 "the login screen"
 ```
 
 ---
 
 ### `atlas transcribe`
 
-Extract a transcript from a video or audio file using Groq Whisper. **Output streams to the terminal in real-time** — no separate flag required.
+Extract a transcript from a video or audio file using Groq Whisper. **Output streams to the terminal in real-time.**
 
 ```
 atlas transcribe VIDEO_PATH [OPTIONS]
 
 Options:
-  -f, --format FMT  Output format: text, vtt, or srt [default: text]
-  -o, --output FILE Output file path
+  -f, --format FMT   Output format: text, vtt, or srt [default: text]
+  -o, --output FILE  Output file path
 ```
 
 **Examples:**
@@ -214,17 +225,16 @@ atlas transcribe audio.mp3 --format=vtt
 
 Ask a question about a previously indexed video. Context is assembled from:
 
-1. **Top-k semantic hits** from `video_index` (multimodal insights)
-2. **Last 20 messages** from the JSONL chat history sidecar (10 user + 10 assistant)
-3. **Top-k semantic hits** from `video_chat` (prior chat turns, deduped against history)
-
-Both the question and answer are persisted in the vector store and in a chat log file.
+1. **Top-k semantic hits** from the video index (multimodal insights)
+2. **Recent chat history** from the chat vector store (last 20 messages)
+3. **Top-k semantic hits** from prior chat turns (deduped against history)
 
 ```
-atlas chat VIDEO_ID QUERY [OPTIONS]
+atlas chat VIDEO_ID QUERY
 
-Options:
-  -s, --store-path DIR  Path to the vector index
+Arguments:
+  VIDEO_ID   Video ID returned by 'atlas index'
+  QUERY      Your question about the video
 ```
 
 **Examples:**
@@ -236,15 +246,35 @@ atlas chat abc123def456 "Who are the people speaking?"
 
 ---
 
-### `atlas list-videos`
+### `atlas get-video`
 
-List all videos that have been indexed.
+Retrieve all indexed data for a video, returned in the same shape as the `extract` command. Useful for inspecting exactly what was stored during indexing.
 
 ```
-atlas list-videos [OPTIONS]
+atlas get-video VIDEO_ID [OPTIONS]
+
+Arguments:
+  VIDEO_ID   Video ID returned by 'atlas index'
 
 Options:
-  -s, --store-path DIR  Path to the vector index
+  -o, --output FILE  Save JSON output to this file (default: print to stdout)
+```
+
+**Examples:**
+
+```bash
+atlas get-video abc123def456
+atlas get-video abc123def456 --output data.json
+```
+
+---
+
+### `atlas list-videos`
+
+List all videos that have been indexed in the local vector store.
+
+```
+atlas list-videos
 ```
 
 ---
@@ -256,22 +286,38 @@ Show the chat history for a given video.
 ```
 atlas list-chat VIDEO_ID [OPTIONS]
 
+Arguments:
+  VIDEO_ID   Video ID to retrieve chat history for
+
 Options:
-  -n, --last-n N        Maximum messages to show [default: 20]
-  -s, --store-path DIR  Path to the vector index
+  -n, --last-n N   Maximum number of messages to show [default: 20]
 ```
 
 ---
 
 ### `atlas stats`
 
-Show statistics about the local vector store.
+Show statistics about the local vector store (collection paths, document counts).
 
 ```
-atlas stats [OPTIONS]
+atlas stats
+```
 
-Options:
-  -s, --store-path DIR  Path to the vector index
+---
+
+### `atlas queue`
+
+Manage the background task queue. Long-running commands (`index`, `extract`) are queued by default; use `--no-queue` on any command to run immediately.
+
+```
+atlas queue list                         # list all tasks
+atlas queue status --task-id TASK_ID     # check status of a specific task
+```
+
+Use `--no-queue` on any command to bypass the queue and run synchronously:
+
+```bash
+atlas index video.mp4 --no-queue
 ```
 
 ---
@@ -281,13 +327,15 @@ Options:
 | Command       | `GEMINI_API_KEY` | `GROQ_API_KEY` |
 | ------------- | ---------------- | -------------- |
 | `extract`     | ✅ Required      | ❌ Not needed  |
-| `index`       | ✅ Required      | ✅ Required    |
+| `index`       | ✅ Required      | ❌ Not needed  |
 | `search`      | ✅ Required      | ❌ Not needed  |
 | `transcribe`  | ❌ Not needed    | ✅ Required    |
 | `chat`        | ✅ Required      | ❌ Not needed  |
+| `get-video`   | ❌ Not needed    | ❌ Not needed  |
 | `list-videos` | ❌ Not needed    | ❌ Not needed  |
 | `list-chat`   | ❌ Not needed    | ❌ Not needed  |
 | `stats`       | ❌ Not needed    | ❌ Not needed  |
+| `queue`       | ❌ Not needed    | ❌ Not needed  |
 
 ---
 
@@ -295,7 +343,7 @@ Options:
 
 ```python
 import asyncio
-from atlas import VideoProcessor, VideoProcessorConfig, VectorStore
+from atlas import VideoProcessor, VideoProcessorConfig
 
 async def main():
     # Extract insights
@@ -316,11 +364,14 @@ async def main():
     video_id, indexed_count, _ = await index_video("video.mp4")
     print(f"video_id: {video_id}  docs: {indexed_count}")
 
-    # Search
+    # Search all videos
     from atlas.vector_store import search_video
     results = await search_video("people discussing AI", top_k=5)
     for r in results:
         print(f"{r.score:.3f}  [{r.video_id}]  {r.content[:80]}")
+
+    # Search within a specific video
+    results = await search_video("login screen", top_k=5, video_id=video_id)
 
     # Chat
     from atlas.vector_store import chat_with_video
@@ -332,10 +383,10 @@ asyncio.run(main())
 
 ### Real-time Extract
 
-Pass on_segment to receive the results as they get processed
+Pass `on_segment` to receive results as each segment is processed:
 
 ```python
-from atlas.vector_store import VideoProcessor, VideoProcessorConfig
+from atlas import VideoProcessor, VideoProcessorConfig
 
 async def realtime_example():
     config = VideoProcessorConfig(video_path="video.mp4", chunk_duration=15)
@@ -354,7 +405,7 @@ import asyncio
 # One-shot
 transcript = asyncio.run(extract_transcript("video.mp4", format="srt"))
 
-# Real-time callback -> pass on_chunk
+# Real-time callback
 async def stream():
     await extract_transcript(
         "video.mp4",
@@ -371,12 +422,11 @@ asyncio.run(stream())
 
 ```
 ~/.atlas/index/
-├── video_index/          # zvec collection — multimodal insights per segment
-├── video_chat/           # zvec collection — chat history per video
-├── video_registry.json   # lightweight index of all indexed video IDs
-└── chat_logs/
-    └── <video_id>.jsonl  # ordered chat log per video (for history replay)
+├── video_index/   # zvec collection — multimodal insights per segment
+└── video_chat/    # zvec collection — chat history per video
 ```
+
+All data (indexed segments, chat history, video metadata) is stored directly in the zvec collections — no sidecar files or external registries.
 
 ---
 
