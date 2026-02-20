@@ -28,6 +28,17 @@ from ..logger import get_logger
 
 logger = get_logger("atlas:worker")
 
+
+def _trigger_dispatch() -> None:
+    """Attempt to start the next pending task after a worker slot opens."""
+    try:
+        from .queue import get_queue
+
+        get_queue().dispatch_next()
+    except Exception as exc:
+        logger.warning("dispatch_next failed: %s", exc)
+
+
 # Command → importable function (resolved lazily).
 _COMMANDS: dict[str, str] = {
     "transcribe": "atlas.cli.tasks._run_transcribe",
@@ -49,19 +60,45 @@ def _import_func(dotted_path: str):
 
 
 def _write_benchmark(task_id: str) -> None:
-    """Write a benchmark summary file for the given task."""
+    """Write a benchmark summary as an ASCII table to benchmark.txt."""
     try:
         from ..benchmark import registry
 
         stats = registry.all_stats()
         if not stats:
             return
-        lines = ["Benchmark Summary", "=" * 60]
-        for s in stats:
-            lines.append(
-                f"{s.name}: calls={s.calls}  total={s.total_s:.3f}s  "
-                f"avg={s.avg_s:.3f}s  min={s.min_s:.3f}s  max={s.max_s:.3f}s"
+
+        headers = ("Function", "Calls", "Total (s)", "Avg (s)", "Min (s)", "Max (s)")
+        rows = [
+            (
+                s.name,
+                str(s.calls),
+                f"{s.total_s:.3f}",
+                f"{s.avg_s:.3f}",
+                f"{s.min_s:.3f}",
+                f"{s.max_s:.3f}",
             )
+            for s in stats
+        ]
+
+        # Compute column widths from headers and data.
+        col_widths = [len(h) for h in headers]
+        for row in rows:
+            for i, cell in enumerate(row):
+                col_widths[i] = max(col_widths[i], len(cell))
+
+        def _fmt_row(cells: tuple[str, ...]) -> str:
+            return "| " + " | ".join(c.ljust(col_widths[i]) for i, c in enumerate(cells)) + " |"
+
+        sep = "+-" + "-+-".join("-" * w for w in col_widths) + "-+"
+        lines = [
+            "Benchmark Summary",
+            sep,
+            _fmt_row(headers),
+            sep,
+            *[_fmt_row(r) for r in rows],
+            sep,
+        ]
         write_file(RESULTS_DIR / task_id / "benchmark.txt", "\n".join(lines))
     except Exception as exc:
         logger.warning("Failed to write benchmark for task %s: %s", task_id, exc)
@@ -125,6 +162,7 @@ def run_task(task_id: str) -> None:
                 success=False,
             )
             logger.error("Task %s timed out after %ds", task_id, TASK_TIMEOUT)
+            _trigger_dispatch()
             # Hard-exit the worker process.
             import os
 
@@ -151,6 +189,7 @@ def run_task(task_id: str) -> None:
             success=True,
         )
         logger.info("Task %s completed", task_id)
+        _trigger_dispatch()
     except Exception as exc:
         timed_out.set()  # cancel watchdog
 
@@ -165,6 +204,7 @@ def run_task(task_id: str) -> None:
             success=False,
         )
         logger.error("Task %s failed: %s", task_id, error_msg)
+        _trigger_dispatch()
 
 
 # ── script entry point ───────────────────────────────────────────────────────

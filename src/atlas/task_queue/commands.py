@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from .config import RESULTS_DIR
@@ -53,6 +55,44 @@ def add_queue_commands(subparsers: Any) -> None:
     p_status.set_defaults(func=_cmd_queue_status)
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+
+def _duration_str(started: str | None, finished: str | None) -> str:
+    """Return a human-readable elapsed duration, or empty string if unavailable."""
+    if not started or not finished:
+        return ""
+    try:
+        secs = int((datetime.fromisoformat(finished) - datetime.fromisoformat(started)).total_seconds())
+        if secs < 60:
+            return f"{secs}s"
+        return f"{secs // 60}m {secs % 60}s"
+    except Exception:
+        return ""
+
+
+def _parse_benchmark_file(path: Path) -> list[tuple[str, ...]]:
+    """Parse the pipe-table benchmark.txt and return data rows (excluding header).
+
+    Each returned tuple has six elements:
+    (Function, Calls, Total (s), Avg (s), Min (s), Max (s))
+    """
+    rows: list[tuple[str, ...]] = []
+    header_seen = False
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line.startswith("|"):
+            continue  # skip title, separator lines
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if len(cells) != 6:
+            continue
+        if not header_seen:
+            header_seen = True  # skip the header row itself
+            continue
+        rows.append(tuple(cells))
+    return rows
+
+
 # ── Handlers ──────────────────────────────────────────────────────────────────
 
 
@@ -93,7 +133,9 @@ def _cmd_queue_list(args: argparse.Namespace) -> None:
 
 
 def _cmd_queue_status(args: argparse.Namespace) -> None:
-    """Show detailed status for a single task."""
+    """Show detailed status for a single task, rendered as a Rich table."""
+    from rich.table import Table
+
     from ..cli import get_console
 
     console = get_console()
@@ -109,20 +151,47 @@ def _cmd_queue_status(args: argparse.Namespace) -> None:
     benchmark_file = results_dir / "benchmark.txt"
     color = _STATUS_COLORS.get(task["status"], "white")
 
-    console.print(f"\n[bold]Task {task['id']}[/bold]")
-    console.print(f"  Command:    {task['command']}")
-    console.print(f"  Label:      {task.get('label', '')}")
-    console.print(f"  Status:     [{color}]{task['status']}[/{color}]")
-    console.print(f"  Created:    {task['created_at']}")
+    # ── Task details table ────────────────────────────────────────────
+    table = Table(show_header=True, title=f"Task {task['id']}", title_style="bold")
+    table.add_column("Field", style="dim", width=14, no_wrap=True)
+    table.add_column("Value", ratio=1)
+
+    table.add_row("Command", task["command"])
+    table.add_row("Label", task.get("label") or "")
+    table.add_row("Status", f"[{color}]{task['status']}[/{color}]")
+    table.add_row("Created", (task.get("created_at") or "")[:19])
+
     if task.get("started_at"):
-        console.print(f"  Started:    {task['started_at']}")
+        table.add_row("Started", task["started_at"][:19])
     if task.get("finished_at"):
-        console.print(f"  Finished:   {task['finished_at']}")
+        table.add_row("Finished", task["finished_at"][:19])
+
+    duration = _duration_str(task.get("started_at"), task.get("finished_at"))
+    if duration:
+        table.add_row("Duration", duration)
+
     if task.get("error"):
-        console.print(f"  [red]Error:[/red]     {task['error']}")
+        table.add_row("Error", f"[red]{task['error']}[/red]")
     if output_file.exists():
-        console.print(f"  Output:     {output_file}")
+        table.add_row("Output", str(output_file))
     if task.get("output_path"):
-        console.print(f"  Output (→): {task['output_path']}")
+        table.add_row("Output (→)", task["output_path"])
     if benchmark_file.exists():
-        console.print(f"  Benchmark:  {benchmark_file}")
+        table.add_row("Benchmark", str(benchmark_file))
+
+    console.print(table)
+
+    # ── Benchmark table (if available) ────────────────────────────────
+    if benchmark_file.exists():
+        rows = _parse_benchmark_file(benchmark_file)
+        if rows:
+            bench_table = Table(show_header=True, title="Benchmark", title_style="bold yellow")
+            bench_table.add_column("Function", ratio=1)
+            bench_table.add_column("Calls", width=7, justify="right")
+            bench_table.add_column("Total (s)", width=10, justify="right")
+            bench_table.add_column("Avg (s)", width=9, justify="right")
+            bench_table.add_column("Min (s)", width=9, justify="right")
+            bench_table.add_column("Max (s)", width=9, justify="right")
+            for row in rows:
+                bench_table.add_row(*row)
+            console.print(bench_table)

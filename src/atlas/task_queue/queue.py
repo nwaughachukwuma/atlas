@@ -11,9 +11,13 @@ from typing import Any, List, Optional
 
 from .config import (
     DEFAULT_WORKERS,
+    HEAVY_COMMANDS,
+    HEAVY_CONCURRENCY,
+    MAX_CONCURRENT,
     MAX_WORKERS,
     RESULTS_DIR,
     TASK_TIMEOUT,
+    TRANSCRIBE_CONCURRENCY,
 )
 from .store import TaskStore
 from ..logger import get_logger
@@ -83,8 +87,9 @@ class TaskQueue:
 
         self._store.add(task_id, command, label, output_path, benchmark)
 
-        # Spawn a fully detached worker process.
-        self._spawn_worker(task_id)
+        # Dispatch immediately if a slot is open; otherwise the task stays
+        # pending and will be picked up when a running worker finishes.
+        self.dispatch_next()
 
         logger.info("Queued task %s (%s): %s", task_id, command, label)
         return task_id
@@ -100,6 +105,52 @@ class TaskQueue:
     def active_count(self) -> int:
         """Number of pending + running tasks."""
         return self._store.active_count()
+
+    # ── concurrency-aware dispatch ──────────────────────────────────────
+
+    def dispatch_next(self) -> list[str]:
+        """Spawn eligible pending tasks within the concurrency policy.
+
+        Rules:
+        * Total running workers ≤ MAX_CONCURRENT (2).
+        * extract + index combined ≤ HEAVY_CONCURRENCY (1).
+        * transcribe ≤ TRANSCRIBE_CONCURRENCY (2).
+
+        Returns the list of task IDs whose workers were spawned.
+        """
+        counts = self._store.running_counts()
+        total = sum(counts.values())
+        heavy = sum(counts.get(cmd, 0) for cmd in HEAVY_COMMANDS)
+        transcribe = counts.get("transcribe", 0)
+
+        dispatched: list[str] = []
+        for task in self._store.list_pending():
+            if total >= MAX_CONCURRENT:
+                break
+            cmd = task["command"]
+            if cmd in HEAVY_COMMANDS:
+                if heavy >= HEAVY_CONCURRENCY:
+                    continue
+                self._spawn_worker(task["id"])
+                dispatched.append(task["id"])
+                heavy += 1
+                total += 1
+            elif cmd == "transcribe":
+                if transcribe >= TRANSCRIBE_CONCURRENCY:
+                    continue
+                self._spawn_worker(task["id"])
+                dispatched.append(task["id"])
+                transcribe += 1
+                total += 1
+            else:
+                # Unknown command type — spawn if there's a free slot.
+                self._spawn_worker(task["id"])
+                dispatched.append(task["id"])
+                total += 1
+
+        if dispatched:
+            logger.info("Dispatched %d pending task(s): %s", len(dispatched), dispatched)
+        return dispatched
 
     # ── subprocess spawning ───────────────────────────────────────────
 

@@ -150,6 +150,20 @@ class TaskStore:
         row = self._conn().execute("SELECT COUNT(*) FROM tasks WHERE status IN ('pending', 'running')").fetchone()
         return row[0]
 
+    def list_pending(self) -> List[dict]:
+        """Return tasks with status=pending, oldest first (FIFO dispatch order)."""
+        rows = self._conn().execute("SELECT * FROM tasks WHERE status='pending' ORDER BY created_at ASC").fetchall()
+        return [dict(r) for r in rows]
+
+    def running_counts(self) -> dict[str, int]:
+        """Return a mapping of command → number of currently running tasks."""
+        rows = (
+            self._conn()
+            .execute("SELECT command, COUNT(*) AS cnt FROM tasks WHERE status='running' GROUP BY command")
+            .fetchall()
+        )
+        return {r["command"]: r["cnt"] for r in rows}
+
     def stale_tasks(self) -> List[dict]:
         """Tasks stuck in pending/running from a previous crashed session."""
         rows = self._conn().execute("SELECT * FROM tasks WHERE status IN ('pending', 'running')").fetchall()

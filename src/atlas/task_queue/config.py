@@ -8,10 +8,21 @@ from pathlib import Path
 
 # ── Worker & timeout knobs ────────────────────────────────────────────────────
 
-DEFAULT_WORKERS = 4
-MAX_WORKERS = 16
+DEFAULT_WORKERS = 2
+MAX_WORKERS = 2
 TASK_TIMEOUT = 600  # seconds (10 minutes)
 HEARTBEAT_INTERVAL = 10  # seconds between heartbeat checks
+
+# ── Concurrency policy ────────────────────────────────────────────────────────
+
+# Hard cap on total simultaneous workers.
+MAX_CONCURRENT = 2
+# extract + index share one slot — only one may run at a time.
+HEAVY_CONCURRENCY = 1
+# transcribe tasks may each fill a slot, up to this many simultaneously.
+TRANSCRIBE_CONCURRENCY = 2
+# Commands that count toward the "heavy" limit.
+HEAVY_COMMANDS: frozenset[str] = frozenset({"extract", "index"})
 
 # ── File-system paths ─────────────────────────────────────────────────────────
 
