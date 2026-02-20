@@ -79,6 +79,7 @@ class TestParserConstruction:
             "list-videos",
             "list-chat",
             "stats",
+            "queue",
         }
 
     # ---- extract ----
@@ -93,6 +94,8 @@ class TestParserConstruction:
         assert ns.format == "text"
         assert ns.include_summary is True
         assert ns.benchmark is False
+        assert ns.no_queue is False
+        assert ns.no_streaming is False
 
     def test_extract_no_summary_flag(self, parser):
         ns = parser.parse_args(["extract", "video.mp4", "--no-summary"])
@@ -186,6 +189,16 @@ class TestParserConstruction:
         ]:
             ns = parser.parse_args(cmd)
             assert ns.benchmark is True, f"--benchmark not set for: {cmd}"
+
+    # ---- shared --no-queue / --no-streaming flags ----
+
+    def test_no_queue_flag(self, parser):
+        ns = parser.parse_args(["transcribe", "v.mp4", "--no-queue"])
+        assert ns.no_queue is True
+
+    def test_no_streaming_flag(self, parser):
+        ns = parser.parse_args(["extract", "v.mp4", "--no-streaming"])
+        assert ns.no_streaming is True
 
     def test_no_subcommand_exits(self, parser):
         with pytest.raises(SystemExit):
@@ -316,7 +329,11 @@ class TestCmdIndex:
             chunk_duration="15s",
             overlap="0s",
             embedding_dim=768,
+            attrs=None,
+            include_summary=True,
             benchmark=False,
+            no_queue=True,
+            no_streaming=False,
         )
 
     def test_success_prints_video_id(self, tmp_path, monkeypatch, progress_ctx):
@@ -330,9 +347,12 @@ class TestCmdIndex:
         mock_result = MagicMock(duration=30.0, video_descriptions=[MagicMock()] * 3)
 
         with (
-            patch("atlas.cli.validate_api_keys"),
-            patch("atlas.cli._make_progress", return_value=progress_ctx),
-            patch("atlas.cli.asyncio.run", side_effect=mock_asyncio_run(return_value=("vid_001", 3, mock_result))),
+            patch("atlas.cli.cmd_media.validate_api_keys"),
+            patch("atlas.cli.cmd_media._make_progress", return_value=progress_ctx),
+            patch(
+                "atlas.cli.cmd_media.asyncio.run",
+                side_effect=mock_asyncio_run(return_value=("vid_001", 3, mock_result)),
+            ),
         ):
             _cmd_index(args)  # must not raise
 
@@ -355,9 +375,9 @@ class TestCmdIndex:
         video = tmp_path / "v.mp4"
         video.touch()
         with (
-            patch("atlas.cli.validate_api_keys"),
-            patch("atlas.cli._make_progress", return_value=progress_ctx),
-            patch("atlas.cli.asyncio.run", side_effect=mock_asyncio_run(side_effect=RuntimeError("boom"))),
+            patch("atlas.cli.cmd_media.validate_api_keys"),
+            patch("atlas.cli.cmd_media._make_progress", return_value=progress_ctx),
+            patch("atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(side_effect=RuntimeError("boom"))),
         ):
             with pytest.raises(SystemExit):
                 _cmd_index(self._args(str(video)))
@@ -383,8 +403,8 @@ class TestCmdSearch:
         mock_result = MagicMock(score=0.95, video_id="vid1", start=0.0, end=10.0, content="visual cues about people")
 
         with (
-            patch("atlas.cli.validate_api_keys"),
-            patch("atlas.cli.asyncio.run", side_effect=mock_asyncio_run(return_value=[mock_result])),
+            patch("atlas.cli.cmd_explore.validate_api_keys"),
+            patch("atlas.cli.cmd_explore.asyncio.run", side_effect=mock_asyncio_run(return_value=[mock_result])),
         ):
             _cmd_search(self._args())  # must not raise
 
@@ -392,16 +412,16 @@ class TestCmdSearch:
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
 
         with (
-            patch("atlas.cli.validate_api_keys"),
-            patch("atlas.cli.asyncio.run", side_effect=mock_asyncio_run(return_value=[])),
+            patch("atlas.cli.cmd_explore.validate_api_keys"),
+            patch("atlas.cli.cmd_explore.asyncio.run", side_effect=mock_asyncio_run(return_value=[])),
         ):
             _cmd_search(self._args())  # no SystemExit — just a "no results" message
 
     def test_exception_exits(self, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
         with (
-            patch("atlas.cli.validate_api_keys"),
-            patch("atlas.cli.asyncio.run", side_effect=mock_asyncio_run(side_effect=RuntimeError("fail"))),
+            patch("atlas.cli.cmd_explore.validate_api_keys"),
+            patch("atlas.cli.cmd_explore.asyncio.run", side_effect=mock_asyncio_run(side_effect=RuntimeError("fail"))),
         ):
             with pytest.raises(SystemExit):
                 _cmd_search(self._args())
@@ -424,9 +444,9 @@ class TestCmdChat:
     def test_success(self, monkeypatch, progress_ctx):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
         with (
-            patch("atlas.cli.validate_api_keys"),
-            patch("atlas.cli._make_progress", return_value=progress_ctx),
-            patch("atlas.cli.asyncio.run", side_effect=mock_asyncio_run(return_value="Here is my answer.")),
+            patch("atlas.cli.cmd_explore.validate_api_keys"),
+            patch("atlas.cli.cmd_explore._make_progress", return_value=progress_ctx),
+            patch("atlas.cli.cmd_explore.asyncio.run", side_effect=mock_asyncio_run(return_value="Here is my answer.")),
         ):
             _cmd_chat(self._args())
 
@@ -438,9 +458,12 @@ class TestCmdChat:
     def test_exception_exits(self, monkeypatch, progress_ctx):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
         with (
-            patch("atlas.cli.validate_api_keys"),
-            patch("atlas.cli._make_progress", return_value=progress_ctx),
-            patch("atlas.cli.asyncio.run", side_effect=mock_asyncio_run(side_effect=RuntimeError("network error"))),
+            patch("atlas.cli.cmd_explore.validate_api_keys"),
+            patch("atlas.cli.cmd_explore._make_progress", return_value=progress_ctx),
+            patch(
+                "atlas.cli.cmd_explore.asyncio.run",
+                side_effect=mock_asyncio_run(side_effect=RuntimeError("network error")),
+            ),
         ):
             with pytest.raises(SystemExit):
                 _cmd_chat(self._args())
@@ -552,15 +575,24 @@ class TestCmdStats:
 
 class TestCmdTranscribe:
     def _args(self, video_path="/tmp/v.mp4", fmt="text", output=None):
-        return argparse.Namespace(video_path=video_path, format=fmt, output=output, benchmark=False)
+        return argparse.Namespace(
+            video_path=video_path,
+            format=fmt,
+            output=output,
+            benchmark=False,
+            no_queue=True,
+            no_streaming=False,
+        )
 
     def test_success_text_to_stdout(self, tmp_path, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "k1")
         video = tmp_path / "v.mp4"
         video.touch()
         with (
-            patch("atlas.cli.validate_api_keys"),
-            patch("atlas.cli.asyncio.run", side_effect=mock_asyncio_run(return_value="Hello world transcript")),
+            patch("atlas.cli.cmd_media.validate_api_keys"),
+            patch(
+                "atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(return_value="Hello world transcript")
+            ),
         ):
             _cmd_transcribe(self._args(str(video)))
 
@@ -570,9 +602,10 @@ class TestCmdTranscribe:
         video.touch()
         out = tmp_path / "out.srt"
         with (
-            patch("atlas.cli.validate_api_keys"),
+            patch("atlas.cli.cmd_media.validate_api_keys"),
             patch(
-                "atlas.cli.asyncio.run", side_effect=mock_asyncio_run(return_value="1\n00:00:00 --> 00:00:10\nHello")
+                "atlas.cli.cmd_media.asyncio.run",
+                side_effect=mock_asyncio_run(return_value="1\n00:00:00 --> 00:00:10\nHello"),
             ),
         ):
             _cmd_transcribe(self._args(str(video), fmt="srt", output=str(out)))
@@ -599,8 +632,8 @@ class TestCmdTranscribe:
         video = tmp_path / "v.mp4"
         video.touch()
         with (
-            patch("atlas.cli.validate_api_keys"),
-            patch("atlas.cli.asyncio.run", side_effect=mock_asyncio_run(side_effect=RuntimeError("fail"))),
+            patch("atlas.cli.cmd_media.validate_api_keys"),
+            patch("atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(side_effect=RuntimeError("fail"))),
         ):
             with pytest.raises(SystemExit):
                 _cmd_transcribe(self._args(str(video)))
@@ -622,6 +655,8 @@ class TestCmdExtract:
             format=fmt,
             include_summary=include_summary,
             benchmark=False,
+            no_queue=True,
+            no_streaming=False,
         )
 
     def test_success_text_format(self, tmp_path, monkeypatch):
@@ -630,8 +665,8 @@ class TestCmdExtract:
         video.touch()
         mock_result = MagicMock(duration=10.0, video_descriptions=[])
         with (
-            patch("atlas.cli.validate_api_keys"),
-            patch("atlas.cli.asyncio.run", side_effect=mock_asyncio_run(return_value=mock_result)),
+            patch("atlas.cli.cmd_media.validate_api_keys"),
+            patch("atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(return_value=mock_result)),
         ):
             _cmd_extract(self._args(str(video)))
 
@@ -641,8 +676,8 @@ class TestCmdExtract:
         video.touch()
         mock_result = MagicMock(duration=10.0, video_descriptions=[])
         with (
-            patch("atlas.cli.validate_api_keys"),
-            patch("atlas.cli.asyncio.run", side_effect=mock_asyncio_run(return_value=mock_result)),
+            patch("atlas.cli.cmd_media.validate_api_keys"),
+            patch("atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(return_value=mock_result)),
         ):
             _cmd_extract(self._args(str(video), fmt="json"))
         captured = capsys.readouterr()
@@ -657,8 +692,8 @@ class TestCmdExtract:
         out = tmp_path / "out.json"
         mock_result = MagicMock(duration=10.0, video_descriptions=[])
         with (
-            patch("atlas.cli.validate_api_keys"),
-            patch("atlas.cli.asyncio.run", side_effect=mock_asyncio_run(return_value=mock_result)),
+            patch("atlas.cli.cmd_media.validate_api_keys"),
+            patch("atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(return_value=mock_result)),
         ):
             _cmd_extract(self._args(str(video), fmt="json", output=str(out)))
         assert out.exists()
@@ -667,7 +702,7 @@ class TestCmdExtract:
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
         video = tmp_path / "v.mp4"
         video.touch()
-        with patch("atlas.cli.validate_api_keys"):
+        with patch("atlas.cli.cmd_media.validate_api_keys"):
             with pytest.raises(SystemExit):
                 _cmd_extract(self._args(str(video), attrs=["invalid_attr"]))
 
@@ -675,7 +710,7 @@ class TestCmdExtract:
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
         video = tmp_path / "v.mp4"
         video.touch()
-        with patch("atlas.cli.validate_api_keys"):
+        with patch("atlas.cli.cmd_media.validate_api_keys"):
             with pytest.raises(SystemExit):
                 _cmd_extract(self._args(str(video), fmt="yaml"))
 
@@ -696,8 +731,277 @@ class TestCmdExtract:
         video = tmp_path / "v.mp4"
         video.touch()
         with (
-            patch("atlas.cli.validate_api_keys"),
-            patch("atlas.cli.asyncio.run", side_effect=mock_asyncio_run(side_effect=RuntimeError("gpu error"))),
+            patch("atlas.cli.cmd_media.validate_api_keys"),
+            patch(
+                "atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(side_effect=RuntimeError("gpu error"))
+            ),
         ):
             with pytest.raises(SystemExit):
                 _cmd_extract(self._args(str(video)))
+
+
+# ---------------------------------------------------------------------------
+# TestTaskQueue — SQLite-backed queue, store, and queue CLI commands
+# ---------------------------------------------------------------------------
+
+
+class TestTaskStore:
+    """Unit tests for the SQLite TaskStore."""
+
+    def test_add_and_get(self, tmp_path):
+        from atlas.task_queue import TaskStore
+
+        store = TaskStore(db_path=tmp_path / "test.db")
+        store.add("t1", "transcribe", "transcribe video.mp4")
+        task = store.get("t1")
+        assert task is not None
+        assert task["id"] == "t1"
+        assert task["command"] == "transcribe"
+        assert task["status"] == "pending"
+
+    def test_status_transitions(self, tmp_path):
+        from atlas.task_queue import TaskStore
+
+        store = TaskStore(db_path=tmp_path / "test.db")
+        store.add("t1", "extract", "extract v.mp4")
+
+        store.mark_running("t1")
+        assert store.get("t1")["status"] == "running"
+
+        store.mark_completed("t1")
+        assert store.get("t1")["status"] == "completed"
+
+    def test_mark_failed(self, tmp_path):
+        from atlas.task_queue import TaskStore
+
+        store = TaskStore(db_path=tmp_path / "test.db")
+        store.add("t1", "index", "index v.mp4")
+        store.mark_running("t1")
+        store.mark_failed("t1", "out of memory")
+        task = store.get("t1")
+        assert task["status"] == "failed"
+        assert task["error"] == "out of memory"
+
+    def test_mark_timeout(self, tmp_path):
+        from atlas.task_queue import TaskStore
+
+        store = TaskStore(db_path=tmp_path / "test.db")
+        store.add("t1", "transcribe", "t v.mp4")
+        store.mark_timeout("t1")
+        assert store.get("t1")["status"] == "timeout"
+
+    def test_list_all_and_filter(self, tmp_path):
+        from atlas.task_queue import TaskStore
+
+        store = TaskStore(db_path=tmp_path / "test.db")
+        store.add("t1", "extract", "extract v1.mp4")
+        store.add("t2", "index", "index v2.mp4")
+        store.mark_running("t1")
+
+        all_tasks = store.list_all()
+        assert len(all_tasks) == 2
+
+        running = store.list_all("running")
+        assert len(running) == 1
+        assert running[0]["id"] == "t1"
+
+    def test_active_count(self, tmp_path):
+        from atlas.task_queue import TaskStore
+
+        store = TaskStore(db_path=tmp_path / "test.db")
+        store.add("t1", "x", "x")
+        store.add("t2", "y", "y")
+        assert store.active_count() == 2
+        store.mark_running("t1")
+        assert store.active_count() == 2  # pending + running
+        store.mark_completed("t1")
+        assert store.active_count() == 1
+
+    def test_trim_completed(self, tmp_path):
+        from atlas.task_queue import MAX_COMPLETED_TASKS, TaskStore
+
+        store = TaskStore(db_path=tmp_path / "test.db")
+        for i in range(MAX_COMPLETED_TASKS + 5):
+            tid = f"c{i:03d}"
+            store.add(tid, "x", "x")
+            store.mark_completed(tid)
+
+        completed = store.list_all("completed")
+        assert len(completed) <= MAX_COMPLETED_TASKS
+
+    def test_trim_failed(self, tmp_path):
+        from atlas.task_queue import MAX_FAILED_TASKS, TaskStore
+
+        store = TaskStore(db_path=tmp_path / "test.db")
+        for i in range(MAX_FAILED_TASKS + 5):
+            tid = f"f{i:03d}"
+            store.add(tid, "x", "x")
+            store.mark_failed(tid, "err")
+
+        failed = store.list_all("failed")
+        assert len(failed) <= MAX_FAILED_TASKS
+
+    def test_stale_tasks(self, tmp_path):
+        from atlas.task_queue import TaskStore
+
+        store = TaskStore(db_path=tmp_path / "test.db")
+        store.add("s1", "x", "x")
+        store.mark_running("s1")
+        stale = store.stale_tasks()
+        assert len(stale) == 1
+        assert stale[0]["id"] == "s1"
+
+    def test_get_nonexistent_returns_none(self, tmp_path):
+        from atlas.task_queue import TaskStore
+
+        store = TaskStore(db_path=tmp_path / "test.db")
+        assert store.get("no-such-id") is None
+
+
+class TestTaskQueueSubmit:
+    """Test TaskQueue.submit (mocks subprocess.Popen to avoid real workers)."""
+
+    def test_submit_returns_task_id(self, tmp_path, monkeypatch):
+        from atlas.task_queue import TaskQueue
+
+        # Redirect RESULTS_DIR to tmp
+        monkeypatch.setattr("atlas.task_queue.queue.RESULTS_DIR", tmp_path / "results")
+
+        # Prevent real subprocess spawn
+        monkeypatch.setattr("atlas.task_queue.queue.subprocess.Popen", lambda *a, **kw: None)
+
+        queue = TaskQueue(max_workers=1, db_path=tmp_path / "q.db")
+        task_id = queue.submit(
+            argparse.Namespace(video_path="test.mp4"),
+            command="transcribe",
+            label="transcribe test.mp4",
+        )
+        assert isinstance(task_id, str)
+        assert len(task_id) == 8
+
+        task = queue.get_task(task_id)
+        assert task is not None
+        assert task["command"] == "transcribe"
+
+    def test_submit_creates_results_dir(self, tmp_path, monkeypatch):
+        from atlas.task_queue import TaskQueue
+
+        results_dir = tmp_path / "results"
+        monkeypatch.setattr("atlas.task_queue.queue.RESULTS_DIR", results_dir)
+        monkeypatch.setattr("atlas.task_queue.queue.subprocess.Popen", lambda *a, **kw: None)
+
+        queue = TaskQueue(max_workers=1, db_path=tmp_path / "q.db")
+        task_id = queue.submit(argparse.Namespace(), command="test")
+        assert (results_dir / task_id).is_dir()
+        # Verify args.json was written
+        assert (results_dir / task_id / "args.json").exists()
+
+
+class TestSerializeResult:
+    def test_none(self):
+        from atlas.task_queue import _serialize_result
+
+        assert _serialize_result(None) == ""
+
+    def test_string(self):
+        from atlas.task_queue import _serialize_result
+
+        assert _serialize_result("hello world") == "hello world"
+
+    def test_dict(self):
+        from atlas.task_queue import _serialize_result
+
+        result = _serialize_result({"key": "value"})
+        data = json.loads(result)
+        assert data == {"key": "value"}
+
+    def test_list(self):
+        from atlas.task_queue import _serialize_result
+
+        result = _serialize_result([1, 2, 3])
+        assert json.loads(result) == [1, 2, 3]
+
+
+class TestQueueCLICommands:
+    """Test queue list/status CLI command handlers."""
+
+    def test_queue_list_empty(self, tmp_path, monkeypatch):
+        from atlas.task_queue import TaskStore, _cmd_queue_list
+
+        monkeypatch.setattr("atlas.task_queue.commands.TaskStore", lambda: TaskStore(db_path=tmp_path / "q.db"))
+        args = argparse.Namespace(status=None)
+        # Should not raise
+        _cmd_queue_list(args)
+
+    def test_queue_list_with_tasks(self, tmp_path, monkeypatch):
+        from atlas.task_queue import TaskStore, _cmd_queue_list
+
+        db_path = tmp_path / "q.db"
+        store = TaskStore(db_path=db_path)
+        store.add("t1", "transcribe", "transcribe v.mp4")
+        store.add("t2", "extract", "extract v.mp4")
+
+        monkeypatch.setattr("atlas.task_queue.commands.TaskStore", lambda: store)
+        args = argparse.Namespace(status=None)
+        _cmd_queue_list(args)  # should not raise
+
+    def test_queue_list_filtered(self, tmp_path, monkeypatch):
+        from atlas.task_queue import TaskStore, _cmd_queue_list
+
+        db_path = tmp_path / "q.db"
+        store = TaskStore(db_path=db_path)
+        store.add("t1", "transcribe", "t v.mp4")
+        store.mark_running("t1")
+
+        monkeypatch.setattr("atlas.task_queue.commands.TaskStore", lambda: store)
+        args = argparse.Namespace(status="running")
+        _cmd_queue_list(args)  # should not raise
+
+    def test_queue_status_found(self, tmp_path, monkeypatch):
+        from atlas.task_queue import TaskStore, _cmd_queue_status
+
+        db_path = tmp_path / "q.db"
+        monkeypatch.setattr("atlas.task_queue.commands.RESULTS_DIR", tmp_path / "results")
+        store = TaskStore(db_path=db_path)
+        store.add("abc12345", "index", "index v.mp4")
+
+        monkeypatch.setattr("atlas.task_queue.commands.TaskStore", lambda: store)
+        args = argparse.Namespace(task_id="abc12345")
+        _cmd_queue_status(args)  # should not raise
+
+    def test_queue_status_not_found(self, tmp_path, monkeypatch):
+        from atlas.task_queue import TaskStore, _cmd_queue_status
+
+        monkeypatch.setattr("atlas.task_queue.commands.RESULTS_DIR", tmp_path / "results")
+        monkeypatch.setattr("atlas.task_queue.commands.TaskStore", lambda: TaskStore(db_path=tmp_path / "q.db"))
+
+        args = argparse.Namespace(task_id="nonexistent")
+        _cmd_queue_status(args)  # should not raise, just prints "not found"
+
+
+class TestCmdTranscribeQueued:
+    """Test that _cmd_transcribe correctly queues when no_queue is False."""
+
+    def test_queue_path(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("GROQ_API_KEY", "k1")
+
+        mock_queue = MagicMock()
+        mock_queue.submit.return_value = "test1234"
+        monkeypatch.setattr("atlas.task_queue.get_queue", lambda: mock_queue)
+
+        video = tmp_path / "v.mp4"
+        video.touch()
+
+        args = argparse.Namespace(
+            video_path=str(video),
+            format="text",
+            output=None,
+            benchmark=False,
+            no_queue=False,
+            no_streaming=False,
+        )
+
+        with patch("atlas.cli.cmd_media.validate_api_keys"):
+            _cmd_transcribe(args)  # should queue and return without error
+
+        mock_queue.submit.assert_called_once()

@@ -160,10 +160,22 @@ class MediaFileManager:
                 output_path,
             ]
 
-        await asyncio.to_thread(
-            subprocess.run,
-            cmd,
-            capture_output=True,
-            check=True,
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
-        return output_path
+        stdout, stderr = await proc.communicate()
+        if proc.returncode == 0:
+            return output_path
+
+        err_text = (stderr or b"").decode(errors="replace").strip()
+        logger.error(
+            "ffmpeg failed (rc=%d) for %s [%s\u2013%s]: %s",
+            proc.returncode,
+            self.file_path,
+            start,
+            end,
+            err_text or "(no stderr)",
+        )
+        raise subprocess.CalledProcessError(proc.returncode or 1, cmd[0], stdout, stderr)

@@ -51,14 +51,11 @@ def send(title: str, message: str, *, success: bool = True) -> None:
 
 # ── Platform implementations ───────────────────────────────────────────────────
 
+
 def _macos(title: str, body: str, success: bool) -> None:
     # osascript is shipped with every macOS installation.
     sound = "Glass" if success else "Basso"
-    script = (
-        f'display notification "{_esc(body)}" '
-        f'with title "{_esc(title)}" '
-        f'sound name "{sound}"'
-    )
+    script = f'display notification "{_esc(body)}" with title "{_esc(title)}" sound name "{sound}"'
     _run("osascript", "-e", script)
 
 
@@ -68,9 +65,12 @@ def _linux(title: str, body: str, success: bool) -> None:
     urgency = "normal" if success else "critical"
     _run(
         "notify-send",
-        "--icon", icon,
-        "--urgency", urgency,
-        "--expire-time", "8000",  # ms
+        "--icon",
+        icon,
+        "--urgency",
+        urgency,
+        "--expire-time",
+        "8000",  # ms
         title,
         body,
     )
