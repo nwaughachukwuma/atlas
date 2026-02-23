@@ -14,18 +14,6 @@ class TextEmbedding:
 
     def __init__(self, content: str):
         self.content = content
-        self._client = None
-
-    @property
-    def client(self):
-        """
-        Get Gemini client
-        """
-        if self._client is None:
-            from .gemini_client import GeminiClient
-
-            self._client = GeminiClient.get_client()
-        return self._client
 
     def get_embedding(self, dimensionality: int = 768) -> list[float]:
         """Get text embedding using Gemini embedding model
@@ -36,19 +24,22 @@ class TextEmbedding:
         """
         from google.genai import types
 
+        from .gemini_client import GeminiClient
+
         try:
-            result = self.client.models.embed_content(
-                model="gemini-embedding-001",
-                contents=self.content,
-                config=types.EmbedContentConfig(
-                    output_dimensionality=dimensionality,
-                ),
-            )
+            with GeminiClient.get_client() as client:
+                result = client.models.embed_content(
+                    model="gemini-embedding-001",
+                    contents=self.content,
+                    config=types.EmbedContentConfig(
+                        output_dimensionality=dimensionality,
+                    ),
+                )
 
-            if not result.embeddings or not result.embeddings[0].values:
-                raise ValueError("Could not generate text embedding for your content")
+                if not result.embeddings or not result.embeddings[0].values:
+                    raise ValueError("Could not generate text embedding for your content")
 
-            return result.embeddings[0].values
+                return result.embeddings[0].values
 
         except Exception as e:
             logger.error(f"Error generating embedding: {e}")

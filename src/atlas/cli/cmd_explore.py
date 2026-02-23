@@ -72,18 +72,35 @@ def cmd_chat(args: argparse.Namespace) -> None:
     console.print(f"\n[bold blue]Chat:[/bold blue] video_id=[cyan]{video_id}[/cyan]")
     console.print(f"[bold]You:[/bold] {query}\n")
 
-    async def _run():
-        with make_progress() as progress:
-            task = progress.add_task("Thinking…", total=None)
-            answer = await chat_with_video(video_id=video_id, query=query)
-            progress.update(task, completed=True)
-        return answer
+    async def _run() -> None:
+        # Show a lightweight indicator while context retrieval runs (before first
+        # token arrives).  As soon as the model starts streaming we clear it and
+        # print the response prefix.
+        sys.stdout.write("Thinking…")
+        sys.stdout.flush()
+
+        first_chunk = True
+        async for chunk in chat_with_video(video_id, query):
+            if first_chunk:
+                # Overwrite the "Thinking…" line with the Atlas response prefix.
+                sys.stdout.write("\r" + " " * 12 + "\r")
+                console.print("[bold green]Atlas:[/bold green] ", end="")
+                first_chunk = False
+            sys.stdout.write(chunk)
+            sys.stdout.flush()
+
+        if first_chunk:
+            # No chunks were yielded — something went wrong.
+            sys.stdout.write("\r" + " " * 12 + "\r")
+            console.print("[yellow]No response received.[/yellow]")
+        else:
+            sys.stdout.write("\n\n")
+            sys.stdout.flush()
 
     try:
-        answer = asyncio.run(_run())
-        console.print(f"[bold green]Atlas:[/bold green] {answer}\n")
+        asyncio.run(_run())
     except Exception as e:
-        console.print(f"[red]Error in chat: {e}[/red]")
+        console.print(f"\n[red]Error in chat: {e}[/red]")
         get_logger().exception("Error in chat command")
         sys.exit(1)
 
