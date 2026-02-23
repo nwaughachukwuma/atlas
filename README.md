@@ -325,10 +325,10 @@ atlas index video.mp4 --no-queue
 
 | Command       | `GEMINI_API_KEY` | `GROQ_API_KEY` |
 | ------------- | ---------------- | -------------- |
-| `extract`     | ✅ Required      | ❌ Not needed  |
-| `index`       | ✅ Required      | ❌ Not needed  |
-| `search`      | ✅ Required      | ❌ Not needed  |
 | `transcribe`  | ❌ Not needed    | ✅ Required    |
+| `extract`     | ✅ Required      | ✅ Required    |
+| `index`       | ✅ Required      | ✅ Required    |
+| `search`      | ✅ Required      | ❌ Not needed  |
 | `chat`        | ✅ Required      | ❌ Not needed  |
 | `get-video`   | ❌ Not needed    | ❌ Not needed  |
 | `list-videos` | ❌ Not needed    | ❌ Not needed  |
