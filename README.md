@@ -431,12 +431,12 @@ All data (indexed segments, chat history, video metadata) is stored directly in 
 
 ## Performance
 
-| Function                   | Avg / call   | Notes                                     |
-| -------------------------- | ------------ | ----------------------------------------- |
-| Gemini multimodal analysis | ~21s         | 4–5 attrs gathered concurrently per chunk |
-| Groq Whisper (transcribe)  | ~30s / video | Full video, one shot                      |
-| ffmpeg clip                | ~0.3s        | Per chunk                                 |
-| zvec query                 | sub-ms       | Local HNSW, ~8× faster than Pinecone      |
+| Function                   | Avg / call  | Notes                                                  |
+| -------------------------- | ----------- | ------------------------------------------------------ |
+| Gemini multimodal analysis | ~5s         | Processing time for a segment with multiple attributes |
+| Groq Whisper (transcribe)  | ~5s / video | Full video, one shot                                   |
+| ffmpeg clip                | ~0.1s       | Per chunk                                              |
+| zvec query                 | sub-ms      | Local HNSW, ~8× faster than Pinecone                   |
 
 For a ~5 min video with 15s chunks (~24 chunks), wall time is typically **2–3 min** with default concurrency, as chunks are processed in parallel.
 

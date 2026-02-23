@@ -3,3 +3,4 @@ __pycache__
 sample_files/
 .env
 .coverage
+product-video/
