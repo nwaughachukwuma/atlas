@@ -21,7 +21,7 @@
 
 ### Requirements
 
-- Python 3.10 – 3.12
+- Python 3.12
 - ffmpeg (for video processing)
 
 ### Install from PyPI
