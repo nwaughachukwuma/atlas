@@ -3,12 +3,12 @@ Integration tests for Atlas — testing component interactions.
 """
 # ruff: noqa: D102
 
-from unittest.mock import AsyncMock, MagicMock, patch  # , PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from atlas.utils import VideoAttrAnalysis
-from atlas.vector_store import VideoIndex  # , SearchResult
+from atlas.vector_store import VideoIndex
 from atlas.video_processor import (
     VideoDescription,
     VideoProcessor,
@@ -61,35 +61,9 @@ class TestVideoIndexIntegration:
         mock_embedding = [0.1] * 768
 
         # Only the Gemini embedding call is mocked — zvec runs for real.
-
-        # # Mock the embedding call and the zvec-dependent layer so the test runs
-        # # on platforms where zvec is not installed (e.g. macOS x86_64).
-        # mock_collection = MagicMock()
-        with (
-            patch("atlas.text_embedding.embed_text", new_callable=AsyncMock, return_value=mock_embedding),
-            # patch.object(type(vi), "collection", new_callable=PropertyMock, return_value=mock_collection),
-            # patch.object(vi, "_make_doc", return_value=MagicMock()),
-        ):
+        with patch("atlas.text_embedding.embed_text", new_callable=AsyncMock, return_value=mock_embedding):
             indexed = await vi.index_video_result(sample_video_result, video_id=video_id)
             assert indexed > 0
-
-            # # Patch search to verify the returned interface
-            # with patch.object(vi, "search", new_callable=AsyncMock) as mock_search:
-            #     mock_search.return_value = [
-            #         SearchResult(
-            #             id="test_id",
-            #             score=0.9,
-            #             video_id=video_id,
-            #             start=0.0,
-            #             end=10.0,
-            #             content="test content",
-            #             metadata={"attr": "visual_cues", "duration": 10.0},
-            #         )
-            #     ]
-            #     results = await vi.search("person walking", top_k=5, video_id=video_id)
-            #     assert len(results) > 0
-            #     assert results[0].score == 0.9
-            #     assert results[0].video_id == video_id
 
             # list_videos() exercises the zvec query path.
             videos = vi.list_videos()
