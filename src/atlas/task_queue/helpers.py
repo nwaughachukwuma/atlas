@@ -38,8 +38,3 @@ def results_dir_for(task_id: str) -> Path:
     """Return the results directory for a given task ID."""
     return RESULTS_DIR / task_id
 
-
-# ── Backward-compatible aliases (kept for any external callers) ───────────────
-
-_write_file = write_file
-_serialize_result = serialize_result

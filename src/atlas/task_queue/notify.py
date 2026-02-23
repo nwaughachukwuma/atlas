@@ -1,4 +1,4 @@
-"""Cross-platform system notifications.  Never raises."""
+"""Cross-platform system notifications. Never raises."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ _PLATFORM = platform.system()
 
 
 def notify(title: str, message: str, *, success: bool = True) -> None:
-    """Send a cross-platform system notification.  Never raises."""
+    """Send a cross-platform system notification. Never raises."""
     try:
         if _PLATFORM == "Darwin":
             sound = "Glass" if success else "Basso"
