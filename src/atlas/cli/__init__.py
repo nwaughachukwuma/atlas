@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 # ── version ───────────────────────────────────────────────────────────────────
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 PROG_NAME = "atlas"
 
 # ── Lazy singletons — nothing heavy is imported until a real command runs ─────

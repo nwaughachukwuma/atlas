@@ -108,12 +108,11 @@ docker run --rm nwaughachukwuma/atlas-video queue list
 
 ### Environment variables
 
-| Variable           | Required for                         | Description                                                       |
-| ------------------ | ------------------------------------ | ----------------------------------------------------------------- |
-| `GEMINI_API_KEY`   | `extract`, `index`, `search`, `chat` | [Google AI Studio](https://aistudio.google.com/app/apikey)        |
-| `GROQ_API_KEY`     | `transcribe`, `extract`, `index`     | [Groq Console](https://console.groq.com/keys)                     |
-| `ENABLE_LOGGING`   | optional                             | Set to `true` for verbose logging (default: `false`)              |
-| `ATLAS_INDEX_PATH` | optional                             | Override the vector store path (defaults to `/home/atlas/.atlas`) |
+| Variable         | Required for                         | Description                                                |
+| ---------------- | ------------------------------------ | ---------------------------------------------------------- |
+| `GEMINI_API_KEY` | `extract`, `index`, `search`, `chat` | [Google AI Studio](https://aistudio.google.com/app/apikey) |
+| `GROQ_API_KEY`   | `transcribe`, `extract`, `index`     | [Groq Console](https://console.groq.com/keys)              |
+| `ENABLE_LOGGING` | optional                             | Set to `true` for verbose logging (default: `false`)       |
 
 ### Persistent vector store
 

@@ -62,7 +62,15 @@ ENV GROQ_API_KEY=""
 # Optional — set to "true" to enable verbose logging:
 ENV ENABLE_LOGGING="false"
 
-# ── Persistent vector store ──────────────────────────────────────────────────
+# ── Persistent data directories ────────────────────────────────────────────
+# Pre-create every subdirectory that Atlas writes to so that Docker volume
+# initialisation copies them with atlas:atlas ownership.  This must happen
+# BEFORE the VOLUME declaration — Docker only seeds a fresh volume from the
+# image contents, and only if those contents already exist with the right owner.
+RUN mkdir -p \
+    /home/atlas/.atlas/index \
+    /home/atlas/.atlas/queue/queued_tasks/results
+
 # Mount a named volume here so indexed data survives container restarts:
 #   docker run -v atlas-data:/home/atlas/.atlas ...
 VOLUME ["/home/atlas/.atlas"]

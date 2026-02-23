@@ -62,12 +62,15 @@ case "${SUBCOMMAND}" in
     ;;
 esac
 
-# ── Vector store path ──────────────────────────────────────────────────────
-# Default: /home/atlas/.atlas  (matches the VOLUME declared in the Dockerfile)
-# Override: set ATLAS_INDEX_PATH to a path inside a mounted volume.
-if [[ -n "${ATLAS_INDEX_PATH:-}" ]]; then
-  export ATLAS_INDEX_PATH
-fi
+# ── Ensure writable data directories ────────────────────────────────────────
+# When an existing named volume is mounted its contents survive across image
+# rebuilds, but subdirectories added in a newer image layer are not
+# retroactively created.  Guard against that (and against volumes that were
+# first seeded as root) by creating the dirs here at runtime.
+ATLAS_HOME="${HOME}/.atlas"
+mkdir -p \
+    "${ATLAS_HOME}/index" \
+    "${ATLAS_HOME}/queue/queued_tasks/results"
 
 # ── Exec ───────────────────────────────────────────────────────────────────
 exec atlas "$@"

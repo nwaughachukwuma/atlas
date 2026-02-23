@@ -11,7 +11,7 @@ import argparse
 from .cmd_explore import cmd_chat, cmd_get_data, cmd_list_chat, cmd_list_videos, cmd_search, cmd_stats
 from .cmd_media import cmd_extract, cmd_index, cmd_transcribe
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 PROG_NAME = "atlas"
 
 
