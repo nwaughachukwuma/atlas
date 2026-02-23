@@ -48,7 +48,7 @@ class GeminiMediaEngine:
     @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))
     async def upload_file_async(self, file_path: str) -> "genai_types.File":
         """Upload a file to Gemini asynchronously"""
-        return await asyncio.to_thread(self.client.files.upload, file=file_path)
+        return await self.client.aio.files.upload(file=file_path)
 
     @process_time()
     @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))
@@ -88,8 +88,8 @@ class GeminiMediaEngine:
         from google.genai import types
 
         @retry(RetryConfig(max_retries=1, delay=3, backoff=1.5))
-        def _handler(model_name: str) -> str:
-            response = self.client.models.generate_content(
+        async def _handler(model_name: str) -> str:
+            response = await self.client.aio.models.generate_content(
                 model=model_name,
                 contents=[file_part, prompt],
                 config=types.GenerateContentConfig(
@@ -104,10 +104,10 @@ class GeminiMediaEngine:
             return response.text
 
         try:
-            return await asyncio.to_thread(_handler, "gemini-2.5-flash-lite")
+            return await _handler("gemini-2.5-flash-lite")
         except Exception as e:
             logger.error(f"Error with gemini-2.5-flash-lite: {e}. Falling back to gemini-2.5-flash")
-            return await asyncio.to_thread(_handler, "gemini-2.5-flash")
+            return await _handler("gemini-2.5-flash")
 
     @process_time()
     async def generate_summary(
@@ -120,8 +120,8 @@ class GeminiMediaEngine:
         from google.genai import types
 
         @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))
-        def _handler() -> str:
-            response = self.client.models.generate_content(
+        async def _handler() -> str:
+            response = await self.client.aio.models.generate_content(
                 model=model,
                 contents=[content],
                 config=types.GenerateContentConfig(
@@ -135,4 +135,4 @@ class GeminiMediaEngine:
                 raise ValueError("Error generating summary")
             return response.text
 
-        return await asyncio.to_thread(_handler)
+        return await _handler()

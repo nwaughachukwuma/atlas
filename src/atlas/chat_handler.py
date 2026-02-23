@@ -5,17 +5,17 @@ This module is the single place that combines vector retrieval with Gemini
 inference.
 
 Pipeline for chat_with_video()
---------------------------------
+-------------------------------
 1. Retrieve top-k multimodal context from VideoIndex (video segments).
 2. Read the last N messages from VideoChat's JSONL sidecar (ordered history).
 3. Retrieve top-k semantically similar past messages from VideoChat (deduped).
-4. Build a system prompt and call Gemini.
+4. Build a system prompt and stream the response from Gemini.
 5. Persist both turns via VideoChat.record_turn().
 """
 
 from __future__ import annotations
 
-import asyncio
+from typing import AsyncGenerator
 
 from .vector_store.video_chat import default_video_chat
 from .vector_store.video_index import default_video_index
@@ -24,10 +24,12 @@ from .vector_store.video_index import default_video_index
 async def chat_with_video(
     video_id: str,
     query: str,
-    top_k_context=10,
-    top_k_chat=10,
-) -> str:
-    """Run a single-turn chat against an indexed video.
+    top_k_context: int = 10,
+    top_k_chat: int = 10,
+) -> AsyncGenerator[str, None]:
+    """Stream a single-turn chat response against an indexed video.
+
+    Yields text chunks as they arrive from Gemini.
 
     Args:
         video_id: The video to chat about.
@@ -35,8 +37,8 @@ async def chat_with_video(
         top_k_context: Number of multimodal segment hits from VideoIndex.
         top_k_chat: Number of semantic chat hits from VideoChat.
 
-    Returns:
-        The assistant's response string.
+    Yields:
+        Incremental text chunks from the model.
     """
     vi = default_video_index()
     vc = default_video_chat()
@@ -53,27 +55,32 @@ async def chat_with_video(
     seen_contents = {msg["content"] for msg in history}
     extra_context = [r.content for r in semantic_hits if r.content not in seen_contents]
 
-    # 4. Build prompt and call Gemini
-    answer = await _generate_response(
+    # 4. Stream the response and collect chunks for persistence
+    answer_parts: list[str] = []
+    async for chunk in _stream_response(
         query=query,
         video_context=video_context,
         history=history,
         extra_context=extra_context,
-    )
+    ):
+        answer_parts.append(chunk)
+        yield chunk
 
-    # 5. Persist both turns
+    # 5. Persist both turns after streaming completes
+    answer = "".join(answer_parts)
+    if not answer.strip():
+        raise ValueError("Empty response from Gemini")
     await vc.record_turn(video_id, "user", query)
     await vc.record_turn(video_id, "assistant", answer)
-    return answer
 
 
-async def _generate_response(
+async def _stream_response(
     query: str,
     video_context: list[str],
     history: list[dict],
     extra_context: list[str],
-) -> str:
-    """Build a system prompt and call Gemini to generate a response.
+) -> AsyncGenerator[str, None]:
+    """Build a system prompt and stream Gemini response.
 
     Args:
         query: The user's question.
@@ -81,8 +88,8 @@ async def _generate_response(
         history: Ordered chat history dicts (role, content, timestamp).
         extra_context: Semantically similar past messages (deduped).
 
-    Returns:
-        The model's response text.
+    Yields:
+        Text chunks from the model as they are produced.
     """
     from google.genai import types
 
@@ -95,21 +102,18 @@ async def _generate_response(
         extra_context=extra_context,
     )
 
-    client = GeminiClient.get_client()
+    config = types.GenerateContentConfig(
+        temperature=0.4,
+        max_output_tokens=1024,
+        response_mime_type="text/plain",
+        system_instruction=system_prompt,
+    )
 
-    def _call() -> str:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash-lite",
-            contents=[query],
-            config=types.GenerateContentConfig(
-                temperature=0.4,
-                max_output_tokens=1024,
-                response_mime_type="text/plain",
-                system_instruction=system_prompt,
-            ),
-        )
-        if not response.text:
-            raise ValueError("Empty response from Gemini")
-        return response.text
-
-    return await asyncio.to_thread(_call)
+    aclient = GeminiClient.get_client().aio
+    async for chunk in await aclient.models.generate_content_stream(
+        model="gemini-2.5-flash-lite",
+        contents=[query],
+        config=config,
+    ):
+        if chunk.text:
+            yield chunk.text

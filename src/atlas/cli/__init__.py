@@ -3,7 +3,7 @@ Atlas CLI — stdlib argparse, zero third-party import overhead at startup.
 
 This package splits the CLI into focused modules while keeping every heavy
 import deferred until a real command runs.  The public surface (``main``,
-``get_console``, individual ``_cmd_*`` handlers, helpers …) is re-exported
+``get_console``, individual ``cmd_*`` handlers, helpers …) is re-exported
 here so that existing call-sites and tests continue to work via
 ``from atlas.cli import …``.
 """
@@ -49,56 +49,56 @@ _state: dict = {"benchmark": False}
 
 
 # ── Re-exports ────────────────────────────────────────────────────────────────
-# Every symbol previously importable from ``atlas.cli`` is re-exported here so
-# that existing test code and user scripts keep working unchanged.
+# Every symbol importable from ``atlas.cli`` is re-exported here so
+# that call-sites and tests continue to work via ``from atlas.cli import …``.
 
 from .cmd_explore import (  # noqa: E402
-    _cmd_chat as _cmd_chat,
+    cmd_chat as cmd_chat,
 )
 from .cmd_explore import (
-    _cmd_get_data as _cmd_get_data,
+    cmd_get_data as cmd_get_data,
 )
 from .cmd_explore import (
-    _cmd_list_chat as _cmd_list_chat,
+    cmd_list_chat as cmd_list_chat,
 )
 from .cmd_explore import (
-    _cmd_list_videos as _cmd_list_videos,
+    cmd_list_videos as cmd_list_videos,
 )
 from .cmd_explore import (
-    _cmd_search as _cmd_search,
+    cmd_search as cmd_search,
 )
 from .cmd_explore import (
-    _cmd_stats as _cmd_stats,
+    cmd_stats as cmd_stats,
 )
 from .cmd_media import (  # noqa: E402
-    _cmd_extract as _cmd_extract,
+    cmd_extract as cmd_extract,
 )
 from .cmd_media import (
-    _cmd_index as _cmd_index,
+    cmd_index as cmd_index,
 )
 from .cmd_media import (
-    _cmd_transcribe as _cmd_transcribe,
+    cmd_transcribe as cmd_transcribe,
 )
 from .helpers import (  # noqa: E402
-    _err as _err,
+    err as err,
 )
 from .helpers import (
-    _format_elapsed as _format_elapsed,
+    format_elapsed as format_elapsed,
 )
 from .helpers import (
-    _make_progress as _make_progress,
-)
-from .helpers import (
-    _print_benchmark_summary as _print_benchmark_summary,
-)
-from .helpers import (
-    _print_queued_info as _print_queued_info,
-)
-from .helpers import (
-    _short_name as _short_name,
+    make_progress as make_progress,
 )
 from .helpers import (
     parse_duration as parse_duration,
+)
+from .helpers import (
+    print_benchmark_summary as print_benchmark_summary,
+)
+from .helpers import (
+    print_queued_info as print_queued_info,
+)
+from .helpers import (
+    short_name as short_name,
 )
 from .helpers import (
     validate_api_keys as validate_api_keys,
@@ -106,15 +106,15 @@ from .helpers import (
 from .helpers import (
     validate_video_path as validate_video_path,
 )
-from .parser import _build_parser as _build_parser  # noqa: E402
+from .parser import build_parser as build_parser  # noqa: E402
 from .tasks import (  # noqa: E402
-    _run_extract as _run_extract,
+    run_extract as run_extract,
 )
 from .tasks import (
-    _run_index as _run_index,
+    run_index as run_index,
 )
 from .tasks import (
-    _run_transcribe as _run_transcribe,
+    run_transcribe as run_transcribe,
 )
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ from .tasks import (
 
 def main() -> None:
     """Parse argv and dispatch to the appropriate command handler."""
-    parser = _build_parser()
+    parser = build_parser()
     args = parser.parse_args()
 
     # Store global flags before dispatching.
@@ -148,11 +148,11 @@ def main() -> None:
         get_console().print(f"[red]Error while executing: {e}[/red]")
         sys.exit(1)
     finally:
-        _print_benchmark_summary()
+        print_benchmark_summary()
         # Suppress "Finished in Xs" for queue commands and queued tasks.
         if not is_queue_cmd and not is_queuing:
             elapsed = perf_counter() - t0
-            get_console().print(f"\n[dim]Finished in {_format_elapsed(elapsed)}[/dim]")
+            get_console().print(f"\n[dim]Finished in {format_elapsed(elapsed)}[/dim]")
 
 
 if __name__ == "__main__":

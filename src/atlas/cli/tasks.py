@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from ..utils import DescriptionAttr
 
 
-def _run_extract(args: argparse.Namespace) -> dict:
+def run_extract(args: argparse.Namespace) -> dict:
     """Run extract in a queue worker thread.  Returns a JSON-serialisable dict."""
     from ..utils import DEFAULT_DESCRIPTION_ATTRS
     from ..video_processor import VideoDescription, VideoProcessor, VideoProcessorConfig
@@ -69,7 +69,7 @@ def _run_extract(args: argparse.Namespace) -> dict:
     }
 
 
-def _run_transcribe(args: argparse.Namespace) -> str:
+def run_transcribe(args: argparse.Namespace) -> str:
     """Run transcribe in a queue worker thread.  Returns the transcript text."""
     from ..transcript import get_video_transcript
 
@@ -96,7 +96,7 @@ def _run_transcribe(args: argparse.Namespace) -> str:
     return full_text
 
 
-def _run_index(args: argparse.Namespace) -> dict:
+def run_index(args: argparse.Namespace) -> dict:
     """Run index in a queue worker thread.  Returns a JSON-serialisable dict."""
     from ..utils import DEFAULT_DESCRIPTION_ATTRS
     from ..vector_store.video_index import index_video

@@ -3,12 +3,12 @@ Integration tests for Atlas — testing component interactions.
 """
 # ruff: noqa: D102
 
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from atlas.utils import VideoAttrAnalysis
-from atlas.vector_store import SearchResult, VideoIndex
+from atlas.vector_store import VideoIndex
 from atlas.video_processor import (
     VideoDescription,
     VideoProcessor,
@@ -46,10 +46,12 @@ class TestVideoIndexIntegration:
         # col_path is not created until first collection access
         assert not temp_col_path.exists()
 
+    @pytest.mark.zvec
     def test_registry_starts_empty(self, temp_col_path):
         vi = VideoIndex(col_path=temp_col_path)
         assert vi.list_videos() == []
 
+    @pytest.mark.zvec
     @pytest.mark.asyncio
     async def test_index_and_search_flow(self, temp_col_path, sample_video_result: VideoProcessorResult, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
@@ -58,35 +60,18 @@ class TestVideoIndexIntegration:
         video_id = "test_video_id_001"
         mock_embedding = [0.1] * 768
 
-        # Mock the embedding call and the zvec-dependent layer so the test runs
-        # on platforms where zvec is not installed (e.g. macOS x86_64).
-        mock_collection = MagicMock()
-
-        with (
-            patch("atlas.text_embedding.embed_text_async", new_callable=AsyncMock, return_value=mock_embedding),
-            patch.object(type(vi), "collection", new_callable=PropertyMock, return_value=mock_collection),
-            patch.object(vi, "_make_doc", return_value=MagicMock()),
-        ):
+        # Only the Gemini embedding call is mocked — zvec runs for real.
+        with patch("atlas.text_embedding.embed_text", new_callable=AsyncMock, return_value=mock_embedding):
             indexed = await vi.index_video_result(sample_video_result, video_id=video_id)
             assert indexed > 0
 
-            # Patch search to verify the returned interface
-            with patch.object(vi, "search", new_callable=AsyncMock) as mock_search:
-                mock_search.return_value = [
-                    SearchResult(
-                        id="test_id",
-                        score=0.9,
-                        video_id=video_id,
-                        start=0.0,
-                        end=10.0,
-                        content="test content",
-                        metadata={"attr": "visual_cues", "duration": 10.0},
-                    )
-                ]
-                results = await vi.search("person walking", top_k=5, video_id=video_id)
-                assert len(results) > 0
-                assert results[0].score == 0.9
-                assert results[0].video_id == video_id
+            # list_videos() exercises the zvec query path.
+            videos = vi.list_videos()
+            assert any(v.video_id == video_id for v in videos)
+            # search() exercises the zvec vector-query path.
+            results = await vi.search("person walking", top_k=5, video_id=video_id)
+            assert len(results) > 0
+            assert all(r.video_id == video_id for r in results)
 
 
 class TestVideoProcessorIntegration:

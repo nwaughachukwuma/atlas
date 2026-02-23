@@ -6,12 +6,12 @@ import argparse
 import asyncio
 import sys
 
-from .helpers import _make_progress, validate_api_keys
+from .helpers import make_progress, validate_api_keys
 
 # ── search ────────────────────────────────────────────────────────────────────
 
 
-def _cmd_search(args: argparse.Namespace) -> None:
+def cmd_search(args: argparse.Namespace) -> None:
     """Run a semantic search against previously indexed videos."""
     from rich.table import Table
 
@@ -58,7 +58,7 @@ def _cmd_search(args: argparse.Namespace) -> None:
 # ── chat ──────────────────────────────────────────────────────────────────────
 
 
-def _cmd_chat(args: argparse.Namespace) -> None:
+def cmd_chat(args: argparse.Namespace) -> None:
     """Chat with an indexed video using semantic context and chat history."""
     from . import get_console, get_logger
     from ..chat_handler import chat_with_video
@@ -72,18 +72,35 @@ def _cmd_chat(args: argparse.Namespace) -> None:
     console.print(f"\n[bold blue]Chat:[/bold blue] video_id=[cyan]{video_id}[/cyan]")
     console.print(f"[bold]You:[/bold] {query}\n")
 
-    async def _run():
-        with _make_progress() as progress:
-            task = progress.add_task("Thinking…", total=None)
-            answer = await chat_with_video(video_id=video_id, query=query)
-            progress.update(task, completed=True)
-        return answer
+    async def _run() -> None:
+        # Show a lightweight indicator while context retrieval runs (before first
+        # token arrives).  As soon as the model starts streaming we clear it and
+        # print the response prefix.
+        sys.stdout.write("Thinking…")
+        sys.stdout.flush()
+
+        first_chunk = True
+        async for chunk in chat_with_video(video_id, query):
+            if first_chunk:
+                # Overwrite the "Thinking…" line with the Atlas response prefix.
+                sys.stdout.write("\r" + " " * 12 + "\r")
+                console.print("[bold green]Atlas:[/bold green] ", end="")
+                first_chunk = False
+            sys.stdout.write(chunk)
+            sys.stdout.flush()
+
+        if first_chunk:
+            # No chunks were yielded — something went wrong.
+            sys.stdout.write("\r" + " " * 12 + "\r")
+            console.print("[yellow]No response received.[/yellow]")
+        else:
+            sys.stdout.write("\n\n")
+            sys.stdout.flush()
 
     try:
-        answer = asyncio.run(_run())
-        console.print(f"[bold green]Atlas:[/bold green] {answer}\n")
+        asyncio.run(_run())
     except Exception as e:
-        console.print(f"[red]Error in chat: {e}[/red]")
+        console.print(f"\n[red]Error in chat: {e}[/red]")
         get_logger().exception("Error in chat command")
         sys.exit(1)
 
@@ -91,7 +108,7 @@ def _cmd_chat(args: argparse.Namespace) -> None:
 # ── list-videos ───────────────────────────────────────────────────────────────
 
 
-def _cmd_list_videos(args: argparse.Namespace) -> None:
+def cmd_list_videos(args: argparse.Namespace) -> None:
     """List all videos that have been indexed in the vector store."""
     from rich.table import Table
 
@@ -99,7 +116,7 @@ def _cmd_list_videos(args: argparse.Namespace) -> None:
     from ..vector_store.video_index import default_video_index
 
     console = get_console()
-    with _make_progress() as progress:
+    with make_progress() as progress:
         task = progress.add_task("Loading videos...", total=None)
         vi = default_video_index()
         videos = vi.list_videos()
@@ -130,7 +147,7 @@ def _cmd_list_videos(args: argparse.Namespace) -> None:
 # ── list-chat ─────────────────────────────────────────────────────────────────
 
 
-def _cmd_list_chat(args: argparse.Namespace) -> None:
+def cmd_list_chat(args: argparse.Namespace) -> None:
     """List the chat history for a given video."""
     from rich.table import Table
 
@@ -139,7 +156,7 @@ def _cmd_list_chat(args: argparse.Namespace) -> None:
 
     console = get_console()
     video_id: str = args.video_id
-    with _make_progress() as progress:
+    with make_progress() as progress:
         task = progress.add_task("Loading chat history...", total=None)
         vc = default_video_chat()
         history = vc.get_history(video_id, last_n=args.last_n)
@@ -171,7 +188,7 @@ def _cmd_list_chat(args: argparse.Namespace) -> None:
 # ── stats ─────────────────────────────────────────────────────────────────────
 
 
-def _cmd_stats(args: argparse.Namespace) -> None:
+def cmd_stats(args: argparse.Namespace) -> None:
     """Show statistics about the local vector store."""
     from rich import markup
     from rich.table import Table
@@ -181,7 +198,7 @@ def _cmd_stats(args: argparse.Namespace) -> None:
     from ..vector_store.video_index import default_video_index
 
     console = get_console()
-    with _make_progress() as progress:
+    with make_progress() as progress:
         task = progress.add_task("Loading stats...", total=None)
         vi = default_video_index()
         vc = default_video_chat()
@@ -207,7 +224,7 @@ def _cmd_stats(args: argparse.Namespace) -> None:
 # ── get-data ───────────────────────────────────────────────────────────────────────
 
 
-def _cmd_get_data(args: argparse.Namespace) -> None:
+def cmd_get_data(args: argparse.Namespace) -> None:
     """Retrieve all indexed data for a video in extract-command shape."""
     import json
     from pathlib import Path
@@ -219,7 +236,7 @@ def _cmd_get_data(args: argparse.Namespace) -> None:
     video_id: str = args.video_id
     output_path: str | None = getattr(args, "output", None)
 
-    with _make_progress() as progress:
+    with make_progress() as progress:
         task = progress.add_task("Fetching video data…", total=None)
         vi = default_video_index()
         data = vi.get_video_data(video_id)

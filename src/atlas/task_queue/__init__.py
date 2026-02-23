@@ -15,7 +15,7 @@ Design
 * No Redis, no external broker, no long-lived daemons.
 """
 
-from .commands import _cmd_queue_list, _cmd_queue_status, add_queue_commands
+from .commands import add_queue_commands, cmd_queue_list, cmd_queue_status
 from .config import (
     DB_PATH,
     DEFAULT_WORKERS,
@@ -32,7 +32,7 @@ from .config import (
     TRANSCRIBE_CONCURRENCY,
     TaskStatus,
 )
-from .helpers import _serialize_result, _write_file, results_dir_for
+from .helpers import results_dir_for, serialize_result, write_file
 from .queue import TaskQueue, get_queue
 from .store import TaskStore
 
@@ -58,11 +58,11 @@ __all__ = [
     "TaskQueue",
     "get_queue",
     # helpers
-    "_serialize_result",
-    "_write_file",
+    "serialize_result",
+    "write_file",
     "results_dir_for",
     # commands
     "add_queue_commands",
-    "_cmd_queue_list",
-    "_cmd_queue_status",
+    "cmd_queue_list",
+    "cmd_queue_status",
 ]

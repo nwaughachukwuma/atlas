@@ -8,14 +8,14 @@ from __future__ import annotations
 
 import argparse
 
-from .cmd_explore import _cmd_chat, _cmd_get_data, _cmd_list_chat, _cmd_list_videos, _cmd_search, _cmd_stats
-from .cmd_media import _cmd_extract, _cmd_index, _cmd_transcribe
+from .cmd_explore import cmd_chat, cmd_get_data, cmd_list_chat, cmd_list_videos, cmd_search, cmd_stats
+from .cmd_media import cmd_extract, cmd_index, cmd_transcribe
 
 VERSION = "0.1.0"
 PROG_NAME = "atlas"
 
 
-def _build_parser() -> argparse.ArgumentParser:
+def build_parser() -> argparse.ArgumentParser:
     """Construct and return the full ``argparse`` parser for every sub-command."""
     # Shared parent that injects --benchmark, --no-queue, --no-streaming.
     _shared = argparse.ArgumentParser(add_help=False)
@@ -37,7 +37,7 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         dest="no_streaming",
-        help="Disable real-time streaming output for queued tasks.",
+        help="Disable streaming output (only applies to direct --no-queue runs).",
     )
 
     parser = argparse.ArgumentParser(
@@ -69,11 +69,13 @@ def _build_parser() -> argparse.ArgumentParser:
     # ── extract ───────────────────────────────────────────────────────
     p_extract = sub.add_parser(
         "extract",
-        help="Extract multimodal insights from a video.",
+        help="Extract multimodal insights from a video without indexing.",
         description=(
-            "Analyze video content and extract visual cues, interactions, contextual "
-            "information, audio analysis, and transcripts. Results stream to the terminal "
-            "in real-time as each segment is processed."
+            "Analyze a video and extract visual cues, interactions, contextual information, "
+            "audio analysis, and transcripts — without indexing it. "
+            "Tasks are queued by default; use --no-queue to run directly and stream results "
+            "to the terminal in real time (note: streamed output is not available for queued tasks "
+            "because the worker runs in a separate Python process)."
         ),
         epilog="Example:\n  atlas extract video.mp4 --chunk-duration=15s --overlap=1s",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -100,18 +102,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_extract.add_argument(
         "--include-summary",
-        action="store_true",
+        type=lambda v: v.lower() not in ("false", "0", "no"),
         default=True,
         dest="include_summary",
-        help="Generate a summary for each segment (default: enabled).",
+        metavar="BOOL",
+        help="Generate a summary for each segment: true or false (default: true).",
     )
-    p_extract.add_argument(
-        "--no-summary",
-        action="store_false",
-        dest="include_summary",
-        help="Disable per-segment summary generation.",
-    )
-    p_extract.set_defaults(func=_cmd_extract)
+    p_extract.set_defaults(func=cmd_extract)
 
     # ── index ─────────────────────────────────────────────────────────
     p_index = sub.add_parser(
@@ -119,7 +116,8 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Index a video for semantic search.",
         description=(
             "Process a video and store embeddings in a local vector store for fast "
-            "semantic search. Prints the assigned video_id on completion."
+            "semantic search. Prints the assigned video_id on completion. "
+            "Tasks are queued by default; use --no-queue to run directly."
         ),
         epilog="Example:\n  atlas index video.mp4 --chunk-duration=15s",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -150,24 +148,22 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_index.add_argument(
         "--include-summary",
-        action="store_true",
+        type=lambda v: v.lower() not in ("false", "0", "no"),
         default=True,
         dest="include_summary",
-        help="Generate a summary for each segment (default: enabled).",
+        metavar="BOOL",
+        help="Generate a summary for each segment: true or false (default: true).",
     )
-    p_index.add_argument(
-        "--no-summary",
-        action="store_false",
-        dest="include_summary",
-        help="Disable per-segment summary generation.",
-    )
-    p_index.set_defaults(func=_cmd_index)
+    p_index.set_defaults(func=cmd_index)
 
     # ── search ────────────────────────────────────────────────────────
     p_search = sub.add_parser(
         "search",
         help="Search indexed videos semantically.",
-        description="Run a natural-language query against previously indexed videos.",
+        description=(
+            "Run a natural-language query against previously indexed videos. "
+            "Optionally scope the search to a single video by passing its video_id as the first argument."
+        ),
         epilog=("Examples:\n  atlas search 'people discussing AI'\n  atlas search abc123 'people discussing AI'"),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=[_shared],
@@ -181,14 +177,17 @@ def _build_parser() -> argparse.ArgumentParser:
     p_search.add_argument(
         "--top-k", "-k", type=int, default=10, metavar="N", help="Number of results to return (default: 10)."
     )
-    p_search.set_defaults(func=_cmd_search)
+    p_search.set_defaults(func=cmd_search)
 
     # ── transcribe ────────────────────────────────────────────────────
     p_transcribe = sub.add_parser(
         "transcribe",
-        help="Extract transcript from a video or audio file.",
+        help="Transcribe a video or audio file without indexing.",
         description=(
-            "Transcribe a video or audio file using Groq Whisper. Output streams to the terminal in real-time."
+            "Transcribe a video or audio file using Groq Whisper, without indexing it. "
+            "Tasks are queued by default; use --no-queue to run directly "
+            "(note: live output streaming to the terminal is only available for direct runs — "
+            "queued tasks run in a separate Python process and cannot stream to this terminal)."
         ),
         epilog="Example:\n  atlas transcribe video.mp4 --format=srt --output=transcript.srt",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -199,15 +198,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "--format", "-f", default="text", metavar="FMT", help="Output format: text, vtt, or srt (default: text)."
     )
     p_transcribe.add_argument("--output", "-o", default=None, metavar="FILE", help="Output file path.")
-    p_transcribe.set_defaults(func=_cmd_transcribe)
+    p_transcribe.set_defaults(func=cmd_transcribe)
 
     # ── chat ──────────────────────────────────────────────────────────
     p_chat = sub.add_parser(
         "chat",
-        help="Chat with an indexed video using AI.",
+        help="Ask a question about an indexed video.",
         description=(
-            "Ask questions about a previously indexed video. Context is sourced from "
-            "the vector store (top-k multimodal insights) and prior conversation history."
+            "Ask a question about a previously indexed video. Context is sourced from "
+            "the vector store (top-k multimodal insights) and prior conversation history "
+            "for the given video."
         ),
         epilog="Example:\n  atlas chat abc123 'What tools are used in this video?'",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -215,24 +215,24 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_chat.add_argument("video_id", help="Video ID returned by 'atlas index'.")
     p_chat.add_argument("query", help="Your question about the video.")
-    p_chat.set_defaults(func=_cmd_chat)
+    p_chat.set_defaults(func=cmd_chat)
 
     # ── list-videos ───────────────────────────────────────────────────
     p_list_videos = sub.add_parser(
         "list-videos",
         help="List all indexed videos.",
-        description="Display all videos that have been indexed in the local vector store.",
+        description="Display all videos that have been indexed in the local vector store, with their IDs and index timestamps.",
         epilog="Example:\n  atlas list-videos",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=[_shared],
     )
-    p_list_videos.set_defaults(func=_cmd_list_videos)
+    p_list_videos.set_defaults(func=cmd_list_videos)
 
     # ── list-chat ─────────────────────────────────────────────────────
     p_list_chat = sub.add_parser(
         "list-chat",
-        help="List chat history for a video.",
-        description="Display the stored chat history for a given video ID.",
+        help="Show chat history for an indexed video.",
+        description="Display the stored conversation history for a given video ID, in insertion order.",
         epilog="Example:\n  atlas list-chat abc123",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=[_shared],
@@ -246,18 +246,18 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="N",
         help="Maximum number of messages to show (default: 20).",
     )
-    p_list_chat.set_defaults(func=_cmd_list_chat)
+    p_list_chat.set_defaults(func=cmd_list_chat)
 
     # ── stats ─────────────────────────────────────────────────────────
     p_stats = sub.add_parser(
         "stats",
         help="Show statistics about the local vector store.",
-        description="Display key metrics about the local Atlas vector index.",
+        description="Display key metrics about the local Atlas vector index: paths, document counts, and video count.",
         epilog="Example:\n  atlas stats",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=[_shared],
     )
-    p_stats.set_defaults(func=_cmd_stats)
+    p_stats.set_defaults(func=cmd_stats)
 
     # ── get-video ─────────────────────────────────────────────────────────
     p_get_video = sub.add_parser(
@@ -272,11 +272,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_get_video.add_argument("video_id", help="Video ID returned by 'atlas index'.")
     p_get_video.add_argument("--output", "-o", metavar="FILE", help="Save JSON output to this file.")
-    p_get_video.set_defaults(func=_cmd_get_data)
+    p_get_video.set_defaults(func=cmd_get_data)
 
     # ── queue ─────────────────────────────────────────────────────────
-    from ..task_queue import add_queue_commands as _add_queue_commands
+    from ..task_queue import add_queue_commands
 
-    _add_queue_commands(sub)
+    add_queue_commands(sub)
 
     return parser

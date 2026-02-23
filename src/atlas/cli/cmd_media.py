@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional
 
 from .helpers import (
-    _err,
-    _make_progress,
-    _print_queued_info,
+    err,
+    make_progress,
     parse_duration,
+    print_queued_info,
     validate_api_keys,
     validate_video_path,
 )
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 # ── extract ───────────────────────────────────────────────────────────────────
 
 
-def _cmd_extract(args: argparse.Namespace) -> None:
+def cmd_extract(args: argparse.Namespace) -> None:
     """Extract multimodal insights, optionally queuing the task."""
     from . import get_console, get_logger
 
@@ -37,7 +37,7 @@ def _cmd_extract(args: argparse.Namespace) -> None:
     output_path: Optional[str] = getattr(args, "output", None)
 
     if fmt not in ("json", "text"):
-        _err("--format must be 'json' or 'text'")
+        err("--format must be 'json' or 'text'")
 
     validate_api_keys(require_gemini=True, require_groq=False)
     video_path = validate_video_path(args.video_path)
@@ -56,7 +56,7 @@ def _cmd_extract(args: argparse.Namespace) -> None:
             output_path=output_path,
             benchmark=benchmark,
         )
-        _print_queued_info(
+        print_queued_info(
             console,
             task_id,
             "extract",
@@ -75,7 +75,7 @@ def _cmd_extract(args: argparse.Namespace) -> None:
     if args.attrs:
         for attr in list(args.attrs):
             if attr not in DEFAULT_DESCRIPTION_ATTRS:
-                _err(f"Invalid attribute: {attr!r} — valid: {', '.join(sorted(DEFAULT_DESCRIPTION_ATTRS))}")
+                err(f"Invalid attribute: {attr!r} — valid: {', '.join(sorted(DEFAULT_DESCRIPTION_ATTRS))}")
         description_attrs: List[DescriptionAttr] = list(args.attrs)
     else:
         description_attrs = DEFAULT_DESCRIPTION_ATTRS
@@ -151,7 +151,7 @@ def _cmd_extract(args: argparse.Namespace) -> None:
 # ── transcribe ────────────────────────────────────────────────────────────────
 
 
-def _cmd_transcribe(args: argparse.Namespace) -> None:
+def cmd_transcribe(args: argparse.Namespace) -> None:
     """Transcribe a video, optionally queuing the task."""
     from . import get_console, get_logger
     from ..utils import TempPath
@@ -164,7 +164,7 @@ def _cmd_transcribe(args: argparse.Namespace) -> None:
     output_path: Optional[str] = getattr(args, "output", None)
 
     if fmt not in ("text", "vtt", "srt"):
-        _err("--format must be 'text', 'vtt', or 'srt'")
+        err("--format must be 'text', 'vtt', or 'srt'")
 
     validate_api_keys(require_gemini=False, require_groq=True)
     video_path = validate_video_path(args.video_path)
@@ -183,7 +183,7 @@ def _cmd_transcribe(args: argparse.Namespace) -> None:
             output_path=output_path,
             benchmark=benchmark,
         )
-        _print_queued_info(
+        print_queued_info(
             console,
             task_id,
             "transcribe",
@@ -213,7 +213,7 @@ def _cmd_transcribe(args: argparse.Namespace) -> None:
         return await get_video_transcript(str(video_path), format=fmt, on_chunk=_on_chunk)
 
     try:
-        with _make_progress() as progress:
+        with make_progress() as progress:
             task = progress.add_task("Transcribing...", total=None)
             final_result = asyncio.run(_run())
             progress.update(task, completed=True)
@@ -240,7 +240,7 @@ def _cmd_transcribe(args: argparse.Namespace) -> None:
 # ── index ─────────────────────────────────────────────────────────────────────
 
 
-def _cmd_index(args: argparse.Namespace) -> None:
+def cmd_index(args: argparse.Namespace) -> None:
     """Index a video for semantic search, optionally queuing the task."""
     from . import get_console, get_logger
     from ..utils import TempPath
@@ -268,7 +268,7 @@ def _cmd_index(args: argparse.Namespace) -> None:
             label=f"index {video_path.name}",
             benchmark=benchmark,
         )
-        _print_queued_info(console, task_id, "index", benchmark=benchmark)
+        print_queued_info(console, task_id, "index", benchmark=benchmark)
         return
 
     # ── Direct execution (no queue) ───────────────────────────────────
@@ -279,13 +279,13 @@ def _cmd_index(args: argparse.Namespace) -> None:
     console.print(f"[dim]Chunk duration: {chunk_sec}s, Overlap: {overlap_sec}s[/dim]")
 
     async def _run():
-        with _make_progress() as progress:
+        with make_progress() as progress:
             task = progress.add_task("Processing and indexing video…", total=None)
 
             if description_attrs := list(args.attrs) if args.attrs else None:
                 for attr in description_attrs:
                     if attr not in DEFAULT_DESCRIPTION_ATTRS:
-                        _err(f"Invalid attribute: {attr!r} — valid: {', '.join(sorted(DEFAULT_DESCRIPTION_ATTRS))}")
+                        err(f"Invalid attribute: {attr!r} — valid: {', '.join(sorted(DEFAULT_DESCRIPTION_ATTRS))}")
 
             video_id, indexed_count, result = await index_video(
                 video_path=str(video_path),
