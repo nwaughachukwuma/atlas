@@ -27,19 +27,18 @@ class TextEmbedding:
         from .gemini_client import GeminiClient
 
         try:
-            with GeminiClient.get_client() as client:
-                result = client.models.embed_content(
-                    model="gemini-embedding-001",
-                    contents=self.content,
-                    config=types.EmbedContentConfig(
-                        output_dimensionality=dimensionality,
-                    ),
-                )
+            result = GeminiClient.get_client().models.embed_content(
+                model="gemini-embedding-001",
+                contents=self.content,
+                config=types.EmbedContentConfig(
+                    output_dimensionality=dimensionality,
+                ),
+            )
 
-                if not result.embeddings or not result.embeddings[0].values:
-                    raise ValueError("Could not generate text embedding for your content")
+            if not result.embeddings or not result.embeddings[0].values:
+                raise ValueError("Could not generate text embedding for your content")
 
-                return result.embeddings[0].values
+            return result.embeddings[0].values
 
         except Exception as e:
             logger.error(f"Error generating embedding: {e}")

@@ -41,12 +41,14 @@ class GeminiClient:
 class GeminiMediaEngine:
     """Engine for analyzing media using Gemini"""
 
+    def __init__(self):
+        self.client = GeminiClient.get_client()
+
     @process_time()
     @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))
     async def upload_file_async(self, file_path: str) -> "genai_types.File":
         """Upload a file to Gemini asynchronously"""
-        async with GeminiClient.get_client().aio as aclient:
-            return await aclient.files.upload(file=file_path)
+        return await self.client.aio.files.upload(file=file_path)
 
     @process_time()
     @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))
@@ -85,11 +87,9 @@ class GeminiMediaEngine:
         """Describe audio/video media file using Gemini"""
         from google.genai import types
 
-        aclient = GeminiClient.get_client().aio
-
         @retry(RetryConfig(max_retries=1, delay=3, backoff=1.5))
         async def _handler(model_name: str) -> str:
-            response = await aclient.models.generate_content(
+            response = await self.client.aio.models.generate_content(
                 model=model_name,
                 contents=[file_part, prompt],
                 config=types.GenerateContentConfig(
@@ -108,8 +108,6 @@ class GeminiMediaEngine:
         except Exception as e:
             logger.error(f"Error with gemini-2.5-flash-lite: {e}. Falling back to gemini-2.5-flash")
             return await _handler("gemini-2.5-flash")
-        finally:
-            await aclient.aclose()
 
     @process_time()
     async def generate_summary(
@@ -123,19 +121,18 @@ class GeminiMediaEngine:
 
         @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))
         async def _handler() -> str:
-            async with GeminiClient.get_client().aio as aclient:
-                response = await aclient.models.generate_content(
-                    model=model,
-                    contents=[content],
-                    config=types.GenerateContentConfig(
-                        temperature=0.25,
-                        max_output_tokens=256,
-                        response_mime_type="text/plain",
-                        system_instruction=system_prompt,
-                    ),
-                )
-                if not response.text:
-                    raise ValueError("Error generating summary")
-                return response.text
+            response = await self.client.aio.models.generate_content(
+                model=model,
+                contents=[content],
+                config=types.GenerateContentConfig(
+                    temperature=0.25,
+                    max_output_tokens=256,
+                    response_mime_type="text/plain",
+                    system_instruction=system_prompt,
+                ),
+            )
+            if not response.text:
+                raise ValueError("Error generating summary")
+            return response.text
 
         return await _handler()

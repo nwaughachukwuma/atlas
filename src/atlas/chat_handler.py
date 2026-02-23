@@ -109,11 +109,11 @@ async def _stream_response(
         system_instruction=system_prompt,
     )
 
-    async with GeminiClient.get_client().aio as aclient:
-        async for chunk in await aclient.models.generate_content_stream(
-            model="gemini-2.5-flash-lite",
-            contents=[query],
-            config=config,
-        ):
-            if chunk.text:
-                yield chunk.text
+    aclient = GeminiClient.get_client().aio
+    async for chunk in await aclient.models.generate_content_stream(
+        model="gemini-2.5-flash-lite",
+        contents=[query],
+        config=config,
+    ):
+        if chunk.text:
+            yield chunk.text
