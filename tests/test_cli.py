@@ -3,10 +3,10 @@ Unit tests for atlas.cli — argument parser, helpers, and command handlers.
 
 Strategy
 --------
-* Parser tests call _build_parser().parse_args() with synthetic argv — no side
+* Parser tests call build_parser().parse_args() with synthetic argv — no side
   effects, no I/O.
 * Helper tests call the pure utility functions directly.
-* Command handler tests call _cmd_* directly with an argparse.Namespace, mocking
+* Command handler tests call cmd_* directly with an argparse.Namespace, mocking
   every I/O boundary (file-system, network, vector store, asyncio.run).
 """
 # ruff: noqa: D102
@@ -21,19 +21,19 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from atlas.cli import (
-    _build_parser,
-    _cmd_chat,
-    _cmd_extract,
-    _cmd_get_data,
-    _cmd_index,
-    _cmd_list_chat,
-    _cmd_list_videos,
-    _cmd_search,
-    _cmd_stats,
-    _cmd_transcribe,
-    _format_elapsed,
-    _short_name,
+    build_parser,
+    cmd_chat,
+    cmd_extract,
+    cmd_get_data,
+    cmd_index,
+    cmd_list_chat,
+    cmd_list_videos,
+    cmd_search,
+    cmd_stats,
+    cmd_transcribe,
+    format_elapsed,
     parse_duration,
+    short_name,
     validate_api_keys,
     validate_video_path,
 )
@@ -47,7 +47,7 @@ from .helpers import mock_asyncio_run
 
 @pytest.fixture()
 def parser() -> argparse.ArgumentParser:
-    return _build_parser()
+    return build_parser()
 
 
 @pytest.fixture()
@@ -99,8 +99,8 @@ class TestParserConstruction:
         assert ns.no_queue is False
         assert ns.no_streaming is False
 
-    def test_extract_no_summary_flag(self, parser):
-        ns = parser.parse_args(["extract", "video.mp4", "--no-summary"])
+    def test_extract_no_include_summary_flag(self, parser):
+        ns = parser.parse_args(["extract", "video.mp4", "--include-summary", "false"])
         assert ns.include_summary is False
 
     def test_extract_json_format(self, parser):
@@ -224,15 +224,15 @@ class TestParserConstruction:
 
     def test_func_set_correctly(self, parser):
         mapping = {
-            "extract": (_cmd_extract, ["extract", "v.mp4"]),
-            "index": (_cmd_index, ["index", "v.mp4"]),
-            "search": (_cmd_search, ["search", "q"]),
-            "transcribe": (_cmd_transcribe, ["transcribe", "v.mp4"]),
-            "chat": (_cmd_chat, ["chat", "vid1", "q?"]),
-            "list-videos": (_cmd_list_videos, ["list-videos"]),
-            "list-chat": (_cmd_list_chat, ["list-chat", "vid1"]),
-            "stats": (_cmd_stats, ["stats"]),
-            "get-video": (_cmd_get_data, ["get-video", "vid1"]),
+            "extract": (cmd_extract, ["extract", "v.mp4"]),
+            "index": (cmd_index, ["index", "v.mp4"]),
+            "search": (cmd_search, ["search", "q"]),
+            "transcribe": (cmd_transcribe, ["transcribe", "v.mp4"]),
+            "chat": (cmd_chat, ["chat", "vid1", "q?"]),
+            "list-videos": (cmd_list_videos, ["list-videos"]),
+            "list-chat": (cmd_list_chat, ["list-chat", "vid1"]),
+            "stats": (cmd_stats, ["stats"]),
+            "get-video": (cmd_get_data, ["get-video", "vid1"]),
         }
         for cmd_name, (expected_fn, argv) in mapping.items():
             ns = parser.parse_args(argv)
@@ -246,27 +246,27 @@ class TestParserConstruction:
 
 class TestShortName:
     def test_strips_module_prefix(self):
-        assert _short_name("atlas.utils.MediaFileManager._clip") == "_clip"
+        assert short_name("atlas.utils.MediaFileManager._clip") == "_clip"
 
     def test_single_component(self):
-        assert _short_name("_clip") == "_clip"
+        assert short_name("_clip") == "_clip"
 
     def test_two_components(self):
-        assert _short_name("module.func") == "func"
+        assert short_name("module.func") == "func"
 
 
 class TestFormatElapsed:
     def test_sub_minute(self):
-        assert _format_elapsed(0.91) == "0.91s"
-        assert _format_elapsed(59.99) == "59.99s"
+        assert format_elapsed(0.91) == "0.91s"
+        assert format_elapsed(59.99) == "59.99s"
 
     def test_minutes(self):
-        assert _format_elapsed(90.0) == "1m 30s"
-        assert _format_elapsed(60.0) == "1m 0s"
+        assert format_elapsed(90.0) == "1m 30s"
+        assert format_elapsed(60.0) == "1m 0s"
 
     def test_hours(self):
-        assert _format_elapsed(3661.0) == "1h 1m 1s"
-        assert _format_elapsed(3600.0) == "1h 0m 0s"
+        assert format_elapsed(3661.0) == "1h 1m 1s"
+        assert format_elapsed(3600.0) == "1h 0m 0s"
 
 
 class TestParseDuration:
@@ -367,26 +367,26 @@ class TestCmdIndex:
 
         with (
             patch("atlas.cli.cmd_media.validate_api_keys"),
-            patch("atlas.cli.cmd_media._make_progress", return_value=progress_ctx),
+            patch("atlas.cli.cmd_media.make_progress", return_value=progress_ctx),
             patch(
                 "atlas.cli.cmd_media.asyncio.run",
                 side_effect=mock_asyncio_run(return_value=("vid_001", 3, mock_result)),
             ),
         ):
-            _cmd_index(args)  # must not raise
+            cmd_index(args)  # must not raise
 
     def test_missing_api_key_exits(self, tmp_path, monkeypatch):
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
         video = tmp_path / "v.mp4"
         video.touch()
         with pytest.raises(SystemExit):
-            _cmd_index(self._args(str(video)))
+            cmd_index(self._args(str(video)))
 
     def test_bad_video_path_exits(self, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
         monkeypatch.setenv("GROQ_API_KEY", "k2")
         with pytest.raises(SystemExit):
-            _cmd_index(self._args("/no/such/file.mp4"))
+            cmd_index(self._args("/no/such/file.mp4"))
 
     def test_exception_in_run_exits(self, tmp_path, monkeypatch, progress_ctx):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
@@ -395,11 +395,11 @@ class TestCmdIndex:
         video.touch()
         with (
             patch("atlas.cli.cmd_media.validate_api_keys"),
-            patch("atlas.cli.cmd_media._make_progress", return_value=progress_ctx),
+            patch("atlas.cli.cmd_media.make_progress", return_value=progress_ctx),
             patch("atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(side_effect=RuntimeError("boom"))),
         ):
             with pytest.raises(SystemExit):
-                _cmd_index(self._args(str(video)))
+                cmd_index(self._args(str(video)))
 
 
 # ---------------------------------------------------------------------------
@@ -425,7 +425,7 @@ class TestCmdSearch:
             patch("atlas.cli.cmd_explore.validate_api_keys"),
             patch("atlas.cli.cmd_explore.asyncio.run", side_effect=mock_asyncio_run(return_value=[mock_result])),
         ):
-            _cmd_search(self._args())  # must not raise
+            cmd_search(self._args())  # must not raise
 
     def test_empty_results_prints_message(self, monkeypatch, capsys):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
@@ -434,7 +434,7 @@ class TestCmdSearch:
             patch("atlas.cli.cmd_explore.validate_api_keys"),
             patch("atlas.cli.cmd_explore.asyncio.run", side_effect=mock_asyncio_run(return_value=[])),
         ):
-            _cmd_search(self._args())  # no SystemExit — just a "no results" message
+            cmd_search(self._args())  # no SystemExit — just a "no results" message
 
     def test_exception_exits(self, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
@@ -443,12 +443,12 @@ class TestCmdSearch:
             patch("atlas.cli.cmd_explore.asyncio.run", side_effect=mock_asyncio_run(side_effect=RuntimeError("fail"))),
         ):
             with pytest.raises(SystemExit):
-                _cmd_search(self._args())
+                cmd_search(self._args())
 
     def test_missing_api_key_exits(self, monkeypatch):
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
         with pytest.raises(SystemExit):
-            _cmd_search(self._args())
+            cmd_search(self._args())
 
 
 # ---------------------------------------------------------------------------
@@ -464,28 +464,28 @@ class TestCmdChat:
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
         with (
             patch("atlas.cli.cmd_explore.validate_api_keys"),
-            patch("atlas.cli.cmd_explore._make_progress", return_value=progress_ctx),
+            patch("atlas.cli.cmd_explore.make_progress", return_value=progress_ctx),
             patch("atlas.cli.cmd_explore.asyncio.run", side_effect=mock_asyncio_run(return_value="Here is my answer.")),
         ):
-            _cmd_chat(self._args())
+            cmd_chat(self._args())
 
     def test_missing_api_key_exits(self, monkeypatch):
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
         with pytest.raises(SystemExit):
-            _cmd_chat(self._args())
+            cmd_chat(self._args())
 
     def test_exception_exits(self, monkeypatch, progress_ctx):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
         with (
             patch("atlas.cli.cmd_explore.validate_api_keys"),
-            patch("atlas.cli.cmd_explore._make_progress", return_value=progress_ctx),
+            patch("atlas.cli.cmd_explore.make_progress", return_value=progress_ctx),
             patch(
                 "atlas.cli.cmd_explore.asyncio.run",
                 side_effect=mock_asyncio_run(side_effect=RuntimeError("network error")),
             ),
         ):
             with pytest.raises(SystemExit):
-                _cmd_chat(self._args())
+                cmd_chat(self._args())
 
 
 # ---------------------------------------------------------------------------
@@ -501,14 +501,14 @@ class TestCmdListVideos:
         mock_vi = MagicMock()
         mock_vi.list_videos.return_value = []
         with patch("atlas.vector_store.video_index.default_video_index", return_value=mock_vi):
-            _cmd_list_videos(self._args())
+            cmd_list_videos(self._args())
 
     def test_with_videos(self):
         entry = MagicMock(video_id="vid_abc", indexed_at="2026-02-18T10:00:00")
         mock_vi = MagicMock()
         mock_vi.list_videos.return_value = [entry]
         with patch("atlas.vector_store.video_index.default_video_index", return_value=mock_vi):
-            _cmd_list_videos(self._args())
+            cmd_list_videos(self._args())
 
 
 # ---------------------------------------------------------------------------
@@ -524,7 +524,7 @@ class TestCmdListChat:
         mock_vc = MagicMock()
         mock_vc.get_history.return_value = []
         with patch("atlas.vector_store.video_chat.default_video_chat", return_value=mock_vc):
-            _cmd_list_chat(self._args())
+            cmd_list_chat(self._args())
 
     def test_with_history(self):
         mock_vc = MagicMock()
@@ -533,13 +533,13 @@ class TestCmdListChat:
             {"role": "assistant", "content": "hello", "timestamp": "2026-01-01T00:00:01"},
         ]
         with patch("atlas.vector_store.video_chat.default_video_chat", return_value=mock_vc):
-            _cmd_list_chat(self._args())
+            cmd_list_chat(self._args())
 
     def test_last_n_forwarded(self):
         mock_vc = MagicMock()
         mock_vc.get_history.return_value = []
         with patch("atlas.vector_store.video_chat.default_video_chat", return_value=mock_vc):
-            _cmd_list_chat(self._args(last_n=5))
+            cmd_list_chat(self._args(last_n=5))
             mock_vc.get_history.assert_called_once_with("vid1", last_n=5)
 
 
@@ -566,7 +566,7 @@ class TestCmdStats:
             patch("atlas.vector_store.video_index.default_video_index", return_value=mock_vi),
             patch("atlas.vector_store.video_chat.default_video_chat", return_value=mock_vc),
         ):
-            _cmd_stats(self._args())
+            cmd_stats(self._args())
 
     def test_stats_raises_if_zvec_unavailable(self):
         """raises RuntimeError if zvec.stats errors or zvec is not available"""
@@ -584,7 +584,7 @@ class TestCmdStats:
             patch("atlas.vector_store.video_chat.default_video_chat", return_value=mock_vc),
         ):
             with pytest.raises(RuntimeError, match="zvec unavail"):
-                _cmd_stats(self._args())
+                cmd_stats(self._args())
 
 
 # ---------------------------------------------------------------------------
@@ -606,9 +606,9 @@ class TestCmdGetData:
         }
         with (
             patch("atlas.vector_store.video_index.default_video_index", return_value=mock_vi),
-            patch("atlas.cli.cmd_explore._make_progress", return_value=progress_ctx),
+            patch("atlas.cli.cmd_explore.make_progress", return_value=progress_ctx),
         ):
-            _cmd_get_data(self._args())
+            cmd_get_data(self._args())
         captured = capsys.readouterr()
         data = json.loads(captured.out)
         assert data["video_id"] == "vid1"
@@ -618,7 +618,7 @@ class TestCmdGetData:
         mock_vi = MagicMock()
         mock_vi.get_video_data.return_value = None
         with patch("atlas.vector_store.video_index.default_video_index", return_value=mock_vi):
-            _cmd_get_data(self._args())
+            cmd_get_data(self._args())
 
     def test_saves_to_file(self, tmp_path):
         mock_vi = MagicMock()
@@ -630,7 +630,7 @@ class TestCmdGetData:
         }
         out = tmp_path / "out.json"
         with patch("atlas.vector_store.video_index.default_video_index", return_value=mock_vi):
-            _cmd_get_data(self._args(output=str(out)))
+            cmd_get_data(self._args(output=str(out)))
         assert out.exists()
         data = json.loads(out.read_text())
         assert data["video_id"] == "vid1"
@@ -662,7 +662,7 @@ class TestCmdTranscribe:
                 "atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(return_value="Hello world transcript")
             ),
         ):
-            _cmd_transcribe(self._args(str(video)))
+            cmd_transcribe(self._args(str(video)))
 
     def test_success_saves_to_file(self, tmp_path, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "k1")
@@ -676,24 +676,24 @@ class TestCmdTranscribe:
                 side_effect=mock_asyncio_run(return_value="1\n00:00:00 --> 00:00:10\nHello"),
             ),
         ):
-            _cmd_transcribe(self._args(str(video), fmt="srt", output=str(out)))
+            cmd_transcribe(self._args(str(video), fmt="srt", output=str(out)))
 
     def test_invalid_format_exits(self, tmp_path, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "k1")
         video = tmp_path / "v.mp4"
         video.touch()
         with pytest.raises(SystemExit):
-            _cmd_transcribe(self._args(str(video), fmt="xml"))
+            cmd_transcribe(self._args(str(video), fmt="xml"))
 
     def test_missing_groq_key_exits(self, monkeypatch):
         monkeypatch.delenv("GROQ_API_KEY", raising=False)
         with pytest.raises(SystemExit):
-            _cmd_transcribe(self._args())
+            cmd_transcribe(self._args())
 
     def test_bad_video_path_exits(self, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "k1")
         with pytest.raises(SystemExit):
-            _cmd_transcribe(self._args("/no/file.mp4"))
+            cmd_transcribe(self._args("/no/file.mp4"))
 
     def test_exception_exits(self, tmp_path, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "k1")
@@ -704,7 +704,7 @@ class TestCmdTranscribe:
             patch("atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(side_effect=RuntimeError("fail"))),
         ):
             with pytest.raises(SystemExit):
-                _cmd_transcribe(self._args(str(video)))
+                cmd_transcribe(self._args(str(video)))
 
 
 # ---------------------------------------------------------------------------
@@ -736,7 +736,7 @@ class TestCmdExtract:
             patch("atlas.cli.cmd_media.validate_api_keys"),
             patch("atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(return_value=mock_result)),
         ):
-            _cmd_extract(self._args(str(video)))
+            cmd_extract(self._args(str(video)))
 
     def test_success_json_to_stdout(self, tmp_path, monkeypatch, capsys):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
@@ -747,7 +747,7 @@ class TestCmdExtract:
             patch("atlas.cli.cmd_media.validate_api_keys"),
             patch("atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(return_value=mock_result)),
         ):
-            _cmd_extract(self._args(str(video), fmt="json"))
+            cmd_extract(self._args(str(video), fmt="json"))
         captured = capsys.readouterr()
 
         data = json.loads(captured.out)
@@ -763,7 +763,7 @@ class TestCmdExtract:
             patch("atlas.cli.cmd_media.validate_api_keys"),
             patch("atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(return_value=mock_result)),
         ):
-            _cmd_extract(self._args(str(video), fmt="json", output=str(out)))
+            cmd_extract(self._args(str(video), fmt="json", output=str(out)))
         assert out.exists()
 
     def test_invalid_attr_exits(self, tmp_path, monkeypatch):
@@ -772,7 +772,7 @@ class TestCmdExtract:
         video.touch()
         with patch("atlas.cli.cmd_media.validate_api_keys"):
             with pytest.raises(SystemExit):
-                _cmd_extract(self._args(str(video), attrs=["invalid_attr"]))
+                cmd_extract(self._args(str(video), attrs=["invalid_attr"]))
 
     def test_invalid_format_exits(self, tmp_path, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
@@ -780,19 +780,19 @@ class TestCmdExtract:
         video.touch()
         with patch("atlas.cli.cmd_media.validate_api_keys"):
             with pytest.raises(SystemExit):
-                _cmd_extract(self._args(str(video), fmt="yaml"))
+                cmd_extract(self._args(str(video), fmt="yaml"))
 
     def test_missing_api_key_exits(self, tmp_path, monkeypatch):
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
         video = tmp_path / "v.mp4"
         video.touch()
         with pytest.raises(SystemExit):
-            _cmd_extract(self._args(str(video)))
+            cmd_extract(self._args(str(video)))
 
     def test_bad_video_path_exits(self, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
         with pytest.raises(SystemExit):
-            _cmd_extract(self._args("/no/file.mp4"))
+            cmd_extract(self._args("/no/file.mp4"))
 
     def test_exception_exits(self, tmp_path, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
@@ -805,7 +805,7 @@ class TestCmdExtract:
             ),
         ):
             with pytest.raises(SystemExit):
-                _cmd_extract(self._args(str(video)))
+                cmd_extract(self._args(str(video)))
 
 
 # ---------------------------------------------------------------------------
@@ -834,10 +834,14 @@ class TestTaskStore:
         store.add("t1", "extract", "extract v.mp4")
 
         store.mark_running("t1")
-        assert store.get("t1")["status"] == "running"
+        rtask = store.get("t1")
+        assert rtask is not None
+        assert rtask["status"] == "running"
 
         store.mark_completed("t1")
-        assert store.get("t1")["status"] == "completed"
+        ctask = store.get("t1")
+        assert ctask is not None
+        assert ctask["status"] == "completed"
 
     def test_mark_failed(self, tmp_path):
         from atlas.task_queue import TaskStore
@@ -846,7 +850,9 @@ class TestTaskStore:
         store.add("t1", "index", "index v.mp4")
         store.mark_running("t1")
         store.mark_failed("t1", "out of memory")
+
         task = store.get("t1")
+        assert task is not None
         assert task["status"] == "failed"
         assert task["error"] == "out of memory"
 
@@ -856,7 +862,10 @@ class TestTaskStore:
         store = TaskStore(db_path=tmp_path / "test.db")
         store.add("t1", "transcribe", "t v.mp4")
         store.mark_timeout("t1")
-        assert store.get("t1")["status"] == "timeout"
+
+        task = store.get("t1")
+        assert task is not None
+        assert task["status"] == "timeout"
 
     def test_list_all_and_filter(self, tmp_path):
         from atlas.task_queue import TaskStore
@@ -967,26 +976,26 @@ class TestTaskQueueSubmit:
 
 class TestSerializeResult:
     def test_none(self):
-        from atlas.task_queue import _serialize_result
+        from atlas.task_queue import serialize_result
 
-        assert _serialize_result(None) == ""
+        assert serialize_result(None) == ""
 
     def test_string(self):
-        from atlas.task_queue import _serialize_result
+        from atlas.task_queue import serialize_result
 
-        assert _serialize_result("hello world") == "hello world"
+        assert serialize_result("hello world") == "hello world"
 
     def test_dict(self):
-        from atlas.task_queue import _serialize_result
+        from atlas.task_queue import serialize_result
 
-        result = _serialize_result({"key": "value"})
+        result = serialize_result({"key": "value"})
         data = json.loads(result)
         assert data == {"key": "value"}
 
     def test_list(self):
-        from atlas.task_queue import _serialize_result
+        from atlas.task_queue import serialize_result
 
-        result = _serialize_result([1, 2, 3])
+        result = serialize_result([1, 2, 3])
         assert json.loads(result) == [1, 2, 3]
 
 
@@ -994,15 +1003,15 @@ class TestQueueCLICommands:
     """Test queue list/status CLI command handlers."""
 
     def test_queue_list_empty(self, tmp_path, monkeypatch):
-        from atlas.task_queue import TaskStore, _cmd_queue_list
+        from atlas.task_queue import TaskStore, cmd_queue_list
 
         monkeypatch.setattr("atlas.task_queue.commands.TaskStore", lambda: TaskStore(db_path=tmp_path / "q.db"))
         args = argparse.Namespace(status=None)
         # Should not raise
-        _cmd_queue_list(args)
+        cmd_queue_list(args)
 
     def test_queue_list_with_tasks(self, tmp_path, monkeypatch):
-        from atlas.task_queue import TaskStore, _cmd_queue_list
+        from atlas.task_queue import TaskStore, cmd_queue_list
 
         db_path = tmp_path / "q.db"
         store = TaskStore(db_path=db_path)
@@ -1011,10 +1020,10 @@ class TestQueueCLICommands:
 
         monkeypatch.setattr("atlas.task_queue.commands.TaskStore", lambda: store)
         args = argparse.Namespace(status=None)
-        _cmd_queue_list(args)  # should not raise
+        cmd_queue_list(args)  # should not raise
 
     def test_queue_list_filtered(self, tmp_path, monkeypatch):
-        from atlas.task_queue import TaskStore, _cmd_queue_list
+        from atlas.task_queue import TaskStore, cmd_queue_list
 
         db_path = tmp_path / "q.db"
         store = TaskStore(db_path=db_path)
@@ -1023,10 +1032,10 @@ class TestQueueCLICommands:
 
         monkeypatch.setattr("atlas.task_queue.commands.TaskStore", lambda: store)
         args = argparse.Namespace(status="running")
-        _cmd_queue_list(args)  # should not raise
+        cmd_queue_list(args)  # should not raise
 
     def test_queue_status_found(self, tmp_path, monkeypatch):
-        from atlas.task_queue import TaskStore, _cmd_queue_status
+        from atlas.task_queue import TaskStore, cmd_queue_status
 
         db_path = tmp_path / "q.db"
         monkeypatch.setattr("atlas.task_queue.commands.RESULTS_DIR", tmp_path / "results")
@@ -1035,20 +1044,20 @@ class TestQueueCLICommands:
 
         monkeypatch.setattr("atlas.task_queue.commands.TaskStore", lambda: store)
         args = argparse.Namespace(task_id="abc12345")
-        _cmd_queue_status(args)  # should not raise
+        cmd_queue_status(args)  # should not raise
 
     def test_queue_status_not_found(self, tmp_path, monkeypatch):
-        from atlas.task_queue import TaskStore, _cmd_queue_status
+        from atlas.task_queue import TaskStore, cmd_queue_status
 
         monkeypatch.setattr("atlas.task_queue.commands.RESULTS_DIR", tmp_path / "results")
         monkeypatch.setattr("atlas.task_queue.commands.TaskStore", lambda: TaskStore(db_path=tmp_path / "q.db"))
 
         args = argparse.Namespace(task_id="nonexistent")
-        _cmd_queue_status(args)  # should not raise, just prints "not found"
+        cmd_queue_status(args)  # should not raise, just prints "not found"
 
 
 class TestCmdTranscribeQueued:
-    """Test that _cmd_transcribe correctly queues when no_queue is False."""
+    """Test that cmd_transcribe correctly queues when no_queue is False."""
 
     def test_queue_path(self, tmp_path, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "k1")
@@ -1070,6 +1079,6 @@ class TestCmdTranscribeQueued:
         )
 
         with patch("atlas.cli.cmd_media.validate_api_keys"):
-            _cmd_transcribe(args)  # should queue and return without error
+            cmd_transcribe(args)  # should queue and return without error
 
         mock_queue.submit.assert_called_once()

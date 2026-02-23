@@ -28,7 +28,7 @@ def get_logger():
 # ── Short helpers ─────────────────────────────────────────────────────────────
 
 
-def _short_name(full: str) -> str:
+def short_name(full: str) -> str:
     """Strip module prefix from a qualified name.
 
     ``'atlas.utils.MediaFileManager._clip_media_async'`` → ``'_clip_media_async'``
@@ -37,7 +37,7 @@ def _short_name(full: str) -> str:
     return v[1] if len(v) > 1 else v[0]
 
 
-def _err(msg: str) -> None:
+def err(msg: str) -> None:
     """Print a red error message and exit."""
     from . import get_console
 
@@ -45,7 +45,7 @@ def _err(msg: str) -> None:
     sys.exit(1)
 
 
-def _format_elapsed(seconds: float) -> str:
+def format_elapsed(seconds: float) -> str:
     """Return a human-readable duration string.
 
     Examples: ``0.91s`` → ``'0.91s'``  |  ``90.4s`` → ``'1m 30s'``  |  ``3661s`` → ``'1h 1m 1s'``
@@ -67,9 +67,9 @@ def _format_elapsed(seconds: float) -> str:
 def validate_api_keys(require_gemini: bool = True, require_groq: bool = False) -> None:
     """Exit with a helpful message if required API keys are missing."""
     if require_gemini and not os.environ.get("GEMINI_API_KEY"):
-        _err("GEMINI_API_KEY environment variable is required.\nSet it with: export GEMINI_API_KEY=your-api-key")
+        err("GEMINI_API_KEY environment variable is required.\nSet it with: export GEMINI_API_KEY=your-api-key")
     if require_groq and not os.environ.get("GROQ_API_KEY"):
-        _err(
+        err(
             "GROQ_API_KEY environment variable is required for transcription.\n"
             "Set it with: export GROQ_API_KEY=your-api-key"
         )
@@ -102,7 +102,7 @@ def parse_duration(duration_str: str) -> int:
         total += int(current)
         parsed_any = True
     if not parsed_any and s:
-        _err(f"Invalid duration format: {duration_str!r} — use e.g. 15s, 1m, 1m30s")
+        err(f"Invalid duration format: {duration_str!r} — use e.g. 15s, 1m, 1m30s")
     return total
 
 
@@ -110,16 +110,16 @@ def validate_video_path(video_path: str) -> Path:
     """Return a validated, absolute ``Path`` or exit with an error."""
     path = Path(video_path).resolve()
     if not path.exists():
-        _err(f"Video file not found: {video_path}")
+        err(f"Video file not found: {video_path}")
     if not path.is_file():
-        _err(f"Not a file: {video_path}")
+        err(f"Not a file: {video_path}")
     return path
 
 
 # ── Rich helpers (lazy) ──────────────────────────────────────────────────────
 
 
-def _make_progress():
+def make_progress():
     """Create a rich ``Progress`` instance for indeterminate tasks."""
     from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 
@@ -134,7 +134,7 @@ def _make_progress():
     )
 
 
-def _print_queued_info(
+def print_queued_info(
     console: "Console",
     task_id: str,
     command: str,
@@ -162,7 +162,7 @@ def _print_queued_info(
     console.print("  [dim]You can keep using Atlas for new tasks.[/dim]")
 
 
-def _print_benchmark_summary() -> None:
+def print_benchmark_summary() -> None:
     """Print benchmark timing table if --benchmark was requested (set by ``_state``)."""
     from . import _state, get_console
 
@@ -188,7 +188,7 @@ def _print_benchmark_summary() -> None:
     table.add_column("Max", justify="right", width=7)
     for s in stats:
         table.add_row(
-            _short_name(s.name),
+            short_name(s.name),
             str(s.calls),
             f"{s.total_s:.2f}s",
             f"{s.avg_s:.2f}s",

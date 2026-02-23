@@ -47,12 +47,12 @@ def add_queue_commands(subparsers: Any) -> None:
         choices=["pending", "running", "completed", "failed", "timeout"],
         help="Filter by status.",
     )
-    p_list.set_defaults(func=_cmd_queue_list)
+    p_list.set_defaults(func=cmd_queue_list)
 
     # atlas queue status
     p_status = sub.add_parser("status", help="Show status of a specific task.")
     p_status.add_argument("--task-id", "-t", required=True, help="Task ID to check.")
-    p_status.set_defaults(func=_cmd_queue_status)
+    p_status.set_defaults(func=cmd_queue_status)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -96,7 +96,7 @@ def _parse_benchmark_file(path: Path) -> list[tuple[str, ...]]:
 # ── Handlers ──────────────────────────────────────────────────────────────────
 
 
-def _cmd_queue_list(args: argparse.Namespace) -> None:
+def cmd_queue_list(args: argparse.Namespace) -> None:
     """Display a table of tasks in the queue."""
     from rich.table import Table
 
@@ -132,7 +132,7 @@ def _cmd_queue_list(args: argparse.Namespace) -> None:
     console.print(table)
 
 
-def _cmd_queue_status(args: argparse.Namespace) -> None:
+def cmd_queue_status(args: argparse.Namespace) -> None:
     """Show detailed status for a single task, rendered as a Rich table."""
     from rich.table import Table
 

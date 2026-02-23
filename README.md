@@ -100,20 +100,19 @@ atlas transcribe video.mp4 --format=srt --output=transcript.srt
 
 ### `atlas extract`
 
-Extract multimodal insights from a video. **Results stream to the terminal in real-time** as each segment is processed.
+Extract multimodal insights from a video without indexing. Tasks are **queued by default**; use `--no-queue` to run directly and stream results to the terminal in real time.
 
 ```
 atlas extract VIDEO_PATH [OPTIONS]
 
 Options:
-  -c, --chunk-duration DUR   Duration of each chunk (e.g. 15s, 1m) [default: 15s]
-  -l, --overlap DUR          Overlap between chunks [default: 1s]
-  -a, --attrs ATTR           Attribute to extract; repeat for multiple
-  -o, --output FILE          Save full output to this JSON file
-  -f, --format FMT           Output format: json or text [default: text]
-      --include-summary      Generate a per-segment summary (default: on)
-      --no-summary           Disable per-segment summary generation
-      --benchmark            Print a timing breakdown after completion
+  -c, --chunk-duration DUR     Duration of each chunk (e.g. 15s, 1m) [default: 15s]
+  -l, --overlap DUR            Overlap between chunks [default: 1s]
+  -a, --attrs ATTR             Attribute to extract; repeat for multiple
+  -o, --output FILE            Save full output to this JSON file
+  -f, --format FMT             Output format: json or text [default: text]
+      --include-summary BOOL   Generate a per-segment summary: true or false (default: true)
+      --benchmark              Print a timing breakdown after completion
 ```
 
 **Available attributes** (`--attrs`):
@@ -141,26 +140,25 @@ atlas extract video.mp4 --chunk-duration=10s --overlap=1s --format=json --output
 atlas extract video.mp4 --attrs visual_cues --attrs audio_analysis
 
 # Disable summary, print benchmark timing
-atlas extract video.mp4 --no-summary --benchmark
+atlas extract video.mp4 --include-summary false --benchmark
 ```
 
 ---
 
 ### `atlas index`
 
-Index a video for semantic search. Prints a **video_id** on completion — use it to filter searches, start chats, or retrieve data with `get-video`.
+Index a video for semantic search. Prints a **video_id** on completion — use it to filter searches, start chats, or retrieve data with `get-video`. Tasks are **queued by default**; use `--no-queue` to run directly.
 
 ```
 atlas index VIDEO_PATH [OPTIONS]
 
 Options:
-  -c, --chunk-duration DUR   Duration of each chunk [default: 15s]
-  -o, --overlap DUR          Overlap between chunks [default: 0s]
-  -e, --embedding-dim N      Embedding dimension: 768 or 3072 [default: 768]
-  -a, --attrs ATTR           Attribute to extract; repeat for multiple
-      --include-summary      Generate a per-segment summary (default: on)
-      --no-summary           Disable per-segment summary generation
-      --benchmark            Print a timing breakdown after completion
+  -c, --chunk-duration DUR     Duration of each chunk [default: 15s]
+  -o, --overlap DUR            Overlap between chunks [default: 0s]
+  -e, --embedding-dim N        Embedding dimension: 768 or 3072 [default: 768]
+  -a, --attrs ATTR             Attribute to extract; repeat for multiple
+      --include-summary BOOL  Generate a per-segment summary: true or false (default: true)
+      --benchmark              Print a timing breakdown after completion
 ```
 
 **Examples:**

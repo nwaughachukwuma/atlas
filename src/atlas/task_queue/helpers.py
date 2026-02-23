@@ -39,7 +39,7 @@ def results_dir_for(task_id: str) -> Path:
     return RESULTS_DIR / task_id
 
 
-# ── Backward-compatible aliases (used by tests / external callers) ────────────
+# ── Backward-compatible aliases (kept for any external callers) ───────────────
 
 _write_file = write_file
 _serialize_result = serialize_result

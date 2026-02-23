@@ -41,9 +41,9 @@ def _trigger_dispatch() -> None:
 
 # Command → importable function (resolved lazily).
 _COMMANDS: dict[str, str] = {
-    "transcribe": "atlas.cli.tasks._run_transcribe",
-    "extract": "atlas.cli.tasks._run_extract",
-    "index": "atlas.cli.tasks._run_index",
+    "transcribe": "atlas.cli.tasks.run_transcribe",
+    "extract": "atlas.cli.tasks.run_extract",
+    "index": "atlas.cli.tasks.run_index",
 }
 
 
