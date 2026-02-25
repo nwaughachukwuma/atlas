@@ -34,9 +34,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 DEFAULT_STORE_ROOT = Path.home() / ".atlas" / "index"
-
 COLLECTION_NAME = "video_index"
-
 DEFAULT_EMBEDDING_CONCURRENCY = 10
 
 

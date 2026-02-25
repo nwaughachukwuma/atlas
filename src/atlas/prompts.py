@@ -114,7 +114,7 @@ You have access to the following context:
 ## Relevant Video Content (semantic search results)
 {video_ctx_block}
 
-## Conversation History (most recent 20 messages)
+## Conversation History (up to 20 recent messages)
 {history_block}
 
 ## Additional Related Context (semantic chat search, new only)
