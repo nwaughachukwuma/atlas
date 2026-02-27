@@ -206,12 +206,12 @@ def cmd_transcribe(args: argparse.Namespace) -> None:
             console.print("[yellow]No transcript content generated.[/yellow]")
             return
 
-        result = {"transcript": full_text, "format": fmt}
-        output_str = json.dumps(result, indent=2)
         if output_path:
-            Path(output_path).write_text(output_str)
+            Path(output_path).write_text(full_text)
             console.print(f"\n[green]Transcript saved to:[/green] {output_path}")
         else:
+            result = {"transcript": full_text, "format": fmt}
+            output_str = json.dumps(result, indent=2)
             print(output_str)
     except Exception as e:
         console.print(f"[red]Error transcribing: {e}[/red]")
@@ -289,7 +289,6 @@ def cmd_index(args: argparse.Namespace) -> None:
         video_id, indexed_count, result = asyncio.run(_run())
         output = {
             "video_id": video_id,
-            "video_path": str(video_path),
             "indexed_count": indexed_count,
             "duration": result.duration,
             "segments_count": len(result.video_descriptions),
