@@ -431,16 +431,28 @@ class TestCmdSearch:
             benchmark=False,
         )
 
-    def test_success_with_results(self, monkeypatch):
+    def test_success_with_results(self, monkeypatch, capsys):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
 
         mock_result = MagicMock(score=0.95, video_id="vid1", start=0.0, end=10.0, content="visual cues about people")
+        mock_result.model_dump.return_value = {
+            "score": 0.95,
+            "video_id": "vid1",
+            "start": 0.0,
+            "end": 10.0,
+            "content": "visual cues about people",
+        }
 
         with (
             patch("atlas.cli.cmd_explore.validate_api_keys"),
             patch("atlas.cli.cmd_explore.asyncio.run", side_effect=mock_asyncio_run(return_value=[mock_result])),
         ):
             cmd_search(self._args())  # must not raise
+
+        out = capsys.readouterr().out
+        body = json.loads(out)
+        assert body["count"] == 1
+        assert body["results"][0]["video_id"] == "vid1"
 
     def test_empty_results_prints_message(self, monkeypatch, capsys):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")

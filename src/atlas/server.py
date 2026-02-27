@@ -11,16 +11,16 @@ Design rules
 from __future__ import annotations
 
 import argparse
+import json
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from .cli.cmd_explore import cmd_chat, cmd_get_data, cmd_list_chat, cmd_list_videos, cmd_search, cmd_stats
 from .cli.cmd_media import cmd_extract, cmd_index, cmd_transcribe
-from .task_queue.commands import cmd_queue_list, cmd_queue_status
 
 
 class CommandResult(BaseModel):
@@ -73,7 +73,14 @@ class ChatRequest(BaseModel):
     query: str
 
 
-def _run_command(func, args: argparse.Namespace) -> CommandResult:
+def _run_command(func, args: argparse.Namespace) -> Any:
+    """Run a CLI handler capturing stdout/stderr.
+
+    Used only for mutating/queuing commands (extract, index, transcribe) whose
+    output is either queued-task confirmation text or JSON (when --no-queue).
+    When stdout is valid JSON it is parsed and returned directly so the client
+    gets structured data rather than an escaped string.
+    """
     from . import cli as cli_module
 
     stdout = StringIO()
@@ -95,7 +102,12 @@ def _run_command(func, args: argparse.Namespace) -> CommandResult:
                 },
             ) from exc
 
-    return CommandResult(ok=True, output=stdout.getvalue(), error=stderr.getvalue())
+    raw = stdout.getvalue()
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        pass
+    return CommandResult(ok=True, output=raw, error=stderr.getvalue())
 
 
 def _ns(model: BaseModel) -> argparse.Namespace:
@@ -112,50 +124,139 @@ def create_app() -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.post("/extract", response_model=CommandResult)
-    def extract(payload: ExtractRequest) -> CommandResult:
+    # ── mutating / long-running (POST) ────────────────────────────────
+
+    @app.post("/extract")
+    def extract(payload: ExtractRequest) -> Any:
         return _run_command(cmd_extract, _ns(payload))
 
-    @app.post("/index", response_model=CommandResult)
-    def index(payload: IndexRequest) -> CommandResult:
+    @app.post("/index")
+    def index(payload: IndexRequest) -> Any:
         return _run_command(cmd_index, _ns(payload))
 
-    @app.post("/transcribe", response_model=CommandResult)
-    def transcribe(payload: TranscribeRequest) -> CommandResult:
+    @app.post("/transcribe")
+    def transcribe(payload: TranscribeRequest) -> Any:
         return _run_command(cmd_transcribe, _ns(payload))
 
-    @app.post("/search", response_model=CommandResult)
-    def search(payload: SearchRequest) -> CommandResult:
-        return _run_command(cmd_search, _ns(payload))
+    # ── search — calls data layer directly, returns structured JSON ────
 
-    @app.post("/chat", response_model=CommandResult)
-    def chat(payload: ChatRequest) -> CommandResult:
-        return _run_command(cmd_chat, _ns(payload))
+    @app.post("/search")
+    async def search(payload: SearchRequest) -> dict[str, Any]:
+        from .vector_store.video_index import search_video
 
-    @app.get("/list-videos", response_model=CommandResult)
-    def list_videos() -> CommandResult:
-        return _run_command(cmd_list_videos, argparse.Namespace(benchmark=False))
+        pos = payload.search_args
+        if len(pos) >= 2:
+            video_id, query = pos[0], " ".join(pos[1:])
+        else:
+            video_id, query = None, pos[0]
 
-    @app.get("/list-chat/{video_id}", response_model=CommandResult)
-    def list_chat(video_id: str, last_n: int = 20) -> CommandResult:
-        return _run_command(cmd_list_chat, argparse.Namespace(video_id=video_id, last_n=last_n))
+        results = await search_video(query, payload.top_k, video_id)
+        return {
+            "count": len(results),
+            "results": [r.model_dump() for r in results],
+        }
 
-    @app.get("/stats", response_model=CommandResult)
-    def stats() -> CommandResult:
-        return _run_command(cmd_stats, argparse.Namespace(benchmark=False))
+    # ── chat — SSE stream ─────────────────────────────────────────────
 
-    @app.get("/get-video/{video_id}", response_model=CommandResult)
-    def get_video(video_id: str) -> CommandResult:
-        return _run_command(cmd_get_data, argparse.Namespace(video_id=video_id, output=None))
+    @app.post("/chat")
+    async def chat(payload: ChatRequest) -> StreamingResponse:
+        from .chat_handler import chat_with_video
 
-    @app.get("/queue/list", response_model=CommandResult)
+        generator = chat_with_video(payload.video_id, payload.query)
+        return StreamingResponse(generator, media_type="text/event-stream")
+
+    @app.get("/list-videos")
+    def list_videos() -> dict[str, Any]:
+        from .vector_store.video_index import default_video_index
+
+        vi = default_video_index()
+        videos = vi.list_videos()
+        return {
+            "count": len(videos),
+            "videos": [v.model_dump() for v in videos],
+        }
+
+    @app.get("/list-chat/{video_id}")
+    def list_chat(video_id: str, last_n: int = 20) -> dict[str, Any]:
+        from .vector_store.video_chat import default_video_chat
+
+        vc = default_video_chat()
+        history = vc.get_history(video_id, last_n=last_n)
+        return {
+            "count": len(history),
+            "messages": history,
+        }
+
+    @app.get("/stats")
+    def stats() -> dict[str, Any]:
+        from .vector_store.video_chat import default_video_chat
+        from .vector_store.video_index import default_video_index
+
+        vi = default_video_index()
+        vc = default_video_chat()
+        return {
+            "video_col_path": str(vi.col_path),
+            "video_index_stats": str(vi.stats),
+            "chat_col_path": str(vc.col_path),
+            "chat_index_stats": str(vc.stats),
+            "videos_indexed": len(vi.list_videos()),
+        }
+
+    @app.get("/get-video/{video_id}")
+    def get_video(video_id: str) -> dict[str, Any]:
+        from .vector_store.video_index import default_video_index
+
+        vi = default_video_index()
+        data = vi.get_video_data(video_id)
+        if not data:
+            raise HTTPException(status_code=404, detail=f"No data found for video_id={video_id}")
+        return {"data": data}
+
+    @app.get("/queue/list")
     def queue_list(
         status: Literal["pending", "running", "completed", "failed", "timeout"] | None = None,
-    ) -> CommandResult:
-        return _run_command(cmd_queue_list, argparse.Namespace(status=status))
+    ) -> dict[str, Any]:
+        from .task_queue.store import TaskStore
 
-    @app.get("/queue/status/{task_id}", response_model=CommandResult)
-    def queue_status(task_id: str) -> CommandResult:
-        return _run_command(cmd_queue_status, argparse.Namespace(task_id=task_id))
+        store = TaskStore()
+        tasks = store.list_all(status)
+        return {
+            "status_filter": status,
+            "count": len(tasks),
+            "tasks": tasks,
+        }
+
+    @app.get("/queue/status/{task_id}")
+    def queue_status(task_id: str) -> dict[str, Any]:
+        from .task_queue.commands import _duration_str, _parse_benchmark_file
+        from .task_queue.config import RESULTS_DIR
+        from .task_queue.store import TaskStore
+
+        store = TaskStore()
+        task = store.get(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+        output: dict[str, Any] = dict(task)
+        output["duration"] = _duration_str(task.get("started_at"), task.get("finished_at")) or None
+
+        results_dir = RESULTS_DIR / task_id
+        output_file = results_dir / "output.json"
+        benchmark_file = results_dir / "benchmark.txt"
+
+        if output_file.exists():
+            try:
+                output["result"] = json.loads(output_file.read_text())
+            except Exception:
+                output["result"] = output_file.read_text()
+
+        if benchmark_file.exists():
+            rows = _parse_benchmark_file(benchmark_file)
+            output["benchmark"] = [
+                {"function": r[0], "calls": r[1], "total_s": r[2], "avg_s": r[3], "min_s": r[4], "max_s": r[5]}
+                for r in rows
+            ]
+
+        return output
 
     return app

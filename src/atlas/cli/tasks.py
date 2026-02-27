@@ -69,8 +69,8 @@ def run_extract(args: argparse.Namespace) -> dict:
     }
 
 
-def run_transcribe(args: argparse.Namespace) -> str:
-    """Run transcribe in a queue worker thread.  Returns the transcript text."""
+def run_transcribe(args: argparse.Namespace) -> dict:
+    """Run transcribe in a queue worker thread.  Returns a JSON-serialisable dict."""
     from ..transcript import get_video_transcript
 
     streaming = getattr(args, "_streaming", False)
@@ -93,7 +93,7 @@ def run_transcribe(args: argparse.Namespace) -> str:
     if not full_text or not full_text.strip():
         raise ValueError(f"No transcript content generated for {video_path}")
 
-    return full_text
+    return {"transcript": full_text, "format": fmt}
 
 
 def run_index(args: argparse.Namespace) -> dict:

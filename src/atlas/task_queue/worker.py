@@ -132,7 +132,7 @@ def run_task(task_id: str) -> None:
     output_path: str | None = task.get("output_path")
     benchmark: bool = bool(task.get("benchmark"))
     results_dir = RESULTS_DIR / task_id
-    output_file = results_dir / "output.txt"
+    output_file = results_dir / "output.json"
     args_file = results_dir / "args.json"
 
     # Resolve the worker function.
@@ -163,9 +163,9 @@ def run_task(task_id: str) -> None:
         if not timed_out.is_set():
             # Timeout reached — the main thread is still blocked.
             store.mark_timeout(task_id)
-            write_file(output_file, f"Error: Exceeded {TASK_TIMEOUT}s timeout")
+            write_file(output_file, json.dumps({"error": f"Exceeded {TASK_TIMEOUT}s timeout"}))
             if output_path:
-                write_file(Path(output_path), f"Error: Exceeded {TASK_TIMEOUT}s timeout")
+                write_file(Path(output_path), json.dumps({"error": f"Exceeded {TASK_TIMEOUT}s timeout"}))
             notify(
                 "Atlas Task Status",
                 f"[timeout]: {command} ({task_id}) — exceeded {TASK_TIMEOUT}s",
@@ -203,9 +203,9 @@ def run_task(task_id: str) -> None:
 
         error_msg = f"{type(exc).__name__}: {exc}"
         store.mark_failed(task_id, error_msg)
-        write_file(output_file, f"Error: {error_msg}")
+        write_file(output_file, json.dumps({"error": error_msg}))
         if output_path:
-            write_file(Path(output_path), f"Error: {error_msg}")
+            write_file(Path(output_path), json.dumps({"error": error_msg}))
         notify(
             "Atlas Task Status",
             f"[failed]: {command} ({task_id}) — {error_msg[:120]}",

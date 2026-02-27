@@ -97,101 +97,50 @@ def _parse_benchmark_file(path: Path) -> list[tuple[str, ...]]:
 
 
 def cmd_queue_list(args: argparse.Namespace) -> None:
-    """Display a table of tasks in the queue."""
-    from rich.table import Table
+    """Print a JSON list of tasks in the queue."""
+    import json
 
-    from ..cli import get_console
-
-    console = get_console()
     store = TaskStore()
     status = getattr(args, "status", None)
     tasks = store.list_all(status)
 
-    if not tasks:
-        msg = f"No {status} tasks." if status else "No tasks in queue."
-        console.print(f"[yellow]{msg}[/yellow]")
-        return
-
-    table = Table(show_header=True, title="Task Queue")
-    table.add_column("ID", width=10, style="cyan")
-    table.add_column("Command", width=12)
-    table.add_column("Status", width=12)
-    table.add_column("Created", width=20)
-    table.add_column("Label", ratio=1)
-
-    for t in tasks:
-        color = _STATUS_COLORS.get(t["status"], "white")
-        table.add_row(
-            t["id"],
-            t["command"],
-            f"[{color}]{t['status']}[/{color}]",
-            (t.get("created_at") or "")[:19],
-            (t.get("label") or "")[:50],
-        )
-
-    console.print(table)
+    output = {
+        "status_filter": status,
+        "count": len(tasks),
+        "tasks": tasks,
+    }
+    print(json.dumps(output, indent=2, default=str))
 
 
 def cmd_queue_status(args: argparse.Namespace) -> None:
-    """Show detailed status for a single task, rendered as a Rich table."""
-    from rich.table import Table
+    """Print detailed status for a single task as JSON."""
+    import json
 
-    from ..cli import get_console
-
-    console = get_console()
     store = TaskStore()
     task = store.get(args.task_id)
 
     if not task:
-        console.print(f"[yellow]Task {args.task_id} not found.[/yellow]")
+        print(json.dumps({"error": f"Task {args.task_id} not found"}))
         return
 
     results_dir = RESULTS_DIR / task["id"]
-    output_file = results_dir / "output.txt"
+    output_file = results_dir / "output.json"
     benchmark_file = results_dir / "benchmark.txt"
-    color = _STATUS_COLORS.get(task["status"], "white")
 
-    # ── Task details table ────────────────────────────────────────────
-    table = Table(show_header=True, title=f"Task {task['id']}", title_style="bold")
-    table.add_column("Field", style="dim", width=14, no_wrap=True)
-    table.add_column("Value", ratio=1)
+    output = dict(task)
+    output["duration"] = _duration_str(task.get("started_at"), task.get("finished_at")) or None
 
-    table.add_row("Command", task["command"])
-    table.add_row("Label", task.get("label") or "")
-    table.add_row("Status", f"[{color}]{task['status']}[/{color}]")
-    table.add_row("Created", (task.get("created_at") or "")[:19])
-
-    if task.get("started_at"):
-        table.add_row("Started", task["started_at"][:19])
-    if task.get("finished_at"):
-        table.add_row("Finished", task["finished_at"][:19])
-
-    duration = _duration_str(task.get("started_at"), task.get("finished_at"))
-    if duration:
-        table.add_row("Duration", duration)
-
-    if task.get("error"):
-        table.add_row("Error", f"[red]{task['error']}[/red]")
     if output_file.exists():
-        table.add_row("Output", str(output_file))
-    if task.get("output_path"):
-        table.add_row("Output (→)", task["output_path"])
-    if benchmark_file.exists():
-        table.add_row("Benchmark", str(benchmark_file))
+        try:
+            output["result"] = json.loads(output_file.read_text())
+        except Exception:
+            output["result"] = output_file.read_text()
 
-    console.print(table)
-
-    # ── Benchmark table (if available) ────────────────────────────────
     if benchmark_file.exists():
         rows = _parse_benchmark_file(benchmark_file)
-        if rows:
-            bench_table = Table(show_header=True, title="Benchmark", title_style="bold yellow")
-            bench_table.add_column("Function", ratio=1)
-            bench_table.add_column("Calls", width=7, justify="right")
-            bench_table.add_column("Total (s)", width=10, justify="right")
-            bench_table.add_column("Avg (s)", width=9, justify="right")
-            bench_table.add_column("Min (s)", width=9, justify="right")
-            bench_table.add_column("Max (s)", width=9, justify="right")
-            for row in rows:
-                bench_table.add_row(*row)
-            console.print(bench_table)
+        output["benchmark"] = [
+            {"function": r[0], "calls": r[1], "total_s": r[2], "avg_s": r[3], "min_s": r[4], "max_s": r[5]}
+            for r in rows
+        ]
+
+    print(json.dumps(output, indent=2, default=str))

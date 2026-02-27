@@ -13,7 +13,7 @@ from .helpers import make_progress, validate_api_keys
 
 def cmd_search(args: argparse.Namespace) -> None:
     """Run a semantic search against previously indexed videos."""
-    from rich.table import Table
+    import json
 
     from . import get_console, get_logger
     from ..vector_store.video_index import search_video
@@ -29,26 +29,13 @@ def cmd_search(args: argparse.Namespace) -> None:
 
     try:
         results = asyncio.run(search_video(query, args.top_k, video_id))
-        if not results:
-            console.print("[yellow]No results found.[/yellow]")
-            console.print("Make sure you have indexed some videos first with 'atlas index'")
-            return
-
-        console.print(f"\n[bold green]Found {len(results)} results for:[/bold green] '{query}'\n")
-        table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("#", style="dim", width=3)
-        table.add_column("Score", justify="right", width=8)
-        table.add_column("Video ID", width=20)
-        table.add_column("Time", width=15)
-        table.add_column("Content", width=55)
-        for i, result in enumerate(results, 1):
-            time_str = f"{result.start:.1f}s – {result.end:.1f}s"
-            content = result.content[:52] + "…" if len(result.content) > 55 else result.content
-            vid_id = result.video_id
-            if len(vid_id) > 20:
-                vid_id = vid_id[:17] + "…"
-            table.add_row(str(i), f"{result.score:.3f}", vid_id, time_str, content)
-        console.print(table)
+        output = {
+            "query": query,
+            "video_id": video_id,
+            "count": len(results),
+            "results": [r.model_dump() for r in results],
+        }
+        print(json.dumps(output, indent=2))
     except Exception as e:
         console.print(f"[red]Error searching: {e}[/red]")
         get_logger().exception("Error in search command")
@@ -110,38 +97,21 @@ def cmd_chat(args: argparse.Namespace) -> None:
 
 def cmd_list_videos(args: argparse.Namespace) -> None:
     """List all videos that have been indexed in the vector store."""
-    from rich.table import Table
+    import json
 
-    from . import get_console
     from ..vector_store.video_index import default_video_index
 
-    console = get_console()
-    with make_progress() as progress:
-        task = progress.add_task("Loading videos...", total=None)
-        vi = default_video_index()
-        videos = vi.list_videos()
-        progress.update(task, completed=True)
-
-    if not videos:
-        console.print("[yellow]No videos indexed yet.[/yellow]")
-        console.print("Index a video first with: [bold]atlas index video.mp4[/bold]")
-        return
-
-    console.print(f"\n[bold blue]Indexed Videos[/bold blue] ({len(videos)} total)\n")
-    table = Table(show_header=True, header_style="bold cyan")
-    table.add_column("#", style="dim", width=4)
-    table.add_column("Video ID", style="cyan", width=36)
-    table.add_column("Indexed At", width=28)
-    for i, entry in enumerate(videos, 1):
-        table.add_row(str(i), entry.video_id, entry.indexed_at)
-    console.print(table)
-    console.print(
-        "\n[dim]Use[/dim] [bold]atlas search <VIDEO_ID> '<Query>'[/bold] [dim]to search a specific video.[/dim]"
+    vi = default_video_index()
+    videos = vi.list_videos()
+    print(
+        json.dumps(
+            {
+                "count": len(videos),
+                "videos": [{"video_id": v.video_id, "indexed_at": v.indexed_at} for v in videos],
+            },
+            indent=2,
+        )
     )
-    console.print(
-        "\n[dim]Use[/dim] [bold]atlas get-video <VIDEO_ID>[/bold] [dim]to retrieve all indexed data for a video.[/dim]"
-    )
-    console.print("\n[dim]Use[/dim] [bold]atlas chat <VIDEO_ID> '<Query>'[/bold] [dim]to chat with your video.[/dim]")
 
 
 # ── list-chat ─────────────────────────────────────────────────────────────────
@@ -149,7 +119,7 @@ def cmd_list_videos(args: argparse.Namespace) -> None:
 
 def cmd_list_chat(args: argparse.Namespace) -> None:
     """List the chat history for a given video."""
-    from rich.table import Table
+    import json
 
     from . import get_console
     from ..vector_store.video_chat import default_video_chat
@@ -162,27 +132,12 @@ def cmd_list_chat(args: argparse.Namespace) -> None:
         history = vc.get_history(video_id, last_n=args.last_n)
         progress.update(task, completed=True)
 
-    if not history:
-        console.print(f"[yellow]No chat history for video_id=[/yellow][cyan]{video_id}[/cyan]")
-        console.print(f"Start a chat with: [bold]atlas chat {video_id} 'your question'[/bold]")
-        return
-
-    console.print(f"\n[bold blue]Chat History[/bold blue] for [cyan]{video_id}[/cyan] ({len(history)} messages)\n")
-    table = Table(show_header=True, header_style="bold magenta", show_lines=True)
-    table.add_column("#", style="dim", width=4)
-    table.add_column("Role", width=12)
-    table.add_column("Message", ratio=1)
-    table.add_column("Timestamp", width=22)
-    for i, msg in enumerate(history, 1):
-        role = msg.get("role", "?")
-        color = "green" if role == "assistant" else "yellow"
-        table.add_row(
-            str(i),
-            f"[{color}]{role}[/{color}]",
-            msg.get("content", ""),
-            msg.get("timestamp", ""),
-        )
-    console.print(table)
+    output = {
+        "video_id": video_id,
+        "count": len(history),
+        "messages": history,
+    }
+    print(json.dumps(output, indent=2))
 
 
 # ── stats ─────────────────────────────────────────────────────────────────────
@@ -190,8 +145,7 @@ def cmd_list_chat(args: argparse.Namespace) -> None:
 
 def cmd_stats(args: argparse.Namespace) -> None:
     """Show statistics about the local vector store."""
-    from rich import markup
-    from rich.table import Table
+    import json
 
     from . import get_console
     from ..vector_store.video_chat import default_video_chat
@@ -204,21 +158,14 @@ def cmd_stats(args: argparse.Namespace) -> None:
         vc = default_video_chat()
         progress.update(task, completed=True)
 
-    stats_data = {
+    output = {
         "video_col_path": str(vi.col_path),
         "video_index_stats": str(vi.stats),
         "chat_col_path": str(vc.col_path),
         "chat_index_stats": str(vc.stats),
-        "videos_indexed": str(len(vi.list_videos())),
+        "videos_indexed": len(vi.list_videos()),
     }
-
-    console.print("\n[bold blue]Atlas Vector Store Statistics[/bold blue]\n")
-    table = Table(show_header=False)
-    table.add_column("Property", style="cyan")
-    table.add_column("Value", style="green")
-    for key, value in stats_data.items():
-        table.add_row(key, markup.escape(value))
-    console.print(table)
+    print(json.dumps(output, indent=2))
 
 
 # ── get-data ───────────────────────────────────────────────────────────────────────

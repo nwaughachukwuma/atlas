@@ -150,7 +150,7 @@ def print_queued_info(
     console.print("\n[bold green]✓ Task queued[/bold green]")
     console.print(f"  [cyan]Task ID:[/cyan]    {task_id}")
     console.print(f"  [cyan]Command:[/cyan]    {command}")
-    console.print(f"  [cyan]Output:[/cyan]     {results_dir / 'output.txt'}")
+    console.print(f"  [cyan]Output:[/cyan]     {results_dir / 'output.json'}")
     if output_path:
         console.print(f"  [cyan]Also at:[/cyan]    {output_path}")
     if benchmark:
