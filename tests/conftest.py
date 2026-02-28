@@ -2,6 +2,7 @@
 Pytest configuration and shared fixtures for Atlas tests
 """
 
+import json
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -9,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.atlas.utils import VideoAttrAnalysis
-from src.atlas.video_processor import VideoDescription, VideoProcessorResult
+from src.atlas.video_processor import VideoDescription, VideoProcessorResult, compile_transcript
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -80,7 +81,7 @@ def sample_video_processor_result(sample_video_description):
     return VideoProcessorResult(
         video_path="/tmp/test_video.mp4",
         duration=10.0,
-        transcript="Test transcript content",
+        transcript=compile_transcript([sample_video_description]),
         video_descriptions=[sample_video_description],
     )
 
@@ -109,6 +110,17 @@ def mock_groq_client():
         yield mock_instance
 
 
+def pytest_collection_modifyitems(config, items):
+    """Auto-skip tests marked with @pytest.mark.zvec when zvec is not importable."""
+    try:
+        import zvec  # noqa: F401
+    except ModuleNotFoundError:
+        skip = pytest.mark.skip(reason="zvec native extension not available on this host")
+        for item in items:
+            if item.get_closest_marker("zvec"):
+                item.add_marker(skip)
+
+
 # Configure pytest-asyncio
 @pytest.fixture(scope="session")
 def event_loop_policy():
@@ -116,3 +128,28 @@ def event_loop_policy():
     import asyncio
 
     return asyncio.DefaultEventLoopPolicy()
+
+
+@pytest.fixture(scope="package")
+def mock_model_dump_json():
+    """Fixture to create a MagicMock with model_dump_json side effect."""
+
+    def _factory(obj: dict):
+        mock = MagicMock()
+        # Attach model_dump_json as a method that returns the JSON string
+        mock.model_dump_json = MagicMock(side_effect=lambda **kwargs: json.dumps(obj, **kwargs))
+        return mock
+
+    return _factory
+
+
+@pytest.fixture(scope="package")
+def mock_model_dump():
+    """Generic fixture to mock Pydantic's model_dump for any MagicMock."""
+
+    def _factory(**model_dump_return_value):
+        mock = MagicMock()
+        mock.model_dump = MagicMock(return_value=model_dump_return_value)
+        return mock
+
+    return _factory

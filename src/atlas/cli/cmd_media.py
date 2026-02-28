@@ -1,4 +1,6 @@
-"""Command handlers for extract, transcribe, and index (the "heavy" video commands)."""
+"""
+Command handlers for extract, transcribe, and index (the "heavy" video commands)
+"""
 
 from __future__ import annotations
 
@@ -80,30 +82,18 @@ def cmd_extract(args: argparse.Namespace) -> None:
     else:
         description_attrs = DEFAULT_DESCRIPTION_ATTRS
 
-    json_to_stdout = fmt == "json" and not output_path
-    if json_to_stdout:
-        from rich.console import Console
+    # --no-queue always outputs JSON; redirect console to stderr to keep stdout clean
+    from rich.console import Console
 
-        console = Console(stderr=True)
+    console = Console(stderr=True)
 
     console.print(f"\n[bold blue]Processing video:[/bold blue] {video_path}")
     console.print(f"[dim]Chunk duration: {chunk_sec}s, Overlap: {overlap_sec}s[/dim]\n")
 
-    all_descriptions: List[VideoDescription] = []
-    output_parts: list[dict] = []
-
     def _on_segment(desc: VideoDescription) -> None:
-        all_descriptions.append(desc)
-        if fmt == "text" and not no_streaming:
-            console.print(f"[bold cyan]Segment {desc.start:.1f}s – {desc.end:.1f}s[/bold cyan]")
-            for analysis in desc.video_analysis:
-                label = " ".join(analysis.attr.upper().split("_"))
-                value = analysis.value
-                preview = value[:200] + "…" if len(value) > 200 else value
-                console.print(f"  [yellow]{label}:[/yellow] {preview}")
-            console.print()
-        else:
-            output_parts.append(desc.model_dump())
+        if not no_streaming:
+            segment_str = desc.model_dump_json(indent=2)
+            console.print("STREAMED SEGMENT: ", segment_str)
 
     try:
 
@@ -119,27 +109,16 @@ def cmd_extract(args: argparse.Namespace) -> None:
                 return await processor.process(_on_segment)
 
         result = asyncio.run(_run())
-        assert result is not None, "VideoProcessor.process() returned None"
+        if not result:
+            err("No insights extracted from the video.")
+            return
 
-        full_output = {
-            "video_path": str(video_path),
-            "duration": result.duration,
-            "video_descriptions": output_parts or [d.model_dump() for d in all_descriptions],
-            "segments_count": len(all_descriptions),
-        }
-
-        if fmt == "json":
-            output_str = json.dumps(full_output, indent=2)
-            if output_path:
-                Path(output_path).write_text(output_str)
-                console.print(f"[green]Results saved to:[/green] {output_path}")
-            else:
-                print(output_str)
+        output_str = result.model_dump_json(indent=2)
+        if output_path:
+            Path(output_path).write_text(output_str)
+            console.print(f"[green]Results saved to:[/green] {output_path}")
         else:
-            console.print(f"[bold green]Done.[/bold green] {len(all_descriptions)} segments extracted.")
-            if output_path:
-                Path(output_path).write_text(json.dumps(full_output, indent=2))
-                console.print(f"[green]Full results saved to:[/green] {output_path}")
+            print(output_str)
     except Exception as e:
         console.print(f"[red]Error processing video: {e}[/red]")
         get_logger().exception("Error in extract command")
@@ -193,32 +172,31 @@ def cmd_transcribe(args: argparse.Namespace) -> None:
         return
 
     # ── Direct execution (no queue) ───────────────────────────────────
+    from rich.console import Console
+
     from ..transcript import get_video_transcript
+
+    console = Console(stderr=True)
 
     console.print(f"\n[bold blue]Transcribing:[/bold blue] {video_path}")
     console.print(f"[dim]Output format: {fmt}[/dim]\n")
 
-    if no_streaming:
-        console.print("[dim]Streaming disabled via --no-streaming[/dim]\n")
-
-    output_lines: list[str] = []
-
     def _on_chunk(text: str) -> None:
-        output_lines.append(text)
-        if not no_streaming and not output_path:
-            sys.stdout.write(text)
-            sys.stdout.flush()
+        if not no_streaming:
+            console.print("STREAMED CHUNK:", text)
 
     async def _run():
-        return await get_video_transcript(str(video_path), format=fmt, on_chunk=_on_chunk)
+        return await get_video_transcript(
+            str(video_path),
+            format=fmt,
+            on_chunk=_on_chunk,
+        )
 
     try:
         with make_progress() as progress:
             task = progress.add_task("Transcribing...", total=None)
-            final_result = asyncio.run(_run())
+            full_text = asyncio.run(_run())
             progress.update(task, completed=True)
-
-        full_text = final_result or "".join(output_lines)
 
         if not full_text.strip():
             console.print("[yellow]No transcript content generated.[/yellow]")
@@ -228,7 +206,8 @@ def cmd_transcribe(args: argparse.Namespace) -> None:
             Path(output_path).write_text(full_text)
             console.print(f"\n[green]Transcript saved to:[/green] {output_path}")
         else:
-            print()  # trailing newline after streamed output
+            result = {"transcript": full_text, "format": fmt}
+            print(json.dumps(result, indent=2))
     except Exception as e:
         console.print(f"[red]Error transcribing: {e}[/red]")
         get_logger().exception("Error in transcribe command")
@@ -272,11 +251,21 @@ def cmd_index(args: argparse.Namespace) -> None:
         return
 
     # ── Direct execution (no queue) ───────────────────────────────────
+    from rich.console import Console
+
     from ..utils import DEFAULT_DESCRIPTION_ATTRS
     from ..vector_store.video_index import index_video
+    from ..video_processor import VideoDescription
+
+    console = Console(stderr=True)
 
     console.print(f"\n[bold blue]Indexing video:[/bold blue] {video_path}")
     console.print(f"[dim]Chunk duration: {chunk_sec}s, Overlap: {overlap_sec}s[/dim]")
+
+    def _on_segment(desc: VideoDescription) -> None:
+        if not no_streaming:
+            segment_str = desc.model_dump_json(indent=2)
+            console.print(f"STREAMED SEGMENT: {segment_str} ")
 
     async def _run():
         with make_progress() as progress:
@@ -293,21 +282,21 @@ def cmd_index(args: argparse.Namespace) -> None:
                 overlap=overlap_sec,
                 description_attrs=description_attrs,
                 include_summary=args.include_summary,
+                on_segment=_on_segment,
             )
             progress.update(task, completed=True)
         return video_id, indexed_count, result
 
     try:
         video_id, indexed_count, result = asyncio.run(_run())
-        console.print("\n[bold green]Indexing complete![/bold green]")
-        console.print(f"  [cyan]Video ID:[/cyan]          {video_id}")
-        console.print(f"  Video:              {video_path}")
-        console.print(f"  Duration:           {result.duration:.2f}s")
-        console.print(f"  Segments processed: {len(result.video_descriptions)}")
-        console.print(f"  Documents indexed:  {indexed_count}")
-        console.print(
-            f"\n[dim]Use[/dim] [bold]atlas search --video-id {video_id} '...'[/bold] [dim]to query this video.[/dim]"
-        )
+        # console.print(f"\n[green]Indexed {indexed_count} chunks for video ID:[/green] {video_id}\n")
+        # print(result.model_dump_json(indent=2))
+        output = {
+            "video_id": video_id,
+            "indexed_count": indexed_count,
+            "result": result.model_dump(),
+        }
+        print(json.dumps(output, indent=2))
     except Exception as e:
         console.print(f"[red]Error indexing video: {e}[/red]")
         get_logger().exception("Error in index command")

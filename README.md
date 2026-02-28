@@ -108,6 +108,31 @@ docker run --rm nwaughachukwuma/atlas-video --version
 docker run --rm nwaughachukwuma/atlas-video queue list
 ```
 
+### Run as HTTP server (Docker)
+
+```bash
+# Start Atlas API server on port 8000
+docker run --rm -d \
+  -p 8000:8000 \
+  --env-file .env \
+  -v atlas-data:/home/atlas/.atlas \
+  nwaughachukwuma/atlas-video serve -H 0.0.0.0 -p 8000
+
+# Health check
+curl http://localhost:8000/health
+```
+
+Or specify the API keys inline:
+
+```bash
+docker run --rm -d \
+  -p 8000:8000 \
+  -e GEMINI_API_KEY="$GEMINI_API_KEY" \
+  -e GROQ_API_KEY="$GROQ_API_KEY" \
+  -v atlas-data:/home/atlas/.atlas \
+  nwaughachukwuma/atlas-video serve -H 0.0.0.0 -p 8000
+```
+
 ### Environment variables
 
 | Variable         | Required for                         | Description                                                |
@@ -265,9 +290,9 @@ atlas index VIDEO_PATH [OPTIONS]
 Options:
   -c, --chunk-duration DUR     Duration of each chunk [default: 15s]
   -o, --overlap DUR            Overlap between chunks [default: 0s]
-  -e, --embedding-dim N        Embedding dimension: 768 or 3072 [default: 768]
+  -e, --embedding-dim N        Embedding dimension: 768 or 3072 [default: 768] (Not Implemented)
   -a, --attrs ATTR             Attribute to extract; repeat for multiple
-      --include-summary BOOL  Generate a per-segment summary: true or false (default: true)
+      --include-summary BOOL   Generate a per-segment summary: true or false (default: true)
       --benchmark              Print a timing breakdown after completion
 ```
 
@@ -275,7 +300,7 @@ Options:
 
 ```bash
 atlas index video.mp4
-atlas index video.mp4 --chunk-duration=10s --embedding-dim=3072
+atlas index video.mp4 --chunk-duration=10s --overlap=2s
 ```
 
 ---
@@ -426,6 +451,70 @@ Use `--no-queue` on any command to bypass the queue and run synchronously:
 
 ```bash
 atlas index video.mp4 --no-queue
+```
+
+---
+
+### `atlas serve`
+
+Start an HTTP API server that exposes all Atlas commands as REST endpoints. Useful for integrating Atlas into a backend service or running it behind a reverse proxy.
+
+```
+atlas serve [OPTIONS]
+
+Options:
+  -H, --host HOST        Host interface to bind [default: 0.0.0.0]
+  -p, --port PORT        Port to listen on [default: 8000]
+      --env-file PATH    Load environment variables from a .env file before starting
+```
+
+**Examples:**
+
+```bash
+# Start with defaults
+atlas serve
+
+# Bind to localhost only, custom port
+atlas serve -H 127.0.0.1 -p 9000
+
+# Load API keys from a .env file
+atlas serve -H 0.0.0.0 -p 8000 --env-file .env
+```
+
+**API endpoints:**
+
+| Method | Path                      | Description                                |
+| ------ | ------------------------- | ------------------------------------------ |
+| GET    | `/health`                 | Health check                               |
+| POST   | `/extract`                | Extract multimodal insights from a video   |
+| POST   | `/index`                  | Index a video for semantic search          |
+| POST   | `/transcribe`             | Transcribe a video                         |
+| POST   | `/search`                 | Semantic search across indexed videos      |
+| POST   | `/chat`                   | Chat with a video (SSE streaming response) |
+| GET    | `/list-videos`            | List all indexed videos                    |
+| GET    | `/list-chat/{video_id}`   | Get chat history for a video               |
+| GET    | `/stats`                  | Vector store statistics                    |
+| GET    | `/get-video/{video_id}`   | Retrieve all indexed data for a video      |
+| GET    | `/queue/list`             | List queued tasks (filter by `?status=`)   |
+| GET    | `/queue/status/{task_id}` | Get status and result of a specific task   |
+
+> `/chat` returns a StreamingResponse.
+
+**Quick test:**
+
+```bash
+# Health
+curl http://localhost:8000/health
+
+# Search
+curl -s -X POST http://localhost:8000/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "machine learning demo", "top_k": 5}'
+
+# Streaming chat
+curl -sN -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"video_id": "<video_id>", "query": "What is this video about?"}'
 ```
 
 ---

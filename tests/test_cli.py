@@ -29,6 +29,7 @@ from atlas.cli import (
     cmd_list_chat,
     cmd_list_videos,
     cmd_search,
+    cmd_serve,
     cmd_stats,
     cmd_transcribe,
     format_elapsed,
@@ -82,6 +83,7 @@ class TestParserConstruction:
             "stats",
             "queue",
             "get-video",
+            "serve",
         }
 
     # ---- extract ----
@@ -127,13 +129,13 @@ class TestParserConstruction:
         assert ns.video_path == "video.mp4"
         assert ns.chunk_duration == "15s"
         assert ns.overlap == "0s"
-        assert ns.embedding_dim == 768
+        # assert ns.embedding_dim == 768
 
     def test_index_custom_flags(self, parser):
-        ns = parser.parse_args(["index", "video.mp4", "-c", "20s", "-o", "2s", "-e", "3072"])
+        ns = parser.parse_args(["index", "video.mp4", "-c", "20s", "-o", "2s"])  # "-e", "3072"
         assert ns.chunk_duration == "20s"
         assert ns.overlap == "2s"
-        assert ns.embedding_dim == 3072
+        # assert ns.embedding_dim == 3072
 
     # ---- get-video ----
 
@@ -146,6 +148,23 @@ class TestParserConstruction:
         ns = parser.parse_args(["get-video", "vid1", "-o", "out.json"])
         assert ns.video_id == "vid1"
         assert ns.output == "out.json"
+
+    # ---- serve ----
+
+    def test_serve_defaults(self, parser):
+        ns = parser.parse_args(["serve"])
+        assert ns.host == "0.0.0.0"
+        assert ns.port == 8000
+        assert ns.env_file is None
+
+    def test_serve_custom_host_port(self, parser):
+        ns = parser.parse_args(["serve", "-H", "127.0.0.1", "-p", "9000"])
+        assert ns.host == "127.0.0.1"
+        assert ns.port == 9000
+
+    def test_serve_env_file(self, parser):
+        ns = parser.parse_args(["serve", "--env-file", ".env"])
+        assert ns.env_file == ".env"
 
     # ---- search ----
 
@@ -233,6 +252,7 @@ class TestParserConstruction:
             "list-chat": (cmd_list_chat, ["list-chat", "vid1"]),
             "stats": (cmd_stats, ["stats"]),
             "get-video": (cmd_get_data, ["get-video", "vid1"]),
+            "serve": (cmd_serve, ["serve"]),
         }
         for cmd_name, (expected_fn, argv) in mapping.items():
             ns = parser.parse_args(argv)
@@ -347,7 +367,6 @@ class TestCmdIndex:
             video_path=video_path,
             chunk_duration="15s",
             overlap="0s",
-            embedding_dim=768,
             attrs=None,
             include_summary=True,
             benchmark=False,
@@ -355,7 +374,7 @@ class TestCmdIndex:
             no_streaming=False,
         )
 
-    def test_success_prints_video_id(self, tmp_path, monkeypatch, progress_ctx):
+    def test_success_prints_video_id(self, tmp_path, monkeypatch, progress_ctx, mock_model_dump):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
         monkeypatch.setenv("GROQ_API_KEY", "k2")
 
@@ -363,7 +382,7 @@ class TestCmdIndex:
         video.touch()
         args = self._args(video_path=str(video))
 
-        mock_result = MagicMock(duration=30.0, video_descriptions=[MagicMock()] * 3)
+        mock_result = mock_model_dump(duration=30.0, video_descriptions=[])
 
         with (
             patch("atlas.cli.cmd_media.validate_api_keys"),
@@ -373,7 +392,7 @@ class TestCmdIndex:
                 side_effect=mock_asyncio_run(return_value=("vid_001", 3, mock_result)),
             ),
         ):
-            cmd_index(args)  # must not raise
+            cmd_index(args)
 
     def test_missing_api_key_exits(self, tmp_path, monkeypatch):
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
@@ -416,16 +435,28 @@ class TestCmdSearch:
             benchmark=False,
         )
 
-    def test_success_with_results(self, monkeypatch):
+    def test_success_with_results(self, monkeypatch, capsys):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
 
         mock_result = MagicMock(score=0.95, video_id="vid1", start=0.0, end=10.0, content="visual cues about people")
+        mock_result.model_dump.return_value = {
+            "score": 0.95,
+            "video_id": "vid1",
+            "start": 0.0,
+            "end": 10.0,
+            "content": "visual cues about people",
+        }
 
         with (
             patch("atlas.cli.cmd_explore.validate_api_keys"),
             patch("atlas.cli.cmd_explore.asyncio.run", side_effect=mock_asyncio_run(return_value=[mock_result])),
         ):
             cmd_search(self._args())  # must not raise
+
+        out = capsys.readouterr().out
+        body = json.loads(out)
+        assert body["count"] == 1
+        assert body["results"][0]["video_id"] == "vid1"
 
     def test_empty_results_prints_message(self, monkeypatch, capsys):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
@@ -738,11 +769,19 @@ class TestCmdExtract:
         ):
             cmd_extract(self._args(str(video)))
 
-    def test_success_json_to_stdout(self, tmp_path, monkeypatch, capsys):
+    def test_success_json_to_stdout(
+        self,
+        tmp_path,
+        monkeypatch,
+        capsys,
+        mock_model_dump_json,
+    ):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
         video = tmp_path / "v.mp4"
         video.touch()
-        mock_result = MagicMock(duration=10.0, video_descriptions=[])
+
+        mock_result = mock_model_dump_json({"duration": 10.0, "video_descriptions": []})
+
         with (
             patch("atlas.cli.cmd_media.validate_api_keys"),
             patch("atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(return_value=mock_result)),
@@ -753,12 +792,14 @@ class TestCmdExtract:
         data = json.loads(captured.out)
         assert data["duration"] == 10.0
 
-    def test_success_json_to_file(self, tmp_path, monkeypatch):
+    def test_success_json_to_file(self, tmp_path, monkeypatch, mock_model_dump_json):
         monkeypatch.setenv("GEMINI_API_KEY", "k1")
         video = tmp_path / "v.mp4"
         video.touch()
         out = tmp_path / "out.json"
-        mock_result = MagicMock(duration=10.0, video_descriptions=[])
+
+        mock_result = mock_model_dump_json({"duration": 10.0, "video_descriptions": []})
+
         with (
             patch("atlas.cli.cmd_media.validate_api_keys"),
             patch("atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(return_value=mock_result)),

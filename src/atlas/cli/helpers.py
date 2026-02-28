@@ -37,12 +37,12 @@ def short_name(full: str) -> str:
     return v[1] if len(v) > 1 else v[0]
 
 
-def err(msg: str) -> None:
-    """Print a red error message and exit."""
+def err(msg: str):
+    """Print a red error message and exit with code 2 (client/validation error)."""
     from . import get_console
 
     get_console().print(f"[red]Error: {msg}[/red]")
-    sys.exit(1)
+    sys.exit(2)
 
 
 def format_elapsed(seconds: float) -> str:
@@ -150,7 +150,7 @@ def print_queued_info(
     console.print("\n[bold green]✓ Task queued[/bold green]")
     console.print(f"  [cyan]Task ID:[/cyan]    {task_id}")
     console.print(f"  [cyan]Command:[/cyan]    {command}")
-    console.print(f"  [cyan]Output:[/cyan]     {results_dir / 'output.txt'}")
+    console.print(f"  [cyan]Output:[/cyan]     {results_dir / 'output.json'}")
     if output_path:
         console.print(f"  [cyan]Also at:[/cyan]    {output_path}")
     if benchmark:

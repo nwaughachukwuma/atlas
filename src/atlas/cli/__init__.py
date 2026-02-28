@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 # ── version ───────────────────────────────────────────────────────────────────
 
-VERSION = "0.1.2"
+VERSION = "0.2.0"
 PROG_NAME = "atlas"
 
 # ── Lazy singletons — nothing heavy is imported until a real command runs ─────
@@ -78,6 +78,9 @@ from .cmd_media import (
 )
 from .cmd_media import (
     cmd_transcribe as cmd_transcribe,
+)
+from .cmd_server import (  # noqa: E402
+    cmd_serve as cmd_serve,
 )
 from .helpers import (  # noqa: E402
     err as err,

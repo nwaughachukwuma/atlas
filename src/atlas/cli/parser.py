@@ -10,8 +10,9 @@ import argparse
 
 from .cmd_explore import cmd_chat, cmd_get_data, cmd_list_chat, cmd_list_videos, cmd_search, cmd_stats
 from .cmd_media import cmd_extract, cmd_index, cmd_transcribe
+from .cmd_server import cmd_serve
 
-VERSION = "0.1.2"
+VERSION = "0.2.0"
 PROG_NAME = "atlas"
 
 
@@ -128,14 +129,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--chunk-duration", "-c", default="15s", metavar="DUR", help="Duration of each chunk (default: 15s)."
     )
     p_index.add_argument("--overlap", "-o", default="0s", metavar="DUR", help="Overlap between chunks (default: 0s).")
-    p_index.add_argument(
-        "--embedding-dim",
-        "-e",
-        type=int,
-        default=768,
-        metavar="N",
-        help="Embedding dimension: 768 or 3072 (default: 768).",
-    )
+    # p_index.add_argument(
+    #     "--embedding-dim",
+    #     "-e",
+    #     type=int,
+    #     default=768,
+    #     metavar="N",
+    #     help="Embedding dimension: 768 or 3072 (default: 768).",
+    # )
     p_index.add_argument(
         "--attrs",
         "-a",
@@ -273,6 +274,27 @@ def build_parser() -> argparse.ArgumentParser:
     p_get_video.add_argument("video_id", help="Video ID returned by 'atlas index'.")
     p_get_video.add_argument("--output", "-o", metavar="FILE", help="Save JSON output to this file.")
     p_get_video.set_defaults(func=cmd_get_data)
+
+    # ── serve ─────────────────────────────────────────────────────────
+    p_serve = sub.add_parser(
+        "serve",
+        help="Run the Atlas HTTP server.",
+        description=(
+            "Start an HTTP server that exposes Atlas CLI actions as API endpoints. "
+            "This is useful for Docker and service-style deployments."
+        ),
+        epilog="Example:\n  atlas serve -H 0.0.0.0 -p 8000 --env-file .env",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_serve.add_argument("--host", "-H", default="0.0.0.0", help="Host interface to bind (default: 0.0.0.0).")
+    p_serve.add_argument("--port", "-p", type=int, default=8000, help="Port to listen on (default: 8000).")
+    p_serve.add_argument(
+        "--env-file",
+        metavar="PATH",
+        default=None,
+        help="Path to a .env file to load before starting the server (e.g. --env-file .env).",
+    )
+    p_serve.set_defaults(func=cmd_serve)
 
     # ── queue ─────────────────────────────────────────────────────────
     from ..task_queue import add_queue_commands
