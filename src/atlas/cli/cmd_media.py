@@ -93,7 +93,7 @@ def cmd_extract(args: argparse.Namespace) -> None:
     def _on_segment(desc: VideoDescription) -> None:
         if not no_streaming:
             segment_str = desc.model_dump_json(indent=2)
-            print("STREAMED SEGMENT: ", segment_str)
+            console.print("STREAMED SEGMENT: ", segment_str)
 
     try:
 
@@ -183,7 +183,7 @@ def cmd_transcribe(args: argparse.Namespace) -> None:
 
     def _on_chunk(text: str) -> None:
         if not no_streaming:
-            print("STREAMED CHUNK:", text)
+            console.print("STREAMED CHUNK:", text)
 
     async def _run():
         return await get_video_transcript(
@@ -265,7 +265,7 @@ def cmd_index(args: argparse.Namespace) -> None:
     def _on_segment(desc: VideoDescription) -> None:
         if not no_streaming:
             segment_str = desc.model_dump_json(indent=2)
-            print("STREAMED SEGMENT: ", segment_str)
+            console.print(f"STREAMED SEGMENT: {segment_str} ")
 
     async def _run():
         with make_progress() as progress:
@@ -289,8 +289,14 @@ def cmd_index(args: argparse.Namespace) -> None:
 
     try:
         video_id, indexed_count, result = asyncio.run(_run())
-        console.print(f"\n[green]Indexed {indexed_count} chunks for video ID:[/green] {video_id}\n")
-        print(result.model_dump_json(indent=2))
+        # console.print(f"\n[green]Indexed {indexed_count} chunks for video ID:[/green] {video_id}\n")
+        # print(result.model_dump_json(indent=2))
+        output = {
+            "video_id": video_id,
+            "indexed_count": indexed_count,
+            "result": result.model_dump(),
+        }
+        print(json.dumps(output, indent=2))
     except Exception as e:
         console.print(f"[red]Error indexing video: {e}[/red]")
         get_logger().exception("Error in index command")

@@ -129,14 +129,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--chunk-duration", "-c", default="15s", metavar="DUR", help="Duration of each chunk (default: 15s)."
     )
     p_index.add_argument("--overlap", "-o", default="0s", metavar="DUR", help="Overlap between chunks (default: 0s).")
-    p_index.add_argument(
-        "--embedding-dim",
-        "-e",
-        type=int,
-        default=768,
-        metavar="N",
-        help="Embedding dimension: 768 or 3072 (default: 768).",
-    )
+    # p_index.add_argument(
+    #     "--embedding-dim",
+    #     "-e",
+    #     type=int,
+    #     default=768,
+    #     metavar="N",
+    #     help="Embedding dimension: 768 or 3072 (default: 768).",
+    # )
     p_index.add_argument(
         "--attrs",
         "-a",

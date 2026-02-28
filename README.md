@@ -290,7 +290,7 @@ atlas index VIDEO_PATH [OPTIONS]
 Options:
   -c, --chunk-duration DUR     Duration of each chunk [default: 15s]
   -o, --overlap DUR            Overlap between chunks [default: 0s]
-  -e, --embedding-dim N        Embedding dimension: 768 or 3072 [default: 768]
+  -e, --embedding-dim N        Embedding dimension: 768 or 3072 [default: 768] (Not Implemented)
   -a, --attrs ATTR             Attribute to extract; repeat for multiple
       --include-summary BOOL  Generate a per-segment summary: true or false (default: true)
       --benchmark              Print a timing breakdown after completion
@@ -498,7 +498,7 @@ atlas serve -H 0.0.0.0 -p 8000 --env-file .env
 | GET    | `/queue/list`             | List queued tasks (filter by `?status=`)   |
 | GET    | `/queue/status/{task_id}` | Get status and result of a specific task   |
 
-> `/chat` returns a [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) stream. Each event carries `data: {"chunk": "..."}` and the stream ends with `data: [DONE]`.
+> `/chat` returns a StreamingResponse.
 
 **Quick test:**
 
