@@ -19,6 +19,7 @@ import tempfile
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
+from time import perf_counter
 from typing import Any, Literal
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -124,6 +125,15 @@ def _run_command(func, args: argparse.Namespace, *, tmp_dir: Path | None = None)
 def create_app() -> FastAPI:
     app = FastAPI(title="Atlas Server", version="0.2.0")
 
+    @app.middleware("http")
+    async def add_execution_time_header(request, call_next):
+        started = perf_counter()
+        response = await call_next(request)
+        elapsed_ms = (perf_counter() - started) * 1000
+        response.headers["x-execution-time"] = f"{elapsed_ms:.3f}ms"
+
+        return response
+
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
@@ -140,8 +150,8 @@ def create_app() -> FastAPI:
         format: Literal["json", "text"] = Form("text"),
         include_summary: bool = Form(True),
         benchmark: bool = Form(False),
-        no_queue: bool = Form(False),
-        no_streaming: bool = Form(False),
+        no_queue: bool = Form(True),
+        no_streaming: bool = Form(True),
     ):
         saved = _save_upload(video)
         args = argparse.Namespace(
@@ -162,12 +172,12 @@ def create_app() -> FastAPI:
     def index(
         video: UploadFile = File(..., description="Video file to process"),
         chunk_duration: str = Form("15s"),
-        overlap: str = Form("0s"),
+        overlap: str = Form("1s"),
         attrs: str | None = Form(None, description="Comma-separated description attributes"),
         include_summary: bool = Form(True),
         benchmark: bool = Form(False),
-        no_queue: bool = Form(False),
-        no_streaming: bool = Form(False),
+        no_queue: bool = Form(True),
+        no_streaming: bool = Form(True),
     ) -> Any:
         saved = _save_upload(video)
         args = argparse.Namespace(
@@ -188,8 +198,8 @@ def create_app() -> FastAPI:
         format: Literal["text", "vtt", "srt"] = Form("text"),
         output: str | None = Form(None),
         benchmark: bool = Form(False),
-        no_queue: bool = Form(False),
-        no_streaming: bool = Form(False),
+        no_queue: bool = Form(True),
+        no_streaming: bool = Form(True),
     ) -> Any:
         saved = _save_upload(video)
         args = argparse.Namespace(

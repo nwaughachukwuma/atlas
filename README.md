@@ -289,7 +289,7 @@ atlas index VIDEO_PATH [OPTIONS]
 
 Options:
   -c, --chunk-duration DUR     Duration of each chunk [default: 15s]
-  -o, --overlap DUR            Overlap between chunks [default: 0s]
+  -o, --overlap DUR            Overlap between chunks [default: 1s]
   -e, --embedding-dim N        Embedding dimension: 768 or 3072 [default: 768] (Not Implemented)
   -a, --attrs ATTR             Attribute to extract; repeat for multiple
       --include-summary BOOL   Generate a per-segment summary: true or false (default: true)

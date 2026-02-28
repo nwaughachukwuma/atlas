@@ -26,6 +26,16 @@ class TestHealthEndpoints:
         assert resp.status_code == 200
         assert resp.json() == {"status": "ok"}
 
+    def test_health_includes_execution_time_header(self):
+        client = TestClient(create_app())
+        resp = client.get("/health")
+
+        assert resp.status_code == 200
+        assert "x-execution-time" in resp.headers
+        value = resp.headers["x-execution-time"]
+        assert value.endswith("ms")
+        assert float(value[:-2]) >= 0.0
+
 
 class TestSearchEndpoint:
     """/search calls the data layer directly and returns structured JSON."""
@@ -386,7 +396,7 @@ class TestMediaPostEndpoints:
 
         assert captured["chunk_duration"] == "15s"
         assert captured["overlap"] == "1s"
-        assert captured["no_queue"] is False
+        assert captured["no_queue"] is True
 
     def test_upload_temp_file_cleaned_up(self, monkeypatch):
         """Verify the temp directory created for the upload is removed after the request."""
