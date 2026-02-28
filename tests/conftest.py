@@ -111,6 +111,17 @@ def mock_groq_client():
         yield mock_instance
 
 
+def pytest_collection_modifyitems(config, items):
+    """Auto-skip tests marked with @pytest.mark.zvec when zvec is not importable."""
+    try:
+        import zvec  # noqa: F401
+    except ModuleNotFoundError:
+        skip = pytest.mark.skip(reason="zvec native extension not available on this host")
+        for item in items:
+            if item.get_closest_marker("zvec"):
+                item.add_marker(skip)
+
+
 # Configure pytest-asyncio
 @pytest.fixture(scope="session")
 def event_loop_policy():
