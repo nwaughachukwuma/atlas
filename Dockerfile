@@ -75,7 +75,7 @@ RUN mkdir -p \
 #   docker run -v atlas-data:/home/atlas/.atlas ...
 VOLUME ["/home/atlas/.atlas"]
 
-# Atlas HTTP server default port (used by `atlas serve`).
+# Atlas HTTP server default port (used by docker run [OPTIONS] and by `atlas serve`).
 EXPOSE 8000
 
 # ── Entrypoint ───────────────────────────────────────────────────────────────

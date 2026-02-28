@@ -35,8 +35,6 @@ def cmd_search(args: argparse.Namespace) -> None:
     try:
         results = asyncio.run(search_video(query, args.top_k, video_id))
         output = {
-            "query": query,
-            "video_id": video_id,
             "count": len(results),
             "results": [r.model_dump() for r in results],
         }
@@ -138,7 +136,6 @@ def cmd_list_chat(args: argparse.Namespace) -> None:
         progress.update(task, completed=True)
 
     output = {
-        "video_id": video_id,
         "count": len(history),
         "messages": history,
     }
