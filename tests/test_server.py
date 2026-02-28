@@ -208,7 +208,7 @@ class TestQueueListEndpoint:
 class TestQueueStatusEndpoint:
     """/queue/status/{task_id} returns task details or 404."""
 
-    def test_queue_status_found_no_output(self):
+    def test_queue_status_found_no_output(self, tmp_path):
         fake_store = MagicMock()
         fake_store.get.return_value = {
             "task_id": "abc123",
@@ -217,17 +217,14 @@ class TestQueueStatusEndpoint:
             "finished_at": "2024-01-01T00:01:00",
         }
 
+        results_dir = tmp_path / "queue_results"
+        results_dir.mkdir()
+
         with (
             patch("atlas.task_queue.store.TaskStore", return_value=fake_store),
             patch("atlas.task_queue.commands._duration_str", return_value="60.0s"),
-            patch("atlas.task_queue.commands._parse_benchmark_file", return_value=[]),
-            patch("atlas.task_queue.config.RESULTS_DIR") as mock_dir,
+            patch("atlas.task_queue.config.RESULTS_DIR", results_dir),
         ):
-            # No output.json or benchmark.txt on disk
-            mock_results_dir = MagicMock()
-            mock_dir.__truediv__ = lambda self, x: mock_results_dir
-            mock_results_dir.__truediv__ = lambda self, x: MagicMock(exists=MagicMock(return_value=False))
-
             client = TestClient(create_app())
             resp = client.get("/queue/status/abc123")
 
@@ -235,6 +232,44 @@ class TestQueueStatusEndpoint:
         body = resp.json()
         assert body["task_id"] == "abc123"
         assert body["status"] == "completed"
+
+    def test_queue_status_found_with_output_json(self, tmp_path):
+        fake_store = MagicMock()
+        fake_store.get.return_value = {
+            "task_id": "abc123",
+            "status": "completed",
+            "started_at": "2024-01-01T00:00:00",
+            "finished_at": "2024-01-01T00:01:00",
+        }
+
+        results_dir = tmp_path / "queue_results"
+        task_dir = results_dir / "abc123"
+        task_dir.mkdir(parents=True)
+        output_path = task_dir / "output.json"
+        output_path.write_text(json.dumps({"ok": True, "segments": 3}))
+
+        benchmark_path = task_dir / "benchmark.txt"
+        benchmark_path.write_text("|...|")
+
+        with (
+            patch("atlas.task_queue.store.TaskStore", return_value=fake_store),
+            patch("atlas.task_queue.commands._duration_str", return_value="60.0s"),
+            patch("atlas.task_queue.config.RESULTS_DIR", results_dir),
+        ):
+            client = TestClient(create_app())
+            resp = client.get("/queue/status/abc123")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["task_id"] == "abc123"
+        assert body["status"] == "completed"
+        assert body["output_path"] == str(output_path)
+        assert body["benchmark_path"] == str(benchmark_path)
+
+        # verify the content of output_path
+        output_content = json.loads(output_path.read_text())
+        assert output_content["ok"] is True
+        assert output_content["segments"] == 3
 
     def test_queue_status_not_found(self):
         fake_store = MagicMock()

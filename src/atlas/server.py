@@ -226,14 +226,14 @@ def create_app() -> FastAPI:
 
     @app.get("/queue/status/{task_id}")
     def queue_status(task_id: str) -> dict[str, Any]:
-        from .task_queue.commands import _duration_str, _parse_benchmark_file
+        from .task_queue.commands import _duration_str
         from .task_queue.config import RESULTS_DIR
         from .task_queue.store import TaskStore
 
         store = TaskStore()
         task = store.get(task_id)
         if not task:
-            raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+            raise HTTPException(404, detail=f"Task {task_id} not found")
 
         output: dict[str, Any] = dict(task)
         output["duration"] = _duration_str(task.get("started_at"), task.get("finished_at")) or None
@@ -243,17 +243,10 @@ def create_app() -> FastAPI:
         benchmark_file = results_dir / "benchmark.txt"
 
         if output_file.exists():
-            try:
-                output["result"] = json.loads(output_file.read_text())
-            except Exception:
-                output["result"] = output_file.read_text()
+            output["output_path"] = str(output_file)
 
         if benchmark_file.exists():
-            rows = _parse_benchmark_file(benchmark_file)
-            output["benchmark"] = [
-                {"function": r[0], "calls": r[1], "total_s": r[2], "avg_s": r[3], "min_s": r[4], "max_s": r[5]}
-                for r in rows
-            ]
+            output["benchmark_path"] = str(benchmark_file)
 
         return output
 
