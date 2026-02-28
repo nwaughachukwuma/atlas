@@ -367,7 +367,6 @@ class TestCmdIndex:
             video_path=video_path,
             chunk_duration="15s",
             overlap="0s",
-            embedding_dim=768,
             attrs=None,
             include_summary=True,
             benchmark=False,

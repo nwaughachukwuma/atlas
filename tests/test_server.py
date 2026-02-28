@@ -178,7 +178,7 @@ class TestQueueListEndpoint:
 
     def test_queue_list_no_filter(self):
         fake_store = MagicMock()
-        fake_store.list_all.return_value = [{"task_id": "t1", "status": "pending"}]
+        fake_store.list_all.return_value = [{"id": "t1", "status": "pending"}]
 
         with patch("atlas.task_queue.store.TaskStore", return_value=fake_store):
             client = TestClient(create_app())
@@ -188,7 +188,7 @@ class TestQueueListEndpoint:
         body = resp.json()
         assert body["status_filter"] is None
         assert body["count"] == 1
-        assert body["tasks"][0]["task_id"] == "t1"
+        assert body["tasks"][0]["id"] == "t1"
 
     def test_queue_list_with_status_filter(self):
         fake_store = MagicMock()
@@ -211,7 +211,7 @@ class TestQueueStatusEndpoint:
     def test_queue_status_found_no_output(self, tmp_path):
         fake_store = MagicMock()
         fake_store.get.return_value = {
-            "task_id": "abc123",
+            "id": "abc123",
             "status": "completed",
             "started_at": "2024-01-01T00:00:00",
             "finished_at": "2024-01-01T00:01:00",
@@ -230,13 +230,13 @@ class TestQueueStatusEndpoint:
 
         assert resp.status_code == 200
         body = resp.json()
-        assert body["task_id"] == "abc123"
+        assert body["id"] == "abc123"
         assert body["status"] == "completed"
 
     def test_queue_status_found_with_output_json(self, tmp_path):
         fake_store = MagicMock()
         fake_store.get.return_value = {
-            "task_id": "abc123",
+            "id": "abc123",
             "status": "completed",
             "started_at": "2024-01-01T00:00:00",
             "finished_at": "2024-01-01T00:01:00",
@@ -261,7 +261,7 @@ class TestQueueStatusEndpoint:
 
         assert resp.status_code == 200
         body = resp.json()
-        assert body["task_id"] == "abc123"
+        assert body["id"] == "abc123"
         assert body["status"] == "completed"
         assert body["output_path"] == str(output_path)
         assert body["benchmark_path"] == str(benchmark_path)

@@ -292,7 +292,7 @@ Options:
   -o, --overlap DUR            Overlap between chunks [default: 0s]
   -e, --embedding-dim N        Embedding dimension: 768 or 3072 [default: 768] (Not Implemented)
   -a, --attrs ATTR             Attribute to extract; repeat for multiple
-      --include-summary BOOL  Generate a per-segment summary: true or false (default: true)
+      --include-summary BOOL   Generate a per-segment summary: true or false (default: true)
       --benchmark              Print a timing breakdown after completion
 ```
 
@@ -300,7 +300,7 @@ Options:
 
 ```bash
 atlas index video.mp4
-atlas index video.mp4 --chunk-duration=10s --embedding-dim=3072
+atlas index video.mp4 --chunk-duration=10s --overlap=2s
 ```
 
 ---
