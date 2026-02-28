@@ -19,6 +19,30 @@ https://github.com/user-attachments/assets/d28fb343-5c74-462f-996e-f0e5dc51cdf8
 - 💻 **CLI First**: Clean, ergonomic command-line interface
 - 🔒 **Local by default**: Vector index stored on disk (`~/.atlas/index`); your videos never leave your machine
 
+## Performance
+
+| Function                   | Avg / call  | Notes                                                  |
+| -------------------------- | ----------- | ------------------------------------------------------ |
+| Gemini multimodal analysis | ~5s         | Processing time for a segment with multiple attributes |
+| Groq Whisper (transcribe)  | ~5s / video | Full video                                             |
+| ffmpeg clip                | ~0.1s       | Per chunk                                              |
+| zvec query                 | ms          | Local HNSW, ~8× faster than Pinecone                   |
+
+For a ~5 min video with 15s chunk_duration (~20 chunks), wall time for indexing is typically **~90s** with default concurrency, as chunks are processed in parallel.
+
+---
+
+## Requirements
+
+- **ffmpeg**: Required for video clipping.
+  - macOS: `brew install ffmpeg`
+  - Ubuntu/Debian: `sudo apt install ffmpeg`
+  - Windows: `winget install ffmpeg`
+
+- **Platform Support**: Linux (x86_64, ARM64) and macOS (ARM64)
+
+---
+
 ## Installation
 
 ### Requirements
@@ -622,28 +646,6 @@ asyncio.run(stream())
 ```
 
 All data (indexed segments, chat history, video metadata) is stored directly in the zvec collections — no sidecar files or external registries.
-
----
-
-## Performance
-
-| Function                   | Avg / call  | Notes                                                  |
-| -------------------------- | ----------- | ------------------------------------------------------ |
-| Gemini multimodal analysis | ~5s         | Processing time for a segment with multiple attributes |
-| Groq Whisper (transcribe)  | ~5s / video | Full video, one shot                                   |
-| ffmpeg clip                | ~0.1s       | Per chunk                                              |
-| zvec query                 | sub-ms      | Local HNSW, ~8× faster than Pinecone                   |
-
-For a ~5 min video with 15s chunks (~24 chunks), wall time is typically **2–3 min** with default concurrency, as chunks are processed in parallel.
-
----
-
-## Requirements
-
-- **ffmpeg**: Required for video clipping.
-  - macOS: `brew install ffmpeg`
-  - Ubuntu/Debian: `sudo apt install ffmpeg`
-  - Windows: `winget install ffmpeg`
 
 ---
 
