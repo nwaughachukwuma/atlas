@@ -2,7 +2,7 @@
 Atlas - A multimodal insights engine for video understanding
 """
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 
 
 # Lazy imports to avoid loading heavy dependencies at import time.

@@ -120,7 +120,7 @@ def _ns(model: BaseModel) -> argparse.Namespace:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Atlas Server", version="0.1.2")
+    app = FastAPI(title="Atlas Server", version="0.2.0")
 
     @app.get("/health")
     def health() -> dict[str, str]:
