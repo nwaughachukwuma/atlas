@@ -16,43 +16,40 @@ import type {
   Video,
 } from "./types.ts";
 
-const BASE = "";
+const BASE_URL = "";
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(BASE + path, {
+  const res = await fetch(BASE_URL + path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const err = (await res
-      .json()
-      .catch(() => ({ detail: res.statusText }))) as { detail?: unknown };
-    throw new Error(err.detail ? JSON.stringify(err.detail) : res.statusText);
-  }
-  return res.json() as Promise<T>;
+  if (res.ok) return res.json() as Promise<T>;
+
+  const err = (await res.json().catch(() => ({ detail: res.statusText }))) as {
+    detail?: unknown;
+  };
+  throw new Error(err.detail ? JSON.stringify(err.detail) : res.statusText);
 }
 
 async function postForm<T>(path: string, formData: FormData): Promise<T> {
-  const res = await fetch(BASE + path, { method: "POST", body: formData });
-  if (!res.ok) {
-    const err = (await res
-      .json()
-      .catch(() => ({ detail: res.statusText }))) as { detail?: unknown };
-    throw new Error(err.detail ? JSON.stringify(err.detail) : res.statusText);
-  }
-  return res.json() as Promise<T>;
+  const res = await fetch(BASE_URL + path, { method: "POST", body: formData });
+  if (res.ok) return res.json() as Promise<T>;
+
+  const err = (await res.json().catch(() => ({ detail: res.statusText }))) as {
+    detail?: unknown;
+  };
+  throw new Error(err.detail ? JSON.stringify(err.detail) : res.statusText);
 }
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(BASE + path);
-  if (!res.ok) {
-    const err = (await res
-      .json()
-      .catch(() => ({ detail: res.statusText }))) as { detail?: unknown };
-    throw new Error(err.detail ? JSON.stringify(err.detail) : res.statusText);
-  }
-  return res.json() as Promise<T>;
+  const res = await fetch(BASE_URL + path);
+  if (res.ok) return res.json() as Promise<T>;
+
+  const err = (await res.json().catch(() => ({ detail: res.statusText }))) as {
+    detail?: unknown;
+  };
+  throw new Error(err.detail ? JSON.stringify(err.detail) : res.statusText);
 }
 
 // ── Mutating endpoints ────────────────────────────────────────────────────────
@@ -68,6 +65,7 @@ export function transcribe(
   fd.append("no_queue", String(opts.no_queue ?? true));
   fd.append("no_streaming", String(opts.no_streaming ?? true));
   if (opts.output) fd.append("output", opts.output);
+
   return postForm<TranscribeResult>("/transcribe", fd);
 }
 
@@ -81,11 +79,13 @@ export function extract(
   fd.append("overlap", opts.overlap ?? "1s");
   fd.append("format", opts.format ?? "json");
   fd.append("include_summary", String(opts.include_summary ?? true));
+
   fd.append("benchmark", String(opts.benchmark ?? false));
   fd.append("no_queue", String(opts.no_queue ?? true));
   fd.append("no_streaming", String(opts.no_streaming ?? true));
   if (opts.attrs) fd.append("attrs", opts.attrs);
   if (opts.output) fd.append("output", opts.output);
+
   return postForm<ExtractResult>("/extract", fd);
 }
 
@@ -99,9 +99,11 @@ export function indexVideo(
   fd.append("overlap", opts.overlap ?? "1s");
   fd.append("include_summary", String(opts.include_summary ?? true));
   fd.append("benchmark", String(opts.benchmark ?? false));
+
   fd.append("no_queue", String(opts.no_queue ?? true));
   fd.append("no_streaming", String(opts.no_streaming ?? true));
   if (opts.attrs) fd.append("attrs", opts.attrs);
+
   return postForm<IndexResult>("/index", fd);
 }
 
@@ -116,17 +118,22 @@ export const search = (
 
 export const listVideos = (): Promise<ListVideosResponse> =>
   get<ListVideosResponse>("/list-videos");
+
 export const getVideo = (id: string): Promise<{ data?: Video } & Video> =>
   get<{ data?: Video } & Video>(`/get-video/${id}`);
+
 export const listChat = (id: string, last_n = 50): Promise<ListChatResponse> =>
   get<ListChatResponse>(`/list-chat/${id}?last_n=${last_n}`);
 export const stats = (): Promise<StatsResponse> => get<StatsResponse>("/stats");
+
 export const health = (): Promise<HealthResponse> =>
   get<HealthResponse>("/health");
+
 export const queueList = (
   status: string | null = null,
 ): Promise<QueueListResponse> =>
   get<QueueListResponse>("/queue/list" + (status ? `?status=${status}` : ""));
+
 export const queueStatus = (id: string): Promise<Task> =>
   get<Task>(`/queue/status/${id}`);
 
@@ -147,15 +154,19 @@ export function chatStream(
   })
     .then(async (res) => {
       if (!res.ok) throw new Error(await res.text());
+
       const reader = res.body!.getReader();
       const dec = new TextDecoder();
       let buf = "";
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+
         buf += dec.decode(value, { stream: true });
         const lines = buf.split("\n");
         buf = lines.pop() ?? "";
+
         for (const line of lines) {
           if (line.startsWith("data: ")) onChunk(line.slice(6));
         }

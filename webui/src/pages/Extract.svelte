@@ -5,6 +5,7 @@
   import { extract } from "../lib/api.ts";
   import type { ExtractResult, TaskQueuedResult } from "../lib/types.ts";
   import { toPath } from "../lib/routing.ts";
+  import { toast } from "svelte-sonner";
 
   let file: File | null = null;
   let chunk_duration: string = "15s";
@@ -18,37 +19,41 @@
   let error: string | null = null;
   let taskInfo: TaskQueuedResult | null = null;
 
-  async function submit(): Promise<void> {
-    if (!file) return;
+  async function submit() {
+    if (loading || !file) return;
+
     loading = true;
     result = null;
     error = null;
     taskInfo = null;
-    try {
-      const data = await extract(file, {
-        chunk_duration,
-        overlap,
-        format,
-        include_summary,
-        benchmark,
-        no_queue,
-        no_streaming: true,
-      });
-      if (data.ok === false) {
-        error = data.error ?? "Unknown error";
-      } else if (
-        data.task_id ||
-        (typeof data === "object" && "id" in data && !("chunks" in data))
-      ) {
-        taskInfo = data;
-      } else {
-        result = data;
-      }
-    } catch (e) {
-      error = (e as Error).message;
-    } finally {
-      loading = false;
-    }
+
+    return extract(file, {
+      chunk_duration,
+      overlap,
+      format,
+      include_summary,
+      benchmark,
+      no_queue,
+      no_streaming: true,
+    })
+      .then((d) => {
+        if (d.ok) return d;
+        throw new Error(d.error || "Unknown error");
+      })
+      .then((d) => {
+        if (
+          d.task_id ||
+          (typeof d === "object" && "id" in d && !("chunks" in d))
+        ) {
+          taskInfo = d;
+        } else result = d;
+      })
+      .catch((e) =>
+        toast.error("Error while extracting multimodal insight", {
+          description: e.message,
+        }),
+      )
+      .finally(() => (loading = false));
   }
 </script>
 

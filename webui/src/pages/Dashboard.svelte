@@ -1,3 +1,7 @@
+<script lang="ts" module>
+  type QueueBreakdown = Record<TaskStatus, number>;
+</script>
+
 <script lang="ts">
   import { route } from "@mateothegreat/svelte5-router";
   import { onMount } from "svelte";
@@ -11,30 +15,35 @@
     ListVideosResponse,
     TaskStatus,
   } from "../lib/types.ts";
-
-  type QueueBreakdown = Record<TaskStatus, number>;
+  import { toast } from "svelte-sonner";
 
   let statsData = $state<StatsResponse | null>(null);
   let healthData = $state<HealthResponse | null>(null);
   let queueData = $state<QueueListResponse | null>(null);
   let videosData = $state<ListVideosResponse | null>(null);
-
   let loading = $state<boolean>(true);
-  let error = $state<string | null>(null);
 
-  onMount(async () => {
-    try {
-      [statsData, healthData, queueData, videosData] = await Promise.all([
-        stats(),
-        health(),
-        queueList(),
-        listVideos(),
-      ]);
-    } catch (e) {
-      error = (e as Error).message;
-    } finally {
-      loading = false;
-    }
+  async function loadData() {
+    await Promise.all([
+      health().then((d) => (healthData = d)),
+      queueList().then((d) => (queueData = d)),
+      stats()
+        .then((d) => (statsData = d))
+        .catch((e) =>
+          toast.error("Error getting stats", { description: e.message }),
+        ),
+      listVideos()
+        .then((d) => (videosData = d))
+        .catch((e) =>
+          toast.error("Error fetching videos", { description: e.message }),
+        ),
+    ])
+      .catch((e) => toast.error((e as Error).message))
+      .finally(() => (loading = false));
+  }
+
+  onMount(() => {
+    loadData();
   });
 
   const queueBreakdown: QueueBreakdown = $derived.by((): QueueBreakdown => {
@@ -87,8 +96,6 @@
 
   {#if loading}
     <p><span class="spinner"></span> Loading…</p>
-  {:else if error}
-    <div class="error-box">{error}</div>
   {:else}
     <!-- KPI row -->
     <div class="grid grid-cols-4 gap-3 mb-4 max-sm:grid-cols-2">

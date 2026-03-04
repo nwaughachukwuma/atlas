@@ -5,6 +5,7 @@
   import { indexVideo } from "../lib/api.ts";
   import type { IndexResult, TaskQueuedResult } from "../lib/types.ts";
   import { toPath } from "../lib/routing.ts";
+  import { toast } from "svelte-sonner";
 
   let file: File | null = null;
   let chunk_duration: string = "15s";
@@ -12,42 +13,43 @@
   let include_summary: boolean = true;
   let benchmark: boolean = false;
   let no_queue: boolean = true;
+
   let loading: boolean = false;
   let result: IndexResult | null = null;
   let error: string | null = null;
   let taskInfo: TaskQueuedResult | null = null;
 
-  async function submit(): Promise<void> {
-    if (!file) return;
+  async function submit() {
+    if (loading || !file) return;
     loading = true;
     result = null;
     error = null;
     taskInfo = null;
-    try {
-      const data = await indexVideo(file, {
-        chunk_duration,
-        overlap,
-        include_summary,
-        benchmark,
-        no_queue,
-        no_streaming: true,
-      });
-      if (data.ok === false) {
-        error = data.error ?? "Unknown error";
-      } else if (data.task_id) {
-        taskInfo = data;
-      } else if (data.video_id) {
-        result = data;
-      } else if ("id" in data && !("video_id" in data)) {
-        taskInfo = data;
-      } else {
-        result = data;
-      }
-    } catch (e) {
-      error = (e as Error).message;
-    } finally {
-      loading = false;
-    }
+
+    return indexVideo(file, {
+      chunk_duration,
+      overlap,
+      include_summary,
+      benchmark,
+      no_queue,
+      no_streaming: true,
+    })
+      .then((d) => {
+        if (d.ok) return d;
+        throw new Error(d.error || "Unknown error");
+      })
+      .then((d) => {
+        if (d.task_id) taskInfo = d;
+        else if (d.video_id) result = d;
+        else if ("id" in d && !("video_id" in d)) taskInfo = d;
+        else result = d;
+      })
+      .catch((e) =>
+        toast.error("Error while indexing video", {
+          description: e.message,
+        }),
+      )
+      .finally(() => (loading = false));
   }
 </script>
 

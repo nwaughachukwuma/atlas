@@ -5,39 +5,36 @@
   import { listVideos, search } from "../lib/api.ts";
   import type { Video, SearchResult } from "../lib/types.ts";
   import { toPath } from "../lib/routing.ts";
+  import { toast } from "svelte-sonner";
 
   let videos: Video[] = [];
-  let loading: boolean = true;
+  let loading = true;
   let error: string | null = null;
-  let searchQuery: string = "";
+  let searchQuery = "";
   let searchResults: SearchResult[] | null = null;
-  let searching: boolean = false;
+  let searching = false;
 
-  onMount(async () => {
-    try {
-      const data = await listVideos();
-      videos = data.videos ?? [];
-    } catch (e) {
-      error = (e as Error).message;
-    } finally {
-      loading = false;
-    }
+  onMount(() => {
+    listVideos()
+      .then((d) => (videos = d.videos))
+      .catch((e) =>
+        toast.error("Error fetching videos", { description: e.message }),
+      )
+      .finally(() => (loading = false));
   });
 
-  async function doSearch(): Promise<void> {
-    if (!searchQuery.trim()) {
-      searchResults = null;
-      return;
+  async function doSearch() {
+    if (searching || !searchQuery.trim()) {
+      return (searchResults = null);
     }
+
     searching = true;
-    try {
-      const data = await search(searchQuery.trim(), null, 20);
-      searchResults = data.results ?? [];
-    } catch (e) {
-      error = (e as Error).message;
-    } finally {
-      searching = false;
-    }
+    return search(searchQuery.trim(), null, 20)
+      .then((d) => (searchResults = d.results))
+      .catch((e) =>
+        toast.error("Error while searching", { description: e.message }),
+      )
+      .finally(() => (searching = false));
   }
 
   function clearSearch(): void {

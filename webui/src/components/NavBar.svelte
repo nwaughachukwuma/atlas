@@ -107,7 +107,7 @@
   <div
     class="px-[1.1rem] pt-4 border-t border-line text-[0.75rem] flex flex-col gap-[0.3em]"
   >
-    <span class="text-muted">Atlas Multimodal Engine</span>
+    <span class="text-muted">Atlas Multimodal AI</span>
     <a
       href="https://github.com/nwaughachukwuma/atlas-video"
       target="_blank"

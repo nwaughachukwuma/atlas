@@ -11,6 +11,7 @@
   import Queue from "./pages/Queue.svelte";
   import Dashboard from "./pages/Dashboard.svelte";
   import { BASE_PATH } from "./lib/routing.ts";
+  import { Toaster } from "svelte-sonner";
 
   const routes: RouteConfig[] = [
     { path: "/", component: Home },
@@ -34,3 +35,5 @@
 <div class="fixed top-4 right-5 z-100">
   <HowItWorks />
 </div>
+
+<Toaster duration={5000} position="bottom-right" />

@@ -1,3 +1,7 @@
+<script module>
+  const POLL_INTERVAL = 3000;
+</script>
+
 <script lang="ts">
   import { route } from "@mateothegreat/svelte5-router";
   import { ClipboardListIcon } from "lucide-svelte";
@@ -5,6 +9,7 @@
   import { queueList, queueStatus } from "../lib/api.ts";
   import type { Task, TaskStatus } from "../lib/types.ts";
   import { toPath } from "../lib/routing.ts";
+  import { toast } from "svelte-sonner";
 
   let { route: routeResult } = $props();
   const taskId: string | null = $derived(
@@ -29,23 +34,22 @@
     "timeout",
   ];
 
-  async function load(): Promise<void> {
+  async function load() {
+    if (loading) return;
+
     loading = true;
     error = null;
-    try {
-      if (taskId) {
-        task = await queueStatus(taskId);
-        tasks = [];
-      } else {
-        const data = await queueList(statusFilter);
-        tasks = data.tasks ?? [];
-        task = null;
-      }
-    } catch (e) {
-      error = (e as Error).message;
-    } finally {
-      loading = false;
-    }
+    return (
+      taskId
+        ? queueStatus(taskId).then((d) => (task = d))
+        : queueList(statusFilter).then((d) => (tasks = d.tasks))
+    )
+      .catch((e) =>
+        toast.error("Error while fetching Queue data", {
+          description: e.message,
+        }),
+      )
+      .finally(() => (loading = false));
   }
 
   onMount(async () => {
@@ -56,18 +60,18 @@
         tasks.some((t) => t.status === "pending" || t.status === "running") ||
         (task && (task.status === "pending" || task.status === "running"));
       if (hasActive) await load();
-    }, 5000);
+    }, POLL_INTERVAL);
   });
 
   onDestroy(() => {
     if (pollInterval) clearInterval(pollInterval);
   });
 
-  function badgeClass(status: string): string {
+  function badgeClass(status: string) {
     return `badge badge-${status ?? "pending"}`;
   }
 
-  function formatDate(iso: string | undefined): string {
+  function formatDate(iso: string | undefined) {
     if (!iso) return "—";
     return new Date(iso).toLocaleString();
   }

@@ -6,19 +6,18 @@
   import type { Video, SearchResult } from "../lib/types.ts";
   import ChatPanel from "../components/ChatPanel.svelte";
   import { toPath } from "../lib/routing.ts";
+  import type { RouteResult } from "@mateothegreat/svelte5-router";
 
-  let { route: routeResult } = $props();
+  let { route: routeResult }: { route: RouteResult } = $props();
 
-  const videoId: string = $derived(
-    ((routeResult?.result?.path?.params?.id as string | undefined) ??
-      "") as string,
-  );
+  let videoId: string = $derived(routeResult.result.path.params?.id);
 
   let videoData: Video | null = $state(null);
   let loading: boolean = $state(true);
   let error: string | null = $state(null);
   let chatOpen: boolean = $state(false);
   let searchQuery: string = $state("");
+
   let searchResults: SearchResult[] | null = $state(null);
   let searching: boolean = $state(false);
   let pollInterval: ReturnType<typeof setInterval> | null = $state(null);
@@ -178,7 +177,7 @@
         </div>
         {#if videoData.chunks}
           <h4 class="mt-4">Segments ({videoData.chunks.length})</h4>
-          {#each videoData.chunks as chunk, i}
+          {#each videoData.chunks as chunk, i (`${i}:${chunk.start_time}`)}
             <details class="border border-line mb-[0.4rem] p-[0.4rem]">
               <summary
                 class="cursor-pointer text-[0.85rem] text-muted hover:text-cobalt"

@@ -58,18 +58,18 @@
 </script>
 
 <div
-  class={`border-2 border-dashed p-8 text-center transition-all duration-[0.15s] bg-surface-alt cursor-pointer ${
+  role="region"
+  aria-label="Video file upload"
+  ondragover={handleDragOver}
+  ondragleave={handleDragLeave}
+  ondrop={handleDrop}
+  class={`border-2 border-dashed p-8 text-center transition-all duration-150 bg-surface-alt cursor-pointer ${
     dragging
       ? "border-cobalt bg-[rgba(19,81,170,0.07)]"
       : file
         ? "border-solid border-success p-4"
         : "border-line"
   }`}
-  ondragover={handleDragOver}
-  ondragleave={handleDragLeave}
-  ondrop={handleDrop}
-  role="region"
-  aria-label="Video file upload"
 >
   {#if file}
     <div class="flex items-center gap-3 text-left">

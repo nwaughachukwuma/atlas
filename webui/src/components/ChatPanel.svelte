@@ -33,9 +33,7 @@
           text: m.content ?? m.query ?? m.answer ?? JSON.stringify(m),
         }),
       );
-    } catch (_) {
-      /* ignore */
-    }
+    } catch (_) {}
   }
 
   $effect(() => {
@@ -56,6 +54,7 @@
   async function send(): Promise<void> {
     const q = query.trim();
     if (!q || streaming) return;
+
     query = "";
     messages = [...messages, { role: "user", text: q }];
     messages = [...messages, { role: "assistant", text: "" }];
@@ -118,6 +117,7 @@
         Ask a question about this video…
       </p>
     {/if}
+
     {#each messages as m}
       <div class={`flex ${m.role === "user" ? "justify-end" : ""}`}>
         <span
@@ -130,6 +130,7 @@
       </div>
     {/each}
   </div>
+
   <div class="flex gap-2 px-4 py-3 border-t border-line">
     <textarea
       bind:value={query}
@@ -139,10 +140,11 @@
       disabled={streaming}
       class="flex-1 resize-none text-[0.85rem]"
     ></textarea>
+
     {#if streaming}
-      <button class="btn-danger self-end whitespace-nowrap" onclick={cancel}
-        >Stop</button
-      >
+      <button class="btn-danger self-end whitespace-nowrap" onclick={cancel}>
+        Stop
+      </button>
     {:else}
       <button
         class="btn-primary self-end whitespace-nowrap"

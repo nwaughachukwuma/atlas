@@ -3,6 +3,7 @@
   import { search } from "../lib/api.ts";
   import type { SearchResult } from "../lib/types.ts";
   import { toPath } from "../lib/routing.ts";
+  import { toast } from "svelte-sonner";
 
   let query: string = "";
   let videoId: string = "";
@@ -12,32 +13,33 @@
   let count: number = 0;
   let error: string | null = null;
 
-  async function doSearch(): Promise<void> {
-    if (!query.trim()) return;
+  async function doSearch() {
+    if (loading || !query.trim()) return;
+
     loading = true;
     error = null;
     results = null;
-    try {
-      const data = await search(query.trim(), videoId.trim() || null, topK);
-      results = data.results ?? [];
-      count = data.count ?? results.length;
-    } catch (e) {
-      error = (e as Error).message;
-    } finally {
-      loading = false;
-    }
+    return search(query.trim(), videoId.trim() || null, topK)
+      .then((d) => {
+        results = d.results ?? [];
+        count = d.count ?? results.length;
+      })
+      .catch((e) =>
+        toast.error("Error while searching", { description: e.message }),
+      )
+      .finally(() => (loading = false));
   }
 
-  function clear(): void {
+  function clear() {
     results = null;
     query = "";
     videoId = "";
     error = null;
   }
 
-  function handleSubmit(e: SubmitEvent): void {
+  async function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
-    void doSearch();
+    return doSearch();
   }
 </script>
 
