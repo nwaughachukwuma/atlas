@@ -4,3 +4,5 @@ sample_files
 .env
 .coverage
 product-video
+webui/node_modules
+webui/dist

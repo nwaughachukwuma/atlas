@@ -6,6 +6,14 @@ IMAGE         = nwaughachukwuma/atlas-video
 VERSION      ?= $(shell python3 -c "import re; m=re.search(r'version\s*=\s*\"([^\"]+)\"', open('pyproject.toml').read()); print(m.group(1))" 2>/dev/null || echo "dev")
 PLATFORM     ?= linux/amd64,linux/arm64
 
+# ── Web UI ────────────────────────────────────────────────────────────────────
+
+# Build the Svelte web UI and copy the assets into the Python package
+build-ui:
+	cd webui && npm ci --prefer-offline && npm run build
+	rm -rf src/atlas/ui
+	cp -r webui/dist src/atlas/ui
+
 # ── Tests ────────────────────────────────────────────────────────────────────
 test:
 	pytest tests/ -vv
@@ -64,4 +72,4 @@ docker-shell:
 		--entrypoint bash \
 		$(IMAGE):latest
 
-.PHONY: test test-all docker-test docker-build docker-push docker-run docker-shell
+.PHONY: build-ui test test-all docker-test docker-build docker-push docker-run docker-shell

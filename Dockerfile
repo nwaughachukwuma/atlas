@@ -13,6 +13,15 @@
 # Platforms: linux/amd64, linux/arm64
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ── Web UI build stage ───────────────────────────────────────────────────────
+FROM node:22-slim AS ui-builder
+
+WORKDIR /build/webui
+COPY webui/package*.json ./
+RUN npm ci --prefer-offline
+COPY webui/ ./
+RUN npm run build
+
 # ── Build stage: compile wheel from source ───────────────────────────────────
 FROM python:3.12-slim AS builder
 
@@ -21,6 +30,9 @@ WORKDIR /build
 # Copy only the files needed to build the package
 COPY pyproject.toml README.md LICENSE ./
 COPY src/ ./src/
+
+# Overlay the pre-built UI assets into the package source tree
+COPY --from=ui-builder /build/webui/dist ./src/atlas/ui
 
 RUN pip install --no-cache-dir build \
  && python -m build --wheel --outdir /dist

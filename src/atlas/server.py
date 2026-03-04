@@ -23,12 +23,16 @@ from time import perf_counter
 from typing import Any, Literal
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .cli.cmd_media import cmd_extract, cmd_index, cmd_transcribe
 from .file_extension import get_ext_from_mimetype
 from .uuid import uuid
+
+# Path to the pre-built Svelte web UI assets
+_UI_DIR = Path(__file__).parent / "ui"
 
 
 class CommandResult(BaseModel):
@@ -322,4 +326,20 @@ def create_app() -> FastAPI:
 
         return output
 
+    _mount_ui(app)
     return app
+
+
+def _mount_ui(app: FastAPI) -> None:
+    """Mount the pre-built Svelte web UI at /ui if the assets directory exists."""
+    if not _UI_DIR.exists():
+        return
+
+    # Serve the SPA index.html for the bare /ui path (redirect to /ui/)
+    @app.get("/ui", include_in_schema=False)
+    def ui_root() -> FileResponse:
+        return FileResponse(_UI_DIR / "index.html")
+
+    # Mount all static assets under /ui/ — html=True serves index.html for
+    # unknown sub-paths, which is required for the hash-based SPA router.
+    app.mount("/ui", StaticFiles(directory=str(_UI_DIR), html=True), name="ui")
