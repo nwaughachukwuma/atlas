@@ -1,14 +1,55 @@
 <script>
+  import {
+    HouseIcon,
+    MicIcon,
+    FlaskConicalIcon,
+    DatabaseIcon,
+    FilmIcon,
+    ClipboardListIcon,
+    LayoutDashboardIcon,
+    ZapIcon,
+  } from "lucide-svelte";
+
   export let currentPath = "/";
 
   const links = [
-    { path: "/", label: "🏠 Home", title: "Atlas Video" },
-    { path: "/transcribe", label: "🎙️ Transcribe", title: "Transcribe" },
-    { path: "/extract", label: "🔬 Extract", title: "Extract Insights" },
-    { path: "/index", label: "📦 Index", title: "Index Video" },
-    { path: "/videos", label: "🎬 Videos", title: "Indexed Videos" },
-    { path: "/queue", label: "📋 Queue", title: "Task Queue" },
-    { path: "/dashboard", label: "📊 Dashboard", title: "Dashboard" },
+    { path: "/", icon: HouseIcon, label: "Home", title: "Atlas Video" },
+    {
+      path: "/transcribe",
+      icon: MicIcon,
+      label: "Transcribe",
+      title: "Transcribe",
+    },
+    {
+      path: "/extract",
+      icon: FlaskConicalIcon,
+      label: "Extract",
+      title: "Extract Insights",
+    },
+    {
+      path: "/index",
+      icon: DatabaseIcon,
+      label: "Index",
+      title: "Index Video",
+    },
+    {
+      path: "/videos",
+      icon: FilmIcon,
+      label: "Videos",
+      title: "Indexed Videos",
+    },
+    {
+      path: "/queue",
+      icon: ClipboardListIcon,
+      label: "Queue",
+      title: "Task Queue",
+    },
+    {
+      path: "/dashboard",
+      icon: LayoutDashboardIcon,
+      label: "Dashboard",
+      title: "Dashboard",
+    },
   ];
 
   function isActive(path) {
@@ -19,13 +60,19 @@
 
 <nav>
   <div class="logo">
-    <a href="#/">⚡ Atlas</a>
+    <a href="#/">
+      <ZapIcon size={16} strokeWidth={2} />
+      <span>Atlas</span>
+    </a>
     <span class="version">Multimodal AI</span>
   </div>
   <ul>
     {#each links as l}
       <li class:active={isActive(l.path)}>
-        <a href={`#${l.path}`}>{l.label}</a>
+        <a href={`#${l.path}`}>
+          <svelte:component this={l.icon} size={15} strokeWidth={1.5} />
+          <span>{l.label}</span>
+        </a>
       </li>
     {/each}
   </ul>
@@ -43,8 +90,8 @@
   nav {
     width: 210px;
     min-height: 100vh;
-    background: var(--bg2);
-    border-right: 1px solid var(--border);
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-line);
     display: flex;
     flex-direction: column;
     padding: 1.25rem 0;
@@ -54,20 +101,25 @@
   }
   .logo {
     padding: 0 1.1rem 1.25rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--color-line);
     margin-bottom: 0.75rem;
   }
   .logo a {
+    font-family: var(--font-display);
     font-size: 1.15rem;
-    font-weight: 700;
-    color: var(--primary);
-    display: block;
+    font-weight: 900;
+    color: var(--color-cobalt);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    letter-spacing: -0.02em;
   }
   .version {
     font-size: 0.7rem;
-    color: var(--text-muted);
+    font-weight: 700;
+    color: var(--color-text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.2em;
   }
   ul {
     list-style: none;
@@ -76,37 +128,41 @@
     flex: 1;
   }
   li a {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     padding: 0.55em 1.1rem;
-    color: var(--text-muted);
-    font-size: 0.9rem;
+    color: var(--color-text-muted);
+    font-size: 0.88rem;
+    font-weight: 500;
     border-left: 2px solid transparent;
-    transition: all 0.15s;
+    transition: all 0.3s linear;
   }
   li a:hover {
-    color: var(--text);
-    background: var(--bg3);
+    color: var(--color-text);
+    background: var(--color-surface-alt);
   }
   li.active a {
-    color: var(--primary);
-    border-left-color: var(--primary);
-    background: rgba(99, 102, 241, 0.1);
+    color: var(--color-cobalt);
+    border-left-color: var(--color-cobalt);
+    background: rgba(19, 81, 170, 0.06);
+    font-weight: 700;
   }
   .nav-footer {
     padding: 1rem 1.1rem 0;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--color-line);
     font-size: 0.75rem;
     display: flex;
     flex-direction: column;
     gap: 0.3em;
   }
   .muted {
-    color: var(--text-muted);
+    color: var(--color-text-muted);
   }
   .gh-link {
-    color: var(--text-muted);
+    color: var(--color-text-muted);
   }
   .gh-link:hover {
-    color: var(--primary);
+    color: var(--color-cobalt);
   }
 </style>

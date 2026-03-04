@@ -31,8 +31,12 @@ from .cli.cmd_media import cmd_extract, cmd_index, cmd_transcribe
 from .file_extension import get_ext_from_mimetype
 from .uuid import uuid
 
-# Path to the pre-built Svelte web UI assets
-_UI_DIR = Path(__file__).parent / "ui"
+# Path to the pre-built Svelte web UI assets.
+# In a development tree the build output lives at ``src/ui/`` (sibling of the
+# ``atlas`` package); when the wheel is installed the ``ui/`` directory is
+# packaged as a top-level data directory next to the ``atlas`` package in
+# site-packages.
+_UI_DIR = Path(__file__).resolve().parent.parent / "ui"
 
 
 class CommandResult(BaseModel):

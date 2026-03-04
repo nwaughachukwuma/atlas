@@ -1,6 +1,8 @@
 <script>
   import Router from "svelte-spa-router";
+  import { location } from "svelte-spa-router";
   import NavBar from "./components/NavBar.svelte";
+  import HowItWorks from "./components/HowItWorks.svelte";
   import Home from "./pages/Home.svelte";
   import Transcribe from "./pages/Transcribe.svelte";
   import Extract from "./pages/Extract.svelte";
@@ -23,8 +25,6 @@
   };
 
   let currentPath = "/";
-
-  import { location } from "svelte-spa-router";
   $: currentPath = $location;
 </script>
 
@@ -33,10 +33,20 @@
   <Router {routes} />
 </main>
 
+<div class="help-fixed">
+  <HowItWorks />
+</div>
+
 <style>
   main {
     flex: 1;
     overflow-y: auto;
     min-height: 100vh;
+  }
+  .help-fixed {
+    position: fixed;
+    top: 1rem;
+    right: 1.25rem;
+    z-index: 100;
   }
 </style>

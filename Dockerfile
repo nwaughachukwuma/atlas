@@ -32,7 +32,7 @@ COPY pyproject.toml README.md LICENSE ./
 COPY src/ ./src/
 
 # Overlay the pre-built UI assets into the package source tree
-COPY --from=ui-builder /build/webui/dist ./src/atlas/ui
+COPY --from=ui-builder /build/webui/dist ./src/ui
 
 RUN pip install --no-cache-dir build \
  && python -m build --wheel --outdir /dist

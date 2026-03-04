@@ -11,8 +11,16 @@ PLATFORM     ?= linux/amd64,linux/arm64
 # Build the Svelte web UI and copy the assets into the Python package
 build-ui:
 	cd webui && npm ci --prefer-offline && npm run build
-	rm -rf src/atlas/ui
-	cp -r webui/dist src/atlas/ui
+	rm -rf src/ui
+	cp -r webui/dist src/ui
+
+# Start the Svelte dev server with HMR (proxy API to localhost:8000)
+dev-ui:
+	cd webui && npm run dev
+
+# Watch mode: rebuild into src/ui on every change
+watch-ui:
+	cd webui && npm run watch
 
 # ── Tests ────────────────────────────────────────────────────────────────────
 test:
@@ -72,4 +80,4 @@ docker-shell:
 		--entrypoint bash \
 		$(IMAGE):latest
 
-.PHONY: build-ui test test-all docker-test docker-build docker-push docker-run docker-shell
+.PHONY: build-ui dev-ui watch-ui test test-all docker-test docker-build docker-push docker-run docker-shell

@@ -1,29 +1,45 @@
+/* ── Design System: Poster Modernist ────────────────────────────────────────── */
+/* High-impact sans-serif typography, flat color palette, functional grid.      */
+
+@import url("https://fonts.googleapis.com/css2?family=General+Sans:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
 :root {
-  --bg: #0f1117;
-  --bg2: #1a1d27;
-  --bg3: #252836;
-  --border: #2e3147;
-  --text: #e2e8f0;
-  --text-muted: #8892a4;
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --info: #3b82f6;
-  --radius: 2px;
-  --shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  /* Color Palette */
+  --color-bg: #e3e2de;
+  --color-cobalt: #1351aa;
+  --color-text: #141414;
+  --color-text-secondary: #444343;
+  --color-text-muted: #7a7a7a;
+  --color-line: #c7c7c7;
+  --color-surface: #f0efec;
+  --color-surface-alt: #d9d8d4;
+
+  /* Semantic aliases (keep existing var names working) */
+  --bg: var(--color-bg);
+  --bg2: var(--color-surface);
+  --bg3: var(--color-surface-alt);
+  --border: var(--color-line);
+  --text: var(--color-text);
+  --text-muted: var(--color-text-muted);
+  --primary: var(--color-cobalt);
+  --primary-hover: #0f3d7a;
+  --success: #1a7a4c;
+  --warning: #b37400;
+  --danger: #b91c1c;
+  --info: var(--color-cobalt);
+  --radius: 0px;
+  --shadow: none;
+
+  /* Typography */
+  --font-display: "General Sans", system-ui, -apple-system, sans-serif;
+  --font-body: "General Sans", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", "SF Mono", monospace;
 
-  font-family:
-    "Inter",
-    system-ui,
-    -apple-system,
-    sans-serif;
+  font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.5;
-  color: var(--text);
-  background-color: var(--bg);
+  color: var(--color-text);
+  background-color: var(--color-bg);
 }
 
 *,
@@ -37,8 +53,9 @@ body {
 }
 
 a {
-  color: var(--primary);
+  color: var(--color-cobalt);
   text-decoration: none;
+  transition: color 0.3s linear;
 }
 a:hover {
   color: var(--primary-hover);
@@ -49,115 +66,154 @@ h2,
 h3,
 h4 {
   margin: 0 0 0.5em;
+  font-family: var(--font-display);
   font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  color: var(--color-text);
+}
+
+h1 {
+  font-size: 3.5rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 0.85;
+}
+
+h2 {
+  font-size: 1.75rem;
+}
+
+h3 {
+  font-size: 1.1rem;
 }
 
 p {
   margin: 0 0 1em;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+/* Labels / UI elements */
+.label,
+.tag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--color-text-muted);
 }
 
 input,
 select,
 textarea {
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 0;
+  color: var(--color-text);
   font-family: inherit;
   font-size: 0.9rem;
   padding: 0.5em 0.75em;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.3s linear;
 }
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--primary);
+  border-color: var(--color-cobalt);
 }
 
 button {
   cursor: pointer;
-  font-family: inherit;
+  font-family: var(--font-display);
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 600;
   padding: 0.5em 1.2em;
-  border-radius: var(--radius);
+  border-radius: 0;
   border: 1px solid transparent;
-  transition: all 0.15s;
+  transition: all 0.3s linear;
+  letter-spacing: -0.01em;
 }
 
 .btn-primary {
-  background: var(--primary);
+  background: var(--color-cobalt);
   color: #fff;
+  border-color: var(--color-cobalt);
 }
 .btn-primary:hover {
   background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 .btn-primary:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .btn-secondary {
-  background: var(--bg3);
-  border-color: var(--border);
-  color: var(--text);
+  background: transparent;
+  border-color: var(--color-line);
+  color: var(--color-text);
 }
 .btn-secondary:hover {
-  border-color: var(--primary);
-  color: var(--primary);
+  border-color: var(--color-cobalt);
+  color: var(--color-cobalt);
 }
 
 .btn-danger {
   background: var(--danger);
   color: #fff;
+  border-color: var(--danger);
 }
 
 .card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 0;
   padding: 1.25rem;
 }
 
 .badge {
   display: inline-block;
   font-size: 0.72rem;
-  font-weight: 600;
+  font-weight: 700;
   padding: 0.15em 0.55em;
-  border-radius: 99px;
+  border-radius: 0;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
+  border: 1px solid;
 }
 .badge-pending {
-  background: #374151;
-  color: #9ca3af;
+  background: transparent;
+  border-color: var(--color-text-muted);
+  color: var(--color-text-muted);
 }
 .badge-running {
-  background: #1e3a5f;
-  color: #60a5fa;
+  background: transparent;
+  border-color: var(--color-cobalt);
+  color: var(--color-cobalt);
 }
 .badge-completed {
-  background: #064e3b;
-  color: #34d399;
+  background: transparent;
+  border-color: var(--success);
+  color: var(--success);
 }
 .badge-failed {
-  background: #450a0a;
-  color: #f87171;
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
 }
 .badge-timeout {
-  background: #451a03;
-  color: #fbbf24;
+  background: transparent;
+  border-color: var(--warning);
+  color: var(--warning);
 }
 
 .spinner {
   display: inline-block;
   width: 1.1em;
   height: 1.1em;
-  border: 2px solid var(--border);
-  border-top-color: var(--primary);
+  border: 2px solid var(--color-line);
+  border-top-color: var(--color-cobalt);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   vertical-align: middle;
@@ -169,34 +225,35 @@ button {
 }
 
 .error-box {
-  background: #450a0a;
-  border: 1px solid #7f1d1d;
-  border-radius: var(--radius);
-  color: #fca5a5;
+  background: #fef2f2;
+  border: 1px solid var(--danger);
+  border-radius: 0;
+  color: var(--danger);
   padding: 0.75rem 1rem;
   margin: 0.75rem 0;
   font-size: 0.88rem;
 }
 
 .success-box {
-  background: #064e3b;
-  border: 1px solid #065f46;
-  border-radius: var(--radius);
-  color: #6ee7b7;
+  background: #f0fdf4;
+  border: 1px solid var(--success);
+  border-radius: 0;
+  color: var(--success);
   padding: 0.75rem 1rem;
   margin: 0.75rem 0;
   font-size: 0.88rem;
 }
 
 pre {
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-line);
+  border-radius: 0;
   padding: 1rem;
   overflow: auto;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
   line-height: 1.5;
-  color: #a5f3fc;
+  color: var(--color-text);
 }
 
 #app {
