@@ -1,19 +1,20 @@
-<script>
+<script lang="ts">
   import { ClipboardListIcon } from "lucide-svelte";
   import { onMount, onDestroy } from "svelte";
-  import { queueList, queueStatus } from "../lib/api.js";
+  import { queueList, queueStatus } from "../lib/api.ts";
+  import type { Task, TaskStatus } from "../lib/types.ts";
 
-  export let params = {};
-  const taskId = params.id ?? null;
+  export let params: Record<string, string> = {};
+  const taskId: string | null = params.id ?? null;
 
-  let tasks = [];
-  let task = null;
-  let loading = true;
-  let error = null;
-  let statusFilter = null;
-  let pollInterval = null;
+  let tasks: Task[] = [];
+  let task: Task | null = null;
+  let loading: boolean = true;
+  let error: string | null = null;
+  let statusFilter: TaskStatus | null = null;
+  let pollInterval: ReturnType<typeof setInterval> | null = null;
 
-  const statusOptions = [
+  const statusOptions: (TaskStatus | null)[] = [
     null,
     "pending",
     "running",
@@ -22,7 +23,7 @@
     "timeout",
   ];
 
-  async function load() {
+  async function load(): Promise<void> {
     try {
       if (taskId) {
         task = await queueStatus(taskId);
@@ -31,7 +32,7 @@
         tasks = data.tasks ?? [];
       }
     } catch (e) {
-      error = e.message;
+      error = (e as Error).message;
     } finally {
       loading = false;
     }
@@ -52,11 +53,11 @@
     if (pollInterval) clearInterval(pollInterval);
   });
 
-  function badgeClass(status) {
+  function badgeClass(status: string): string {
     return `badge badge-${status ?? "pending"}`;
   }
 
-  function formatDate(iso) {
+  function formatDate(iso: string | undefined): string {
     if (!iso) return "—";
     return new Date(iso).toLocaleString();
   }

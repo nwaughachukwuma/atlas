@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import {
     CircleAlertIcon,
     CircleCheckIcon,
@@ -6,12 +6,11 @@
     XIcon,
   } from "lucide-svelte";
 
-  /** @type {'error' | 'success' | 'info'} */
-  export let type = "error";
-  export let message = "";
-  export let dismissible = false;
+  export let type: "error" | "success" | "info" = "error";
+  export let message: string = "";
+  export let dismissible: boolean = false;
 
-  let visible = true;
+  let visible: boolean = true;
 
   $: if (message) visible = true;
 </script>

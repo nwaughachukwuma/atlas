@@ -1,9 +1,10 @@
-<script>
+<script lang="ts">
   import { CircleQuestionMarkIcon, XIcon } from "lucide-svelte";
+  import type { Step } from "../lib/types.ts";
 
-  let open = false;
+  let open: boolean = false;
 
-  const steps = [
+  const steps: Step[] = [
     {
       num: "01",
       action: "Upload",

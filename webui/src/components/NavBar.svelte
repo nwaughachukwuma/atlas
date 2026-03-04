@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import {
     HouseIcon,
     MicIcon,
@@ -9,10 +9,13 @@
     LayoutDashboardIcon,
     ZapIcon,
   } from "lucide-svelte";
+  import type { NavLink } from "../lib/types.ts";
 
-  export let currentPath = "/";
+  let { route } = $props();
 
-  const links = [
+  let currentPath = route.result.path.params.id;
+
+  const links: NavLink[] = [
     { path: "/", icon: HouseIcon, label: "Home", title: "Atlas Video" },
     {
       path: "/transcribe",
@@ -52,7 +55,7 @@
     },
   ];
 
-  function isActive(path) {
+  function isActive(path: string): boolean {
     if (path === "/") return currentPath === "/";
     return currentPath.startsWith(path);
   }

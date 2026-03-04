@@ -1,20 +1,21 @@
-<script>
+<script lang="ts">
   import { DatabaseIcon, CircleCheckIcon } from "lucide-svelte";
   import VideoUpload from "../components/VideoUpload.svelte";
-  import { indexVideo } from "../lib/api.js";
+  import { indexVideo } from "../lib/api.ts";
+  import type { IndexResult, TaskQueuedResult } from "../lib/types.ts";
 
-  let file = null;
-  let chunk_duration = "15s";
-  let overlap = "1s";
-  let include_summary = true;
-  let benchmark = false;
-  let no_queue = true;
-  let loading = false;
-  let result = null;
-  let error = null;
-  let taskInfo = null;
+  let file: File | null = null;
+  let chunk_duration: string = "15s";
+  let overlap: string = "1s";
+  let include_summary: boolean = true;
+  let benchmark: boolean = false;
+  let no_queue: boolean = true;
+  let loading: boolean = false;
+  let result: IndexResult | null = null;
+  let error: string | null = null;
+  let taskInfo: TaskQueuedResult | null = null;
 
-  async function submit() {
+  async function submit(): Promise<void> {
     if (!file) return;
     loading = true;
     result = null;
@@ -30,7 +31,7 @@
         no_streaming: true,
       });
       if (data.ok === false) {
-        error = data.error || "Unknown error";
+        error = data.error ?? "Unknown error";
       } else if (data.task_id) {
         taskInfo = data;
       } else if (data.video_id) {
@@ -41,7 +42,7 @@
         result = data;
       }
     } catch (e) {
-      error = e.message;
+      error = (e as Error).message;
     } finally {
       loading = false;
     }

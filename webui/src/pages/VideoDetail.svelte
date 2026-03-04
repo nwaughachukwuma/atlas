@@ -1,40 +1,42 @@
-<script>
+<script lang="ts">
   import { FilmIcon, MessageSquareIcon } from "lucide-svelte";
   import { onMount, onDestroy } from "svelte";
-  import { getVideo, search, queueStatus } from "../lib/api.js";
+  import { getVideo, search } from "../lib/api.ts";
+  import type { Video, SearchResult } from "../lib/types.ts";
   import ChatPanel from "../components/ChatPanel.svelte";
 
-  export let params = {};
-  const videoId = params.id;
+  export let params: Record<string, string> = {};
+  const videoId: string = params.id;
 
-  let videoData = null;
-  let loading = true;
-  let error = null;
-  let chatOpen = false;
-  let searchQuery = "";
-  let searchResults = null;
-  let searching = false;
-  let pollInterval = null;
-  let taskStatus = null;
+  let videoData: Video | null = null;
+  let loading: boolean = true;
+  let error: string | null = null;
+  let chatOpen: boolean = false;
+  let searchQuery: string = "";
+  let searchResults: SearchResult[] | null = null;
+  let searching: boolean = false;
+  let pollInterval: ReturnType<typeof setInterval> | null = null;
+  let taskStatus: string | null = null;
 
-  async function loadVideo() {
+  async function loadVideo(): Promise<void> {
     try {
       const data = await getVideo(videoId);
       videoData = data.data ?? data;
       loading = false;
     } catch (e) {
-      if (e.message.includes("404") || e.message.includes("No data")) {
-        // may still be indexing via queue — poll queue
+      const msg = (e as Error).message;
+      if (msg.includes("404") || msg.includes("No data")) {
+        // may still be indexing via queue — poll
         loading = false;
         taskStatus = "pending";
       } else {
-        error = e.message;
+        error = msg;
         loading = false;
       }
     }
   }
 
-  async function doSearch() {
+  async function doSearch(): Promise<void> {
     if (!searchQuery.trim()) {
       searchResults = null;
       return;
@@ -44,13 +46,13 @@
       const data = await search(searchQuery.trim(), videoId, 20);
       searchResults = data.results ?? [];
     } catch (e) {
-      error = e.message;
+      error = (e as Error).message;
     } finally {
       searching = false;
     }
   }
 
-  function clearSearch() {
+  function clearSearch(): void {
     searchQuery = "";
     searchResults = null;
   }
@@ -61,7 +63,7 @@
       // Poll until video is available (queued indexing)
       pollInterval = setInterval(async () => {
         await loadVideo();
-        if (videoData) clearInterval(pollInterval);
+        if (videoData) clearInterval(pollInterval!);
       }, 4000);
     }
   });
@@ -70,7 +72,7 @@
     if (pollInterval) clearInterval(pollInterval);
   });
 
-  function formatDate(iso) {
+  function formatDate(iso: string | undefined): string {
     if (!iso) return "—";
     return new Date(iso).toLocaleString();
   }

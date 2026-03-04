@@ -1,18 +1,19 @@
-<script>
+<script lang="ts">
   import { MicIcon, CircleCheckIcon } from "lucide-svelte";
   import VideoUpload from "../components/VideoUpload.svelte";
-  import { transcribe } from "../lib/api.js";
+  import { transcribe } from "../lib/api.ts";
+  import type { TranscribeResult, TaskQueuedResult } from "../lib/types.ts";
 
-  let file = null;
-  let format = "text";
-  let benchmark = false;
-  let no_queue = true;
-  let loading = false;
-  let result = null;
-  let error = null;
-  let taskInfo = null;
+  let file: File | null = null;
+  let format: string = "text";
+  let benchmark: boolean = false;
+  let no_queue: boolean = true;
+  let loading: boolean = false;
+  let result: TranscribeResult | null = null;
+  let error: string | null = null;
+  let taskInfo: TaskQueuedResult | null = null;
 
-  async function submit() {
+  async function submit(): Promise<void> {
     if (!file) return;
     loading = true;
     result = null;
@@ -26,14 +27,14 @@
         no_streaming: true,
       });
       if (data.ok === false) {
-        error = data.error || "Unknown error";
+        error = data.error ?? "Unknown error";
       } else if (data.task_id) {
         taskInfo = data;
       } else {
         result = data;
       }
     } catch (e) {
-      error = e.message;
+      error = (e as Error).message;
     } finally {
       loading = false;
     }

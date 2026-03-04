@@ -1,6 +1,5 @@
-<script>
-  import Router from "svelte-spa-router";
-  import { location } from "svelte-spa-router";
+<script lang="ts">
+  import { Router, type RouteConfig } from "@mateothegreat/svelte5-router";
   import NavBar from "./components/NavBar.svelte";
   import HowItWorks from "./components/HowItWorks.svelte";
   import Home from "./pages/Home.svelte";
@@ -12,23 +11,21 @@
   import Queue from "./pages/Queue.svelte";
   import Dashboard from "./pages/Dashboard.svelte";
 
-  const routes = {
-    "/": Home,
-    "/transcribe": Transcribe,
-    "/extract": Extract,
-    "/index": Index,
-    "/videos": Videos,
-    "/videos/:id": VideoDetail,
-    "/queue": Queue,
-    "/queue/:id": Queue,
-    "/dashboard": Dashboard,
-  };
-
-  let currentPath = "/";
-  $: currentPath = $location;
+  // svelte-spa-router accepts a loose map of path → component
+  const routes: RouteConfig[] = [
+    { component: Home },
+    { path: "/transcribe", component: Transcribe },
+    { path: "/extract", component: Extract },
+    { path: "/index", component: Index },
+    { path: "/videos", component: Videos },
+    { path: "/videos/:id", component: VideoDetail },
+    { path: "/queue", component: Queue },
+    { path: "/queue/:id", component: Queue },
+    { path: "/dashboard", component: Dashboard },
+  ];
 </script>
 
-<NavBar {currentPath} />
+<NavBar />
 <main class="flex-1 overflow-y-auto min-h-screen">
   <Router {routes} />
 </main>

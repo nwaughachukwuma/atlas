@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import {
     MicIcon,
     FlaskConicalIcon,
@@ -8,8 +8,9 @@
     LayoutDashboardIcon,
     ZapIcon,
   } from "lucide-svelte";
+  import type { Feature } from "../lib/types.ts";
 
-  const features = [
+  const features: Feature[] = [
     {
       path: "/transcribe",
       icon: MicIcon,

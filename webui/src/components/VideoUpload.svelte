@@ -1,38 +1,40 @@
-<script>
+<script lang="ts">
   import { FilmIcon, UploadIcon, XIcon } from "lucide-svelte";
   import { createEventDispatcher } from "svelte";
-  const dispatch = createEventDispatcher();
 
-  export let accept = "video/*";
-  export let file = null;
+  const dispatch = createEventDispatcher<{ change: File | null }>();
 
-  let dragging = false;
-  let input;
+  export let accept: string = "video/*";
+  export let file: File | null = null;
 
-  function handleDrop(e) {
+  let dragging: boolean = false;
+  let input: HTMLInputElement;
+
+  function handleDrop(e: DragEvent): void {
     e.preventDefault();
     dragging = false;
     const f = e.dataTransfer?.files[0];
     if (f) setFile(f);
   }
 
-  function setFile(f) {
+  function setFile(f: File): void {
     file = f;
     dispatch("change", f);
   }
 
-  function handleInput(e) {
-    const f = e.target.files[0];
+  function handleInput(e: Event): void {
+    const target = e.target as HTMLInputElement;
+    const f = target.files?.[0];
     if (f) setFile(f);
   }
 
-  function clear() {
+  function clear(): void {
     file = null;
     if (input) input.value = "";
     dispatch("change", null);
   }
 
-  function formatSize(bytes) {
+  function formatSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1048576).toFixed(1)} MB`;

@@ -1,21 +1,22 @@
-<script>
+<script lang="ts">
   import { FlaskConicalIcon, CircleCheckIcon } from "lucide-svelte";
   import VideoUpload from "../components/VideoUpload.svelte";
-  import { extract } from "../lib/api.js";
+  import { extract } from "../lib/api.ts";
+  import type { ExtractResult, TaskQueuedResult } from "../lib/types.ts";
 
-  let file = null;
-  let chunk_duration = "15s";
-  let overlap = "1s";
-  let format = "json";
-  let include_summary = true;
-  let benchmark = false;
-  let no_queue = true;
-  let loading = false;
-  let result = null;
-  let error = null;
-  let taskInfo = null;
+  let file: File | null = null;
+  let chunk_duration: string = "15s";
+  let overlap: string = "1s";
+  let format: string = "json";
+  let include_summary: boolean = true;
+  let benchmark: boolean = false;
+  let no_queue: boolean = true;
+  let loading: boolean = false;
+  let result: ExtractResult | null = null;
+  let error: string | null = null;
+  let taskInfo: TaskQueuedResult | null = null;
 
-  async function submit() {
+  async function submit(): Promise<void> {
     if (!file) return;
     loading = true;
     result = null;
@@ -32,7 +33,7 @@
         no_streaming: true,
       });
       if (data.ok === false) {
-        error = data.error || "Unknown error";
+        error = data.error ?? "Unknown error";
       } else if (
         data.task_id ||
         (typeof data === "object" && "id" in data && !("chunks" in data))
@@ -42,7 +43,7 @@
         result = data;
       }
     } catch (e) {
-      error = e.message;
+      error = (e as Error).message;
     } finally {
       loading = false;
     }

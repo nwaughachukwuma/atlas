@@ -1,25 +1,33 @@
-<script>
+<script lang="ts">
   import { MessageSquareIcon, XIcon } from "lucide-svelte";
   import { createEventDispatcher, onDestroy } from "svelte";
-  import { chatStream, listChat } from "../lib/api.js";
+  import { chatStream, listChat } from "../lib/api.ts";
+  import type { ChatMessage, RawChatMessage } from "../lib/types.ts";
 
-  export let videoId;
+  export let videoId: string;
 
-  const dispatch = createEventDispatcher();
+  const dispatch = createEventDispatcher<{ close: void }>();
 
-  let messages = [];
-  let query = "";
-  let streaming = false;
-  let ctrl = null;
-  let listEl;
+  let messages: ChatMessage[] = [];
+  let query: string = "";
+  let streaming: boolean = false;
+  let ctrl: AbortController | null = null;
+  let listEl: HTMLDivElement;
 
-  async function loadHistory() {
+  async function loadHistory(): Promise<void> {
     try {
       const data = await listChat(videoId);
-      messages = (data.messages || []).map((m) => ({
-        role: m.role ?? (m.query ? "user" : "assistant"),
-        text: m.content ?? m.query ?? m.answer ?? JSON.stringify(m),
-      }));
+      messages = (data.messages || []).map(
+        (m: RawChatMessage): ChatMessage => ({
+          role:
+            m.role === "user" || m.role === "assistant"
+              ? m.role
+              : m.query
+                ? "user"
+                : "assistant",
+          text: m.content ?? m.query ?? m.answer ?? JSON.stringify(m),
+        }),
+      );
     } catch (_) {
       /* ignore */
     }
@@ -27,14 +35,14 @@
 
   loadHistory();
 
-  function scrollBottom() {
+  function scrollBottom(): void {
     if (listEl)
       setTimeout(() => {
         listEl.scrollTop = listEl.scrollHeight;
       }, 50);
   }
 
-  async function send() {
+  async function send(): Promise<void> {
     const q = query.trim();
     if (!q || streaming) return;
     query = "";
@@ -58,14 +66,14 @@
     );
   }
 
-  function cancel() {
+  function cancel(): void {
     ctrl?.abort();
     streaming = false;
   }
 
   onDestroy(() => ctrl?.abort());
 
-  function handleKey(e) {
+  function handleKey(e: KeyboardEvent): void {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       send();

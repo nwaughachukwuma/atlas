@@ -1,27 +1,28 @@
-<script>
+<script lang="ts">
   import { FilmIcon } from "lucide-svelte";
   import { onMount } from "svelte";
-  import { listVideos, search } from "../lib/api.js";
+  import { listVideos, search } from "../lib/api.ts";
+  import type { Video, SearchResult } from "../lib/types.ts";
 
-  let videos = [];
-  let loading = true;
-  let error = null;
-  let searchQuery = "";
-  let searchResults = null;
-  let searching = false;
+  let videos: Video[] = [];
+  let loading: boolean = true;
+  let error: string | null = null;
+  let searchQuery: string = "";
+  let searchResults: SearchResult[] | null = null;
+  let searching: boolean = false;
 
   onMount(async () => {
     try {
       const data = await listVideos();
       videos = data.videos ?? [];
     } catch (e) {
-      error = e.message;
+      error = (e as Error).message;
     } finally {
       loading = false;
     }
   });
 
-  async function doSearch() {
+  async function doSearch(): Promise<void> {
     if (!searchQuery.trim()) {
       searchResults = null;
       return;
@@ -31,18 +32,18 @@
       const data = await search(searchQuery.trim(), null, 20);
       searchResults = data.results ?? [];
     } catch (e) {
-      error = e.message;
+      error = (e as Error).message;
     } finally {
       searching = false;
     }
   }
 
-  function clearSearch() {
+  function clearSearch(): void {
     searchQuery = "";
     searchResults = null;
   }
 
-  function formatDate(iso) {
+  function formatDate(iso: string | undefined): string {
     if (!iso) return "—";
     return new Date(iso).toLocaleString();
   }

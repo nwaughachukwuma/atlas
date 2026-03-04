@@ -1,14 +1,23 @@
-<script>
+<script lang="ts">
   import { onMount } from "svelte";
-  import { stats, health, queueList, listVideos } from "../lib/api.js";
+  import { stats, health, queueList, listVideos } from "../lib/api.ts";
   import { LayoutDashboardIcon } from "lucide-svelte";
+  import type {
+    StatsResponse,
+    HealthResponse,
+    QueueListResponse,
+    ListVideosResponse,
+    TaskStatus,
+  } from "../lib/types.ts";
 
-  let statsData = null;
-  let healthData = null;
-  let queueData = null;
-  let videosData = null;
-  let loading = true;
-  let error = null;
+  type QueueBreakdown = Record<TaskStatus, number>;
+
+  let statsData: StatsResponse | null = null;
+  let healthData: HealthResponse | null = null;
+  let queueData: QueueListResponse | null = null;
+  let videosData: ListVideosResponse | null = null;
+  let loading: boolean = true;
+  let error: string | null = null;
 
   onMount(async () => {
     try {
@@ -19,15 +28,14 @@
         listVideos(),
       ]);
     } catch (e) {
-      error = e.message;
+      error = (e as Error).message;
     } finally {
       loading = false;
     }
   });
 
-  /** @type {{ pending: number, running: number, completed: number, failed: number, timeout: number }} */
-  $: queueBreakdown = (() => {
-    const counts = {
+  $: queueBreakdown = ((): QueueBreakdown => {
+    const counts: QueueBreakdown = {
       pending: 0,
       running: 0,
       completed: 0,
@@ -44,9 +52,17 @@
   $: videoCount = videosData?.count ?? statsData?.videos_indexed ?? 0;
   $: totalTasks = queueData?.tasks?.length ?? 0;
 
-  function badgeClass(status) {
+  function badgeClass(status: string): string {
     return `badge badge-${status}`;
   }
+
+  const queueStatusRows: Array<[TaskStatus, string]> = [
+    ["pending", "Pending"],
+    ["running", "Running"],
+    ["completed", "Completed"],
+    ["failed", "Failed"],
+    ["timeout", "Timeout"],
+  ];
 </script>
 
 <div class="p-8 max-w-[900px]">
@@ -121,7 +137,7 @@
         <p class="text-muted text-[0.85rem]">No tasks in queue.</p>
       {:else}
         <div class="flex flex-col gap-2">
-          {#each [["pending", "Pending"], ["running", "Running"], ["completed", "Completed"], ["failed", "Failed"], ["timeout", "Timeout"]] as [key, label]}
+          {#each queueStatusRows as [key, label]}
             {@const count = queueBreakdown[key] ?? 0}
             {#if count > 0}
               <div class="flex items-center gap-3">
