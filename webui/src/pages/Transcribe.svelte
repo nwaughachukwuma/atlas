@@ -77,13 +77,13 @@
     </div>
     <div class="flex flex-col gap-2 mt-3">
       <label
-        class="flex items-center gap-2 cursor-pointer text-[0.88rem] !text-ink !mb-0"
+        class="flex items-center gap-2 cursor-pointer text-[0.88rem] text-ink mb-0"
       >
         <input type="checkbox" bind:checked={benchmark} class="accent-cobalt" />
         <span>Benchmark timing</span>
       </label>
       <label
-        class="flex items-center gap-2 cursor-pointer text-[0.88rem] !text-ink !mb-0"
+        class="flex items-center gap-2 cursor-pointer text-[0.88rem] text-ink mb-0"
       >
         <input type="checkbox" bind:checked={no_queue} class="accent-cobalt" />
         <span>Run immediately (no queue)</span>

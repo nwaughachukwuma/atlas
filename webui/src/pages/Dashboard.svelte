@@ -51,7 +51,7 @@
 <div class="p-8 max-w-[900px]">
   <div class="mb-6">
     <h2 class="text-[1.5rem] mb-1">Dashboard</h2>
-    <p class="text-muted text-[0.9rem] !mb-0">
+    <p class="text-muted text-[0.9rem] mb-0">
       System health, usage metrics, and storage overview.
     </p>
   </div>
@@ -118,7 +118,7 @@
             {#if count > 0}
               <div class="flex items-center gap-3">
                 <span class={badgeClass(key)}>{label}</span>
-                <div class="flex-1 h-[6px] bg-surface-alt overflow-hidden">
+                <div class="flex-1 h-1.5 bg-surface-alt overflow-hidden">
                   <div
                     class={`h-full transition-[width] duration-300 ${
                       key === "pending"
@@ -150,7 +150,7 @@
       <div class="card mb-4">
         <div class="flex justify-between items-center mb-3">
           <h3
-            class="text-[0.85rem] uppercase tracking-[0.05em] text-muted !mb-0"
+            class="text-[0.85rem] uppercase tracking-[0.05em] text-muted mb-0"
           >
             Indexed Videos
           </h3>
@@ -174,7 +174,7 @@
             </a>
           {/each}
           {#if videosData.videos.length > 8}
-            <p class="text-muted mt-2 !mb-0 text-[0.8rem]">
+            <p class="text-muted mt-2 mb-0 text-[0.8rem]">
               +{videosData.videos.length - 8} more
             </p>
           {/if}
@@ -189,14 +189,14 @@
       </h3>
       <div class="flex flex-col gap-2">
         <div class="flex gap-4 text-[0.85rem] items-start">
-          <span class="text-muted min-w-[100px] shrink-0">Video index</span>
+          <span class="text-muted min-w-24 shrink-0">Video index</span>
           <code
             class="text-[0.78rem] font-mono bg-surface-alt px-[0.4em] py-[0.15em] break-all"
             >{statsData?.video_col_path ?? "—"}</code
           >
         </div>
         <div class="flex gap-4 text-[0.85rem] items-start">
-          <span class="text-muted min-w-[100px] shrink-0">Chat store</span>
+          <span class="text-muted min-w-24 shrink-0">Chat store</span>
           <code
             class="text-[0.78rem] font-mono bg-surface-alt px-[0.4em] py-[0.15em] break-all"
             >{statsData?.chat_col_path ?? "—"}</code
@@ -211,9 +211,9 @@
           Index Stats
         </h3>
         {#if statsData?.video_index_stats}
-          <pre class="!m-0 text-[0.75rem]">{statsData.video_index_stats}</pre>
+          <pre class="m-0 text-[0.75rem]">{statsData.video_index_stats}</pre>
         {:else}
-          <p class="text-muted text-[0.85rem] !mb-0">
+          <p class="text-muted text-[0.85rem] mb-0">
             No index stats available.
           </p>
         {/if}
@@ -223,9 +223,9 @@
           Chat Stats
         </h3>
         {#if statsData?.chat_index_stats}
-          <pre class="!m-0 text-[0.75rem]">{statsData.chat_index_stats}</pre>
+          <pre class="m-0 text-[0.75rem]">{statsData.chat_index_stats}</pre>
         {:else}
-          <p class="text-muted text-[0.85rem] !mb-0">
+          <p class="text-muted text-[0.85rem] mb-0">
             No chat stats available.
           </p>
         {/if}

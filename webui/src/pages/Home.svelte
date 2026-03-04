@@ -58,7 +58,7 @@
         style="display:inline;vertical-align:baseline;"
       /> Atlas <span class="text-cobalt">Video</span>
     </h1>
-    <p class="text-muted text-[1.05rem] max-w-[580px] !mb-0">
+    <p class="text-muted text-[1.05rem] max-w-[580px] mb-0">
       Multimodal AI engine for video insights — transcription, semantic
       extraction, semantic search, and conversational chat. All running locally.
     </p>
@@ -70,13 +70,13 @@
     {#each features as f}
       <a
         href={`#${f.path}`}
-        class="card flex flex-col gap-[0.4rem] text-ink transition-[border-color,transform] duration-[0.15s] hover:border-cobalt hover:-translate-y-0.5"
+        class="card flex flex-col gap-[0.4rem] text-ink transition-[border-color,transform] duration-150 hover:border-cobalt hover:-translate-y-0.5"
       >
         <span class="text-cobalt flex items-center"
           ><svelte:component this={f.icon} size={24} strokeWidth={1.5} /></span
         >
-        <h3 class="!m-0 text-[1rem]">{f.title}</h3>
-        <p class="text-muted text-[0.85rem] flex-1 !m-0">{f.desc}</p>
+        <h3 class="m-0 text-[1rem]">{f.title}</h3>
+        <p class="text-muted text-[0.85rem] flex-1 m-0">{f.desc}</p>
         <span class="text-cobalt text-[0.85rem] font-semibold">Explore →</span>
       </a>
     {/each}

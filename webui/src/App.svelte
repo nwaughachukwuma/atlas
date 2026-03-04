@@ -33,6 +33,6 @@
   <Router {routes} />
 </main>
 
-<div class="fixed top-4 right-5 z-[100]">
+<div class="fixed top-4 right-5 z-100">
   <HowItWorks />
 </div>

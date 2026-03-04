@@ -105,7 +105,7 @@
       <p class="mt-2 mb-0">
         Video is still being indexed… Checking every 4 seconds.
       </p>
-      <p class="text-muted text-[0.85rem] !mb-0">
+      <p class="text-muted text-[0.85rem] mb-0">
         This page will update automatically when ready.
       </p>
     </div>
@@ -162,7 +162,7 @@
           {#each Object.entries(videoData) as [k, v]}
             {#if typeof v !== "object" || v === null}
               <div class="flex gap-4 text-[0.88rem]">
-                <span class="text-muted min-w-[130px]">{k}</span>
+                <span class="text-muted min-w-32">{k}</span>
                 <span class="text-ink">{v ?? "—"}</span>
               </div>
             {/if}

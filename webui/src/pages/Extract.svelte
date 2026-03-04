@@ -50,7 +50,7 @@
 </script>
 
 <div class="p-8 max-w-[760px]">
-  <h2>
+  <h2 class="flex items-center gap-1.5">
     <FlaskConicalIcon
       size={20}
       strokeWidth={2}
@@ -90,7 +90,7 @@
       </div>
       <div class="mb-4">
         <label for="fmt">Format</label>
-        <select id="fmt" bind:value={format} class="w-[100px]">
+        <select id="fmt" bind:value={format} class="w-24">
           <option value="json">JSON</option>
           <option value="text">Text</option>
         </select>
@@ -98,7 +98,7 @@
     </div>
     <div class="flex flex-col gap-2 mt-3">
       <label
-        class="flex items-center gap-2 cursor-pointer text-[0.88rem] !text-ink !mb-0"
+        class="flex items-center gap-2 cursor-pointer text-[0.88rem] text-ink mb-0"
       >
         <input
           type="checkbox"
@@ -108,13 +108,13 @@
         <span>Include summary</span>
       </label>
       <label
-        class="flex items-center gap-2 cursor-pointer text-[0.88rem] !text-ink !mb-0"
+        class="flex items-center gap-2 cursor-pointer text-[0.88rem] text-ink mb-0"
       >
         <input type="checkbox" bind:checked={benchmark} class="accent-cobalt" />
         <span>Benchmark timing</span>
       </label>
       <label
-        class="flex items-center gap-2 cursor-pointer text-[0.88rem] !text-ink !mb-0"
+        class="flex items-center gap-2 cursor-pointer text-[0.88rem] text-ink mb-0"
       >
         <input type="checkbox" bind:checked={no_queue} class="accent-cobalt" />
         <span>Run immediately (no queue)</span>

@@ -130,14 +130,14 @@
       {#each videos as v}
         <a
           href={`#/videos/${v.video_id}`}
-          class="card flex gap-3 items-start text-ink transition-[border-color] duration-[0.15s] hover:border-cobalt"
+          class="card flex gap-3 items-start text-ink transition-[border-color] duration-150 hover:border-cobalt"
         >
           <div class="text-cobalt flex items-center">
             <FilmIcon size={20} strokeWidth={1.5} />
           </div>
           <div class="flex flex-col gap-1 min-w-0">
             <span
-              class="text-[0.8rem] font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]"
+              class="text-[0.8rem] font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-36"
               title={v.video_id}>{v.video_id}</span
             >
             {#if v.indexed_at}<span class="text-muted text-[0.85rem]"

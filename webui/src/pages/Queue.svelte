@@ -92,32 +92,32 @@
         </div>
         <div class="flex flex-col gap-[0.4rem]">
           <div class="flex gap-4 text-[0.88rem]">
-            <span class="text-muted min-w-[100px]">Command</span><span
+            <span class="text-muted min-w-24">Command</span><span
               class="text-ink">{task.command}</span
             >
           </div>
           <div class="flex gap-4 text-[0.88rem]">
-            <span class="text-muted min-w-[100px]">Label</span><span
-              class="text-ink">{task.label}</span
+            <span class="text-muted min-w-24">Label</span><span class="text-ink"
+              >{task.label}</span
             >
           </div>
           <div class="flex gap-4 text-[0.88rem]">
-            <span class="text-muted min-w-[100px]">Created</span><span
+            <span class="text-muted min-w-24">Created</span><span
               class="text-ink">{formatDate(task.created_at)}</span
             >
           </div>
           <div class="flex gap-4 text-[0.88rem]">
-            <span class="text-muted min-w-[100px]">Started</span><span
+            <span class="text-muted min-w-24">Started</span><span
               class="text-ink">{formatDate(task.started_at)}</span
             >
           </div>
           <div class="flex gap-4 text-[0.88rem]">
-            <span class="text-muted min-w-[100px]">Finished</span><span
+            <span class="text-muted min-w-24">Finished</span><span
               class="text-ink">{formatDate(task.finished_at)}</span
             >
           </div>
           {#if task.duration}<div class="flex gap-4 text-[0.88rem]">
-              <span class="text-muted min-w-[100px]">Duration</span><span
+              <span class="text-muted min-w-24">Duration</span><span
                 class="text-ink">{task.duration}</span
               >
             </div>{/if}
@@ -178,7 +178,7 @@
         {#each tasks as t}
           <a
             href={`#/queue/${t.id}`}
-            class="card flex flex-col gap-[0.3rem] text-ink transition-[border-color] duration-[0.15s] hover:border-cobalt"
+            class="card flex flex-col gap-[0.3rem] text-ink transition-[border-color] duration-150 hover:border-cobalt"
           >
             <div class="flex items-center gap-2">
               <span class={badgeClass(t.status)}>{t.status}</span>
