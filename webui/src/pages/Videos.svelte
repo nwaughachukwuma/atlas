@@ -2,17 +2,15 @@
   import { route } from "@mateothegreat/svelte5-router";
   import { FilmIcon, LoaderCircleIcon } from "lucide-svelte";
   import { onMount } from "svelte";
-  import { listVideos, search } from "../lib/api.ts";
-  import type { Video, SearchResult } from "../lib/types.ts";
+  import { listVideos } from "../lib/api.ts";
+  import type { Video } from "../lib/types.ts";
   import { toPath } from "../lib/routing.ts";
   import { toast } from "svelte-sonner";
+  import VideoSearch from "../components/VideoSearch.svelte";
 
   let videos = $state<Video[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let searchQuery = $state("");
-  let searchResults = $state<SearchResult[] | null>(null);
-  let searching = $state(false);
 
   onMount(() => {
     listVideos()
@@ -22,25 +20,6 @@
       )
       .finally(() => (loading = false));
   });
-
-  async function doSearch() {
-    if (searching || !searchQuery.trim()) {
-      return (searchResults = null);
-    }
-
-    searching = true;
-    return search(searchQuery.trim(), null, 20)
-      .then((d) => (searchResults = d.results))
-      .catch((e) =>
-        toast.error("Error while searching", { description: e.message }),
-      )
-      .finally(() => (searching = false));
-  }
-
-  function clearSearch(): void {
-    searchQuery = "";
-    searchResults = null;
-  }
 
   function formatDate(iso: string | undefined): string {
     if (!iso) return "—";
@@ -61,68 +40,11 @@
     or chat with it.
   </p>
 
-  <div class="flex gap-2 mb-6">
-    <input
-      type="search"
-      bind:value={searchQuery}
-      placeholder="Search across all videos…"
-      class="flex-1"
-      onkeydown={(e) => e.key === "Enter" && doSearch()}
-    />
-    <button
-      class="btn-primary flex items-center gap-x-2"
-      onclick={doSearch}
-      disabled={searching || !searchQuery.trim()}
-    >
-      {#if searching}
-        <LoaderCircleIcon
-          class="w-5 h-5 animate-spin"
-          style="animation-duration: 0.3s"
-        />
-      {:else}
-        Search
-      {/if}
-    </button>
-    {#if searchResults !== null}
-      <button class="btn-secondary" onclick={clearSearch}>Clear</button>
-    {/if}
-  </div>
+  <VideoSearch />
 
   {#if error}<div class="error-box">{error}</div>{/if}
 
-  {#if searchResults !== null}
-    <section>
-      <h3 class="mb-3">
-        Search results <span class="text-muted text-[0.85rem]"
-          >({searchResults.length})</span
-        >
-      </h3>
-      {#if searchResults.length === 0}
-        <p class="text-muted text-[0.85rem]">No results found.</p>
-      {:else}
-        {#each searchResults as r}
-          <div class="card mb-3">
-            <div class="flex justify-between mb-[0.4rem]">
-              <a
-                href={toPath(`/video/${r.video_id}`)}
-                use:route
-                class="font-mono text-[0.85rem] text-cobalt">{r.video_id}</a
-              >
-              <span class="text-[0.78rem] text-muted"
-                >score: {r.score?.toFixed(3) ?? "—"}</span
-              >
-            </div>
-            {#if r.description}<p class="text-[0.85rem] text-muted mt-1 mb-0">
-                {r.description}
-              </p>{/if}
-            {#if r.transcript}<p class="text-[0.85rem] text-muted mt-1 mb-0">
-                {r.transcript}
-              </p>{/if}
-          </div>
-        {/each}
-      {/if}
-    </section>
-  {:else if loading}
+  {#if loading}
     <p class="flex gap-x-2 items-center">
       <LoaderCircleIcon
         class="w-5 h-5 animate-spin"

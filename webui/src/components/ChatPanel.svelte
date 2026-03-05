@@ -20,7 +20,7 @@
 
   let { videoId }: Props = $props();
 
-  let isOpen: boolean = $state(true);
+  let isOpen: boolean = $state(false);
   let messages: ChatMessage[] = $state([]);
   let query: string = $state("");
   let streaming: boolean = $state(false);
