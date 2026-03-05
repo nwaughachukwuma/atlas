@@ -3,6 +3,8 @@ __pycache__
 sample_files
 .env
 .coverage
-product-video
-webui/dist
 node_modules/
+
+product-video
+src/ui
+webui/dist
