@@ -7,7 +7,6 @@ VERSION      ?= $(shell python3 -c "import re; m=re.search(r'version\s*=\s*\"([^
 PLATFORM     ?= linux/amd64,linux/arm64
 
 # ── Web UI ────────────────────────────────────────────────────────────────────
-
 # Build the Svelte web UI and copy the assets into the Python package
 build-ui:
 	cd webui && npm ci --prefer-offline && npm run build
@@ -17,10 +16,6 @@ build-ui:
 # Start the Svelte dev server with HMR (proxy API to localhost:8000)
 dev-ui:
 	cd webui && npm run dev
-
-# Watch mode: rebuild into src/ui on every change
-watch-ui:
-	cd webui && npm run watch
 
 # ── Tests ────────────────────────────────────────────────────────────────────
 test:
@@ -80,4 +75,4 @@ docker-shell:
 		--entrypoint bash \
 		$(IMAGE):latest
 
-.PHONY: build-ui dev-ui watch-ui test test-all docker-test docker-build docker-push docker-run docker-shell
+.PHONY: build-ui dev-ui test test-all docker-test docker-build docker-push docker-run docker-shell
