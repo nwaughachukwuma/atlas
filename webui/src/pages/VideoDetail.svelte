@@ -1,62 +1,57 @@
 <script lang="ts">
   import { route, type RouteResult } from "@mateothegreat/svelte5-router";
-  import { FilmIcon, LoaderCircleIcon, MessageSquareIcon } from "lucide-svelte";
-  import { onMount, onDestroy } from "svelte";
+  import { FilmIcon, LoaderCircleIcon } from "lucide-svelte";
+  import { onMount } from "svelte";
   import { getVideo, search } from "../lib/api.ts";
   import type { Video, SearchResult } from "../lib/types.ts";
   import ChatPanel from "../components/ChatPanel.svelte";
   import { toPath } from "../lib/routing.ts";
+  import { toast } from "svelte-sonner";
 
   let { route: routeResult }: { route: RouteResult } = $props();
 
   // @ts-expect-error
   let videoId: string = $derived(routeResult.result.path.params?.id);
+  let videoData = $state<Video | null>(null);
+  let loading = $state(true);
 
-  let videoData: Video | null = $state(null);
-  let loading: boolean = $state(true);
-  let error: string | null = $state(null);
-  let chatOpen: boolean = $state(false);
-  let searchQuery: string = $state("");
+  let searchQuery = $state("");
+  let searchResults = $state<SearchResult[] | null>(null);
+  let searching = $state(false);
+  let pollInterval = $state<number | null>(null);
+  let taskStatus = $state<string | null>(null);
 
-  let searchResults: SearchResult[] | null = $state(null);
-  let searching: boolean = $state(false);
-  let pollInterval: ReturnType<typeof setInterval> | null = $state(null);
-  let taskStatus: string | null = $state(null);
-
-  async function loadVideo(): Promise<void> {
+  async function loadVideoData() {
     if (!videoId) throw new Error("videoId not found");
-
-    try {
-      const data = await getVideo(videoId);
-      videoData = data.data ?? data;
-      loading = false;
-    } catch (e) {
-      const msg = (e as Error).message;
-      if (msg.includes("404") || msg.includes("No data")) {
+    return getVideo(videoId)
+      .then((d) => {
+        if (d.data) videoData = d.data;
+        return d.data;
+      })
+      .catch((e) => {
         // may still be indexing via queue — poll
-        loading = false;
-        taskStatus = "pending";
-      } else {
-        error = msg;
-        loading = false;
-      }
-    }
+        if (e.message.includes("404") || e.message.includes("No data")) {
+          taskStatus = "pending";
+          return;
+        }
+        toast.error("Error fetching video data", { description: e.message });
+      })
+      .finally(() => (loading = false));
   }
 
-  async function doSearch(): Promise<void> {
+  async function doSearch() {
     if (!searchQuery.trim()) {
-      searchResults = null;
-      return;
+      return (searchResults = null);
     }
     searching = true;
-    try {
-      const data = await search(searchQuery.trim(), videoId, 20);
-      searchResults = data.results ?? [];
-    } catch (e) {
-      error = (e as Error).message;
-    } finally {
-      searching = false;
-    }
+    return search(searchQuery.trim(), videoId, 10)
+      .then((d) => (searchResults = d.results))
+      .catch((e) =>
+        toast.error("Error while searching video", {
+          description: e.message,
+        }),
+      )
+      .finally(() => (searching = false));
   }
 
   function clearSearch(): void {
@@ -64,19 +59,19 @@
     searchResults = null;
   }
 
-  onMount(async () => {
-    await loadVideo();
+  onMount(() => {
+    loadVideoData();
     if (!videoData) {
       // Poll until video is available (queued indexing)
-      pollInterval = setInterval(async () => {
-        await loadVideo();
-        if (videoData) clearInterval(pollInterval!);
+      pollInterval = setInterval(() => {
+        loadVideoData().then(
+          (d) => d && pollInterval && clearInterval(pollInterval),
+        );
       }, 4000);
     }
-  });
-
-  onDestroy(() => {
-    if (pollInterval) clearInterval(pollInterval);
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
   });
 </script>
 
@@ -102,20 +97,18 @@
         class="w-5 h-5 animate-spin"
         style="animation-duration: 0.3s"
       />
-      <p class="mt-2 mb-0">Loading video data…</p>
+      <span>Loading video data…</span>
     </div>
-  {:else if error}
-    <div class="error-box">{error}</div>
   {:else if !videoData}
-    <div class="card text-center py-8 flex items-center gap-x-2">
-      <LoaderCircleIcon
-        class="w-5 h-5 animate-spin"
-        style="animation-duration: 0.3s"
-      />
-      <p class="mt-2 mb-0">
-        Video is still being indexed… Checking every 4 seconds.
-      </p>
-      <p class="text-muted text-[0.85rem] mb-0">
+    <div class="card py-8">
+      <div class="flex items-center gap-x-2">
+        <LoaderCircleIcon
+          class="w-5 h-5 animate-spin"
+          style="animation-duration: 0.3s"
+        />
+        <div>Video is being indexed...Checking every 4s.</div>
+      </div>
+      <p class="text-muted mt-4 text-[0.85rem] mb-0">
         This page will update automatically when ready.
       </p>
     </div>
@@ -160,12 +153,16 @@
               <span class="text-[0.75rem] text-muted"
                 >score: {r.score?.toFixed(3) ?? "—"}</span
               >
-              {#if r.description}<p class="text-[0.88rem] mt-1 mb-0">
+              {#if r.description}
+                <p class="text-[0.88rem] mt-1 mb-0">
                   {r.description}
-                </p>{/if}
-              {#if r.transcript}<p class="text-[0.85rem] text-muted mb-0">
+                </p>
+              {/if}
+              {#if r.transcript}
+                <p class="text-[0.85rem] text-muted mb-0">
                   {r.transcript}
-                </p>{/if}
+                </p>
+              {/if}
             </div>
           {/each}
         {/if}
@@ -197,20 +194,7 @@
         {/if}
       </div>
     {/if}
-
-    <button
-      class="btn-primary mt-6 text-base px-[1.6em] py-[0.6em]"
-      onclick={() => (chatOpen = true)}
-    >
-      <MessageSquareIcon
-        size={16}
-        strokeWidth={2}
-        style="display:inline;vertical-align:middle;"
-      /> Chat with this video
-    </button>
   {/if}
 </div>
 
-{#if chatOpen}
-  <ChatPanel {videoId} onClose={() => (chatOpen = false)} />
-{/if}
+<ChatPanel {videoId} />

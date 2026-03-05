@@ -119,8 +119,8 @@ export const search = (
 export const listVideos = (): Promise<ListVideosResponse> =>
   get<ListVideosResponse>("/list-videos");
 
-export const getVideo = (id: string): Promise<{ data?: Video } & Video> =>
-  get<{ data?: Video } & Video>(`/get-video/${id}`);
+export const getVideo = (id: string): Promise<{ data?: Video }> =>
+  get<{ data?: Video }>(`/get-video/${id}`);
 
 export const listChat = (id: string, last_n = 50): Promise<ListChatResponse> =>
   get<ListChatResponse>(`/list-chat/${id}?last_n=${last_n}`);
