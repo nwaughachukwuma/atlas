@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Literal
 
 from .utils import RetryConfig, logger, process_time, retry
 
@@ -28,24 +28,14 @@ Model = Literal[
 class GeminiClient:
     """Client for Google Gemini API"""
 
-    _client: Optional["genai.Client"] = None
-
     @classmethod
     def get_client(cls) -> "genai.Client":
-        """Get Gemini client (lazy-initialised on first use)."""
-        if cls._client is None:
-            from google import genai
+        """Create a fresh Gemini client on every call."""
+        from google import genai
 
-            api_key = os.environ.get("GEMINI_API_KEY")
-            if not api_key:
-                raise ValueError("GEMINI_API_KEY environment variable is required")
-            cls._client = genai.Client(api_key=api_key)
-        return cls._client
-
-    @classmethod
-    def reset_client(cls) -> None:
-        """Reset the client (useful for testing)"""
-        cls._client = None
+        if api_key := os.environ.get("GEMINI_API_KEY"):
+            return genai.Client(api_key=api_key)
+        raise ValueError("GEMINI_API_KEY environment variable is required")
 
 
 class GeminiMediaEngine:

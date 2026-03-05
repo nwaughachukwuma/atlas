@@ -55,7 +55,7 @@ export interface QueueListResponse {
 export interface SearchResult {
   video_id: string;
   score?: number;
-  description?: string;
+  content?: string;
   transcript?: string;
   start_time?: number;
   end_time?: number;

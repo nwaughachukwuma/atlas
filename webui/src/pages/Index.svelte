@@ -117,7 +117,7 @@
   </div>
 
   <button
-    class="btn-primary mb-3 flex items-center gap-x-2 text-base px-[1.6em] py-[0.6em]"
+    class="btn-primary mb-3 flex items-center gap-x-2 text-base px-6 py-2.5"
     onclick={submit}
     disabled={!file || loading}
   >
@@ -164,15 +164,15 @@
       <a
         href={toPath(`/video/${result.video_id}`)}
         use:route
-        class="btn-primary inline-block mt-2"
+        class="btn-primary inline-block mt-2 px-6 py-2.5"
       >
         View Video →
       </a>
       {#if result.result}
         <details class="mt-4 border border-line p-2">
-          <summary class="cursor-pointer text-[0.88rem] text-muted"
-            >Full result JSON</summary
-          >
+          <summary class="cursor-pointer text-[0.88rem] text-muted">
+            Full result JSON
+          </summary>
           <pre>{JSON.stringify(result.result, null, 2)}</pre>
         </details>
       {/if}

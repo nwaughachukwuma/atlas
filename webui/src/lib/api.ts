@@ -166,10 +166,7 @@ export function chatStream(
         buf += dec.decode(value, { stream: true });
         const lines = buf.split("\n");
         buf = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) onChunk(line.slice(6));
-        }
+        for (const line of lines) onChunk(line);
       }
       onDone();
     })

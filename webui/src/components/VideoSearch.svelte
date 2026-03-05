@@ -97,7 +97,7 @@
       {#if results.length === 0}
         <p class="text-muted text-[0.85rem] mb-0">No results found.</p>
       {:else}
-        {#each results as r}
+        {#each results as r, ix (ix + `${r.start}` + `${r.video_id}`)}
           <div class="border-b border-line py-3 last:border-b-0">
             {#if !isScoped}
               <div class="flex justify-between mb-1">
@@ -118,12 +118,9 @@
               </span>
             {/if}
 
-            {#if r.description}
-              <p class="text-[0.88rem] mt-1 mb-0">{r.description}</p>
-            {/if}
-            {#if r.transcript}
-              <p class="text-[0.85rem] text-muted mt-1 mb-0">{r.transcript}</p>
-            {/if}
+            <p class="text-[0.85rem] text-muted line-clamp-2 mt-1 mb-0">
+              {r.content}
+            </p>
           </div>
         {/each}
       {/if}
