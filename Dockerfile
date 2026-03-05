@@ -67,10 +67,8 @@ RUN pip install --no-cache-dir --user /tmp/*.whl \
 ENV PATH="/home/atlas/.local/bin:${PATH}"
 
 # ── 12-factor configuration (all via ENV) ───────────────────────────────────
-# Required for extract / index / search / chat:
-ENV GEMINI_API_KEY=""
-# Required for transcribe / extract / index:
-ENV GROQ_API_KEY=""
+# Pass secrets at runtime — never bake them into the image:
+#   docker run -e GEMINI_API_KEY="..." -e GROQ_API_KEY="..." ...
 # Optional — set to "true" to enable verbose logging:
 ENV ENABLE_LOGGING="false"
 
