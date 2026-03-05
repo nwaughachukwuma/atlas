@@ -1,6 +1,10 @@
 <script lang="ts">
   import { route } from "@mateothegreat/svelte5-router";
-  import { DatabaseIcon, CircleCheckIcon } from "lucide-svelte";
+  import {
+    DatabaseIcon,
+    CircleCheckIcon,
+    LoaderCircleIcon,
+  } from "lucide-svelte";
   import VideoUpload from "../components/VideoUpload.svelte";
   import { indexVideo } from "../lib/api.ts";
   import type { IndexResult, TaskQueuedResult } from "../lib/types.ts";
@@ -34,10 +38,6 @@
       no_queue,
       no_streaming: true,
     })
-      .then((d) => {
-        if (d.ok) return d;
-        throw new Error(d.error || "Unknown error");
-      })
       .then((d) => {
         if (d.task_id) taskInfo = d;
         else if (d.video_id) result = d;
@@ -120,11 +120,19 @@
   </div>
 
   <button
-    class="btn-primary mb-3 text-base px-[1.6em] py-[0.6em]"
+    class="btn-primary mb-3 flex items-center gap-x-2 text-base px-[1.6em] py-[0.6em]"
     onclick={submit}
     disabled={!file || loading}
   >
-    {#if loading}<span class="spinner"></span> Indexing…{:else}Index Video{/if}
+    {#if loading}
+      <LoaderCircleIcon
+        class="w-5 h-5 animate-spin"
+        style="animation-duration: 0.3s"
+      />
+      Indexing…
+    {:else}
+      Index Video
+    {/if}
   </button>
 
   {#if error}<div class="error-box">{error}</div>{/if}
@@ -159,7 +167,7 @@
       </p>
       <p><strong>Indexed chunks:</strong> {result.indexed_count}</p>
       <a
-        href={toPath(`/videos/${result.video_id}`)}
+        href={toPath(`/video/${result.video_id}`)}
         use:route
         class="btn-primary inline-block mt-2"
       >

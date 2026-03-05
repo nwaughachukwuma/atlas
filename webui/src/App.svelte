@@ -18,9 +18,9 @@
     { path: "/transcribe", component: Transcribe },
     { path: "/extract", component: Extract },
     { path: "/index", component: Index },
+    { path: "/video/(?<id>[^/]+)", component: VideoDetail },
     { path: "/videos", component: Videos },
-    { path: "/videos/:id", component: VideoDetail },
-    { path: "/queue/:id", component: Queue },
+    { path: "/queue/(?<id>[^/]+)", component: Queue },
     { path: "/queue", component: Queue },
     { path: "/dashboard", component: Dashboard },
   ];

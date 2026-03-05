@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { route } from "@mateothegreat/svelte5-router";
-  import { FilmIcon, MessageSquareIcon } from "lucide-svelte";
+  import { route, type RouteResult } from "@mateothegreat/svelte5-router";
+  import { FilmIcon, LoaderCircleIcon, MessageSquareIcon } from "lucide-svelte";
   import { onMount, onDestroy } from "svelte";
   import { getVideo, search } from "../lib/api.ts";
   import type { Video, SearchResult } from "../lib/types.ts";
   import ChatPanel from "../components/ChatPanel.svelte";
   import { toPath } from "../lib/routing.ts";
-  import type { RouteResult } from "@mateothegreat/svelte5-router";
 
   let { route: routeResult }: { route: RouteResult } = $props();
 
+  // @ts-expect-error
   let videoId: string = $derived(routeResult.result.path.params?.id);
 
   let videoData: Video | null = $state(null);
@@ -24,6 +24,8 @@
   let taskStatus: string | null = $state(null);
 
   async function loadVideo(): Promise<void> {
+    if (!videoId) throw new Error("videoId not found");
+
     try {
       const data = await getVideo(videoId);
       videoData = data.data ?? data;
@@ -76,11 +78,6 @@
   onDestroy(() => {
     if (pollInterval) clearInterval(pollInterval);
   });
-
-  function formatDate(iso: string | undefined): string {
-    if (!iso) return "—";
-    return new Date(iso).toLocaleString();
-  }
 </script>
 
 <div class="p-8 max-w-[860px]">
@@ -100,15 +97,21 @@
   >
 
   {#if loading}
-    <div class="card text-center py-8">
-      <span class="spinner"></span>
+    <div class="card flex items-center gap-x-2 text-center py-8">
+      <LoaderCircleIcon
+        class="w-5 h-5 animate-spin"
+        style="animation-duration: 0.3s"
+      />
       <p class="mt-2 mb-0">Loading video data…</p>
     </div>
   {:else if error}
     <div class="error-box">{error}</div>
   {:else if !videoData}
-    <div class="card text-center py-8">
-      <span class="spinner"></span>
+    <div class="card text-center py-8 flex items-center gap-x-2">
+      <LoaderCircleIcon
+        class="w-5 h-5 animate-spin"
+        style="animation-duration: 0.3s"
+      />
       <p class="mt-2 mb-0">
         Video is still being indexed… Checking every 4 seconds.
       </p>
@@ -130,7 +133,12 @@
         onclick={doSearch}
         disabled={searching || !searchQuery.trim()}
       >
-        {#if searching}<span class="spinner"></span>{:else}Search{/if}
+        {#if searching}
+          <LoaderCircleIcon
+            class="w-5 h-5 animate-spin"
+            style="animation-duration: 0.3s"
+          />
+        {:else}Search{/if}
       </button>
       {#if searchResults !== null}
         <button class="btn-secondary" onclick={clearSearch}>Clear</button>

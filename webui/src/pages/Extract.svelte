@@ -1,6 +1,10 @@
 <script lang="ts">
   import { route } from "@mateothegreat/svelte5-router";
-  import { FlaskConicalIcon, CircleCheckIcon } from "lucide-svelte";
+  import {
+    FlaskConicalIcon,
+    CircleCheckIcon,
+    LoaderCircleIcon,
+  } from "lucide-svelte";
   import VideoUpload from "../components/VideoUpload.svelte";
   import { extract } from "../lib/api.ts";
   import type { ExtractResult, TaskQueuedResult } from "../lib/types.ts";
@@ -36,10 +40,6 @@
       no_queue,
       no_streaming: true,
     })
-      .then((d) => {
-        if (d.ok) return d;
-        throw new Error(d.error || "Unknown error");
-      })
       .then((d) => {
         if (
           d.task_id ||
@@ -131,12 +131,18 @@
   </div>
 
   <button
-    class="btn-primary mb-3 text-base px-[1.6em] py-[0.6em]"
+    class="btn-primary mb-3 flex items-center gap-x-2 text-base px-[1.6em] py-[0.6em]"
     onclick={submit}
     disabled={!file || loading}
   >
-    {#if loading}<span class="spinner"></span> Extracting…{:else}Extract
-      Insights{/if}
+    {#if loading}
+      <LoaderCircleIcon
+        class="w-5 h-5 animate-spin"
+        style="animation-duration: 0.3s"
+      /> Extracting…
+    {:else}
+      Extract Insights
+    {/if}
   </button>
 
   {#if error}<div class="error-box">{error}</div>{/if}
@@ -167,7 +173,9 @@
               >Segment {i + 1} — {chunk.start_time ?? ""}s – {chunk.end_time ??
                 ""}s</summary
             >
-            <pre>{JSON.stringify(chunk, null, 2)}</pre>
+            <pre class="text-sm">
+              {JSON.stringify(chunk, null, 2)}
+            </pre>
           </details>
         {/each}
         {#if result.summary}
@@ -177,7 +185,9 @@
           </div>
         {/if}
       {:else}
-        <pre>{JSON.stringify(result, null, 2)}</pre>
+        <pre class="text-sm">
+          {JSON.stringify(result, null, 2)}
+        </pre>
       {/if}
     </div>
   {/if}

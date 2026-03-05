@@ -1,6 +1,6 @@
 <script lang="ts">
   import { route, type RouteResult } from "@mateothegreat/svelte5-router";
-  import { ClipboardListIcon } from "lucide-svelte";
+  import { ClipboardListIcon, LoaderCircleIcon } from "lucide-svelte";
   import { onMount } from "svelte";
   import { queueList } from "../lib/api.ts";
   import type { Task, TaskStatus } from "../lib/types.ts";
@@ -11,14 +11,15 @@
   let { route: routeResult }: { route: RouteResult } = $props();
   const taskId: string | null = $derived.by(
     () =>
+      // @ts-expect-error
       routeResult.result.path.params?.id ??
       routeResult.result.path.original.match(/^\/queue\/([^/]+)$/)?.[1] ??
       null,
   );
 
-  let tasks: Task[] = $state([]);
-  let fetchTasksing: boolean = $state(false);
-  let statusFilter: TaskStatus | null = $state(null);
+  let tasks = $state<Task[]>([]);
+  let loading = $state(false);
+  let statusFilter = $state<TaskStatus | null>(null);
 
   const statusOptions: (TaskStatus | null)[] = [
     null,
@@ -30,9 +31,9 @@
   ];
 
   async function fetchTasks() {
-    if (fetchTasksing) return;
+    if (loading) return;
 
-    fetchTasksing = true;
+    loading = true;
     return queueList(statusFilter)
       .then((d) => (tasks = d.tasks))
       .catch((e) =>
@@ -40,7 +41,7 @@
           description: e.message,
         }),
       )
-      .finally(() => (fetchTasksing = false));
+      .finally(() => (loading = false));
   }
 
   onMount(() => {
@@ -71,7 +72,7 @@
 <div class="p-8 max-w-[860px]">
   {#if taskId}
     <!-- Single task view -->
-    <QueueTaskId {taskId} {fetchTasksing} />
+    <QueueTaskId {taskId} {loading} />
   {:else}
     <!-- Task list view -->
     <h2 class="flex items-center gap-1.5">
@@ -100,8 +101,14 @@
       >
     </div>
 
-    {#if fetchTasksing}
-      <p><span class="spinner"></span> fetchTasksing…</p>
+    {#if loading}
+      <p class="flex gap-x-2 items-center">
+        <LoaderCircleIcon
+          class="w-5 h-5 animate-spin"
+          style="animation-duration: 0.3s"
+        />
+        Loading…
+      </p>
     {:else if tasks.length === 0}
       <div class="card text-center py-8"><p>No tasks found.</p></div>
     {:else}

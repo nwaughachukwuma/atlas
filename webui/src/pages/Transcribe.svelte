@@ -1,6 +1,6 @@
 <script lang="ts">
   import { route } from "@mateothegreat/svelte5-router";
-  import { MicIcon, CircleCheckIcon } from "lucide-svelte";
+  import { MicIcon, CircleCheckIcon, LoaderCircleIcon } from "lucide-svelte";
   import VideoUpload from "../components/VideoUpload.svelte";
   import { transcribe } from "../lib/api.ts";
   import type { TranscribeResult, TaskQueuedResult } from "../lib/types.ts";
@@ -32,16 +32,12 @@
       no_streaming: true,
     })
       .then((d) => {
-        if (d.ok) return d;
-        throw new Error(d.error ?? "Unknown error");
-      })
-      .then((d) => {
         if (d.task_id) taskInfo = d;
         else result = d;
       })
       .catch((e) =>
         toast.error("Error in transcribe video", {
-          description: (e as Error).message,
+          description: e.message,
         }),
       )
       .finally(() => (loading = false));
@@ -100,11 +96,15 @@
   </div>
 
   <button
-    class="btn-primary mb-3 text-base px-[1.6em] py-[0.6em]"
+    class="btn-primary flex items-center gap-x-2 mb-3 text-base px-[1.6em] py-[0.6em]"
     onclick={submit}
     disabled={!file || loading}
   >
-    {#if loading}<span class="spinner"></span> Transcribing…{:else}Transcribe{/if}
+    {#if loading}
+      <LoaderCircleIcon
+        class="w-5 h-5 animate-spin"
+        style="animation-duration: 0.3s"
+      /> Transcribing…{:else}Transcribe{/if}
   </button>
 
   {#if error}
@@ -125,12 +125,18 @@
 
   {#if result}
     <div class="card mt-2">
-      <h3 class="mb-3">Transcript <span class="tag">{format}</span></h3>
-      {#if result.transcript}
-        <pre>{result.transcript}</pre>
-      {:else}
-        <pre>{JSON.stringify(result, null, 2)}</pre>
-      {/if}
+      <h3 class="mb-3 flex items-center gap-x-2">
+        Transcript <span class="tag">{format}</span>
+      </h3>
+      <p
+        class="text-wrap bg-neutral-500/3 max-h-80 overflow-y-auto p-1.5 font-mono text-sm text-muted"
+      >
+        {#if result.transcript}
+          {result.transcript}
+        {:else}
+          {JSON.stringify(result, null, 2)}
+        {/if}
+      </p>
     </div>
   {/if}
 </div>

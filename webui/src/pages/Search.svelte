@@ -4,6 +4,7 @@
   import type { SearchResult } from "../lib/types.ts";
   import { toPath } from "../lib/routing.ts";
   import { toast } from "svelte-sonner";
+  import { LoaderCircleIcon } from "lucide-svelte";
 
   let query: string = "";
   let videoId: string = "";
@@ -72,10 +73,15 @@
     <div class="btn-row">
       <button
         type="submit"
-        class="btn-primary"
+        class="btn-primary flex items-center gap-x-2"
         disabled={loading || !query.trim()}
       >
-        {#if loading}<span class="spinner"></span>{/if}
+        {#if loading}
+          <LoaderCircleIcon
+            class="w-5 h-5 animate-spin"
+            style="animation-duration: 0.3s"
+          />
+        {/if}
         Search
       </button>
       {#if results !== null || error}
@@ -108,7 +114,7 @@
               <div class="result-header">
                 <span class="result-num">#{i + 1}</span>
                 <a
-                  href={toPath(`/videos/${r.video_id}`)}
+                  href={toPath(`/video/${r.video_id}`)}
                   use:route
                   class="vid-link">{r.video_id}</a
                 >

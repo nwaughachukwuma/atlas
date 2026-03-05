@@ -6,7 +6,7 @@
   import { route } from "@mateothegreat/svelte5-router";
   import { onMount } from "svelte";
   import { stats, health, queueList, listVideos } from "../lib/api.ts";
-  import { LayoutDashboardIcon } from "lucide-svelte";
+  import { LayoutDashboardIcon, LoaderCircleIcon } from "lucide-svelte";
   import { toPath } from "../lib/routing.ts";
   import type {
     StatsResponse,
@@ -95,7 +95,12 @@
   </div>
 
   {#if loading}
-    <p><span class="spinner"></span> Loading…</p>
+    <p class="flex gap-x-2 items-center">
+      <LoaderCircleIcon
+        class="w-5 h-5 animate-spin"
+        style="animation-duration: 0.3s"
+      /> Loading…
+    </p>
   {:else}
     <!-- KPI row -->
     <div class="grid grid-cols-4 gap-3 mb-4 max-sm:grid-cols-2">
@@ -199,7 +204,7 @@
         <div class="flex flex-col">
           {#each videosData.videos.slice(0, 8) as v}
             <a
-              href={toPath(`/videos/${v.video_id}`)}
+              href={toPath(`/video/${v.video_id}`)}
               use:route
               class="flex justify-between items-center py-[0.45rem] border-b border-line text-ink text-[0.85rem] hover:text-cobalt last:border-b-0"
             >

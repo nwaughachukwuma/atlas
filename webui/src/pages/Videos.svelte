@@ -1,18 +1,18 @@
 <script lang="ts">
   import { route } from "@mateothegreat/svelte5-router";
-  import { FilmIcon } from "lucide-svelte";
+  import { FilmIcon, LoaderCircleIcon } from "lucide-svelte";
   import { onMount } from "svelte";
   import { listVideos, search } from "../lib/api.ts";
   import type { Video, SearchResult } from "../lib/types.ts";
   import { toPath } from "../lib/routing.ts";
   import { toast } from "svelte-sonner";
 
-  let videos: Video[] = [];
-  let loading = true;
-  let error: string | null = null;
-  let searchQuery = "";
-  let searchResults: SearchResult[] | null = null;
-  let searching = false;
+  let videos = $state<Video[]>([]);
+  let loading = $state(true);
+  let error = $state<string | null>(null);
+  let searchQuery = $state("");
+  let searchResults = $state<SearchResult[] | null>(null);
+  let searching = $state(false);
 
   onMount(() => {
     listVideos()
@@ -70,11 +70,18 @@
       onkeydown={(e) => e.key === "Enter" && doSearch()}
     />
     <button
-      class="btn-primary"
+      class="btn-primary flex items-center gap-x-2"
       onclick={doSearch}
       disabled={searching || !searchQuery.trim()}
     >
-      {#if searching}<span class="spinner"></span>{:else}Search{/if}
+      {#if searching}
+        <LoaderCircleIcon
+          class="w-5 h-5 animate-spin"
+          style="animation-duration: 0.3s"
+        />
+      {:else}
+        Search
+      {/if}
     </button>
     {#if searchResults !== null}
       <button class="btn-secondary" onclick={clearSearch}>Clear</button>
@@ -97,7 +104,7 @@
           <div class="card mb-3">
             <div class="flex justify-between mb-[0.4rem]">
               <a
-                href={toPath(`/videos/${r.video_id}`)}
+                href={toPath(`/video/${r.video_id}`)}
                 use:route
                 class="font-mono text-[0.85rem] text-cobalt">{r.video_id}</a
               >
@@ -116,7 +123,13 @@
       {/if}
     </section>
   {:else if loading}
-    <p><span class="spinner"></span> Loading videos…</p>
+    <p class="flex gap-x-2 items-center">
+      <LoaderCircleIcon
+        class="w-5 h-5 animate-spin"
+        style="animation-duration: 0.3s"
+      />
+      Loading videos…
+    </p>
   {:else if videos.length === 0}
     <div class="card text-center py-10">
       <p class="mb-4">No videos indexed yet.</p>
@@ -131,7 +144,7 @@
     <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
       {#each videos as v}
         <a
-          href={toPath(`/videos/${v.video_id}`)}
+          href={toPath(`/video/${v.video_id}`)}
           use:route
           class="card flex gap-3 items-start text-ink transition-[border-color] duration-150 hover:border-cobalt"
         >

@@ -4,7 +4,7 @@
 
 <script lang="ts">
   import { route } from "@mateothegreat/svelte5-router";
-  import { ClipboardListIcon } from "lucide-svelte";
+  import { ClipboardListIcon, LoaderCircleIcon } from "lucide-svelte";
   import type { Task } from "../lib/types";
   import { toPath } from "../lib/routing";
   import { onMount } from "svelte";
@@ -13,7 +13,7 @@
 
   let { taskId, loading }: { taskId: string; loading: boolean } = $props();
 
-  let task: Task | null = $state(null);
+  let task = $state<Task | null>(null);
 
   function badgeClass(status: Task["status"]) {
     return `badge badge-${status ?? "pending"}`;
@@ -61,7 +61,13 @@
   /> Task Detail
 </h2>
 {#if loading}
-  <p><span class="spinner"></span> Loading…</p>
+  <p class="flex items-center gap-x-2">
+    <LoaderCircleIcon
+      class="w-5 h-5 animate-spin"
+      style="animation-duration: 0.3s"
+    />
+    Loading…
+  </p>
 {:else if task}
   <div class="card">
     <div class="flex items-center gap-3 mb-4">
@@ -116,8 +122,12 @@
       </div>
     {/if}
     {#if task.status === "pending" || task.status === "running"}
-      <p class="text-muted text-[0.85rem] mt-4">
-        <span class="spinner"></span> Refreshing every 5s…
+      <p class="text-muted flex items-center gap-x-2 text-[0.85rem] mt-4">
+        <LoaderCircleIcon
+          class="w-5 h-5 animate-spin"
+          style="animation-duration: 0.3s"
+        />
+        Refreshing every 5s…
       </p>
     {/if}
   </div>

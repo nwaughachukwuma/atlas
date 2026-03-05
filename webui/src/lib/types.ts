@@ -137,7 +137,6 @@ export interface IndexOptions {
 export interface TaskQueuedResult {
   task_id?: string;
   id?: string;
-  ok?: boolean;
   error?: string;
 }
 
