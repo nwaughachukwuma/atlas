@@ -41,7 +41,7 @@ def get_or_create_collection(path: str, schema) -> "Collection":
         try:
             return zvec.open(path=path)
         except Exception as e:
-            logger.info("Error in zvec.open %s", e)
+            logger.warning("Error in zvec.open %s", e)
             import shutil
 
             shutil.rmtree(p)

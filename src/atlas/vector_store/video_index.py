@@ -423,13 +423,13 @@ async def index_video(
     async with VideoProcessor(config) as processor:
         result = await processor.process(on_segment)
 
-    vi = default_video_index(embedding_dim)
-    vi.col_path.mkdir(parents=True, exist_ok=True)
+        vi = default_video_index(embedding_dim)
+        vi.col_path.mkdir(parents=True, exist_ok=True)
 
-    video_id = uuid(16)
-    indexed = await vi.index_video_result(result, video_id=video_id)
+        video_id = uuid(16)
+        indexed = await vi.index_video_result(result, video_id=video_id)
 
-    return video_id, indexed, result
+        return video_id, indexed, result
 
 
 async def search_video(

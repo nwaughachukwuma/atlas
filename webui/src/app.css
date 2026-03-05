@@ -210,18 +210,6 @@
     color: var(--color-warning);
   }
 
-  /* Loading spinner */
-  .spinner {
-    display: inline-block;
-    width: 1.1em;
-    height: 1.1em;
-    border: 2px solid var(--color-line);
-    border-top-color: var(--color-cobalt);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    vertical-align: middle;
-  }
-
   /* Feedback boxes */
   .error-box {
     background: #fef2f2;

@@ -81,7 +81,8 @@ ENV ENABLE_LOGGING="false"
 # image contents, and only if those contents already exist with the right owner.
 RUN mkdir -p \
     /home/atlas/.atlas/index \
-    /home/atlas/.atlas/queue/queued_tasks/results
+    /home/atlas/.atlas/queue/queued_tasks/results \
+    && chmod -R 775 /home/atlas/.atlas
 
 # Mount a named volume here so indexed data survives container restarts:
 #   docker run -v atlas-data:/home/atlas/.atlas ...
