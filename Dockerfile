@@ -46,8 +46,6 @@ LABEL org.opencontainers.image.source="https://github.com/nwaughachukwuma/atlas-
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 # ── System dependencies ──────────────────────────────────────────────────────
-# ffmpeg  : video clipping and audio extraction
-# libgomp1: OpenMP runtime (zvec / numpy dependency)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libgomp1 \

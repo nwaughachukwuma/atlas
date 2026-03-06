@@ -30,7 +30,7 @@ no-e2e-test:
 
 # Run tests inside the running dev container
 docker-test:
-	docker exec -it $(CONTAINER_NAME) bash -c "cd /root/atlas && source .venv/bin/activate && pytest tests/ -vv && deactivate"
+	docker exec -it $(CONTAINER_NAME) bash -c "cd /home/atlas && source .venv/bin/activate && pytest tests/ -vv && deactivate"
 
 # ── Docker: production image ─────────────────────────────────────────────────
 
