@@ -27,6 +27,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from ._meta import DISPLAY_NAME, __version__
 from .cli.cmd_media import cmd_extract, cmd_index, cmd_transcribe
 from .file_extension import get_ext_from_mimetype
 from .ui_router import ui_router
@@ -125,7 +126,7 @@ def _run_command(func, args: argparse.Namespace, *, tmp_dir: Path | None = None)
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Atlas Server", version="0.2.1")
+    app = FastAPI(title=f"{DISPLAY_NAME} Server", version=__version__)
 
     app.add_middleware(
         CORSMiddleware,

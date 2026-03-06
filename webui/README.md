@@ -1,43 +1,85 @@
-# Svelte + Vite
+# Atlas Web UI
 
-This template should help get you started developing with Svelte in Vite.
+This directory contains the Svelte 5 Web UI for Atlas Video. In production, the built assets are served by the Atlas HTTP server under `/ui`.
 
-## Recommended IDE Setup
+## What it supports
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
+The Web UI is a browser companion to the Atlas Docker/server workflow. It currently provides pages for:
 
-## Need an official Svelte framework?
+- dashboard and health overview
+- transcription
+- multimodal extraction
+- video indexing
+- indexed video browsing and per-video detail views
+- chat history and video chat
+- task queue monitoring
 
-Check out [SvelteKit](https://github.com/sveltejs/kit#readme), which is also powered by Vite. Deploy anywhere with its serverless-first approach and adapt to various platforms, with out of the box support for TypeScript, SCSS, and Less, and easily-added support for mdsvex, GraphQL, PostCSS, Tailwind CSS, and more.
+Routes are mounted under `/ui`, including:
 
-## Technical considerations
+- `/ui`
+- `/ui/transcribe`
+- `/ui/extract`
+- `/ui/index`
+- `/ui/videos`
+- `/ui/video/:id`
+- `/ui/queue`
+- `/ui/dashboard`
 
-**Why use this over SvelteKit?**
+## Production workflow
 
-- It brings its own routing solution which might not be preferable for some users.
-- It is first and foremost a framework that just happens to use Vite under the hood, not a Vite app.
+Users do not need Node.js or the Vite dev server to use the Web UI. After pulling the Docker image, start Atlas and open the browser:
 
-This template contains as little as possible to get started with Vite + Svelte, while taking into account the developer experience with regards to HMR and intellisense. It demonstrates capabilities on par with the other `create-vite` templates and is a good starting point for beginners dipping their toes into a Vite + Svelte project.
-
-Should you later need the extended capabilities and extensibility provided by SvelteKit, the template has been structured similarly to SvelteKit so that it is easy to migrate.
-
-**Why include `.vscode/extensions.json`?**
-
-Other templates indirectly recommend extensions via the README, but this file allows VS Code to prompt the user to install the recommended extension upon opening the project.
-
-**Why enable `checkJs` in the JS template?**
-
-It is likely that most cases of changing variable types in runtime are likely to be accidental, rather than deliberate. This provides advanced typechecking out of the box. Should you like to take advantage of the dynamically-typed nature of JavaScript, it is trivial to change the configuration.
-
-**Why is HMR not preserving my local component state?**
-
-HMR state preservation comes with a number of gotchas! It has been disabled by default in both `svelte-hmr` and `@sveltejs/vite-plugin-svelte` due to its often surprising behavior. You can read the details [here](https://github.com/sveltejs/svelte-hmr/tree/master/packages/svelte-hmr#preservation-of-local-state).
-
-If you have state that's important to retain within a component, consider creating an external store which would not be replaced by HMR.
-
-```js
-// store.js
-// An extremely simple external store
-import { writable } from 'svelte/store'
-export default writable(0)
+```bash
+docker run -p 8000:8000 -it \
+	-v atlas-data:/home/atlas/.atlas \
+	--env-file .env \
+	nwaughachukwuma/atlas-video
 ```
+
+Then visit:
+
+```text
+http://localhost:8000/ui
+```
+
+The UI talks to the Atlas server on the same host and uses the same REST API exposed on port `8000`.
+
+## Local development
+
+For contributors working on the frontend itself:
+
+```bash
+cd webui
+npm install
+npm run dev
+```
+
+Useful scripts:
+
+- `npm run dev` starts the Vite development server
+- `npm run build` builds production assets
+- `npm run watch` rebuilds on file changes
+- `npm run preview` previews the production build
+- `npm run check` runs `svelte-check`
+
+## Backend expectations
+
+The frontend expects the Atlas server to expose these endpoints on `http://localhost:8000`:
+
+- `POST /transcribe`
+- `POST /extract`
+- `POST /index`
+- `POST /search`
+- `POST /chat`
+- `GET /health`
+- `GET /list-videos`
+- `GET /get-video/:video_id`
+- `GET /list-chat/:video_id`
+- `GET /stats`
+- `GET /queue/list`
+- `GET /queue/status/:task_id`
+
+## Notes
+
+- Persistent vector data should be mounted to `/home/atlas/.atlas` in Docker.
+- The Web UI is bundled with the main Atlas image; it is not a separate deployable service.

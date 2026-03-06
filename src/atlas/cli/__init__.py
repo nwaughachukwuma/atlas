@@ -13,13 +13,15 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING, Optional
 
+from .._meta import PROGRAM_NAME, __version__
+
 if TYPE_CHECKING:
     from rich.console import Console
 
 # ── version ───────────────────────────────────────────────────────────────────
 
-VERSION = "0.2.1"
-PROG_NAME = "atlas"
+VERSION = __version__
+PROG_NAME = PROGRAM_NAME
 
 # ── Lazy singletons — nothing heavy is imported until a real command runs ─────
 

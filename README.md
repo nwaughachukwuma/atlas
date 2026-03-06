@@ -4,7 +4,7 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/atlas-video.svg)](https://pypi.org/project/atlas-video/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Atlas** is an open-source multimodal insights engine for video understanding. Extract rich semantic insights from videos using AI, index them in a local vector store, and chat with your video content — all from the terminal.
+**Atlas** is an open-source multimodal insights engine for video understanding. Extract rich semantic insights from videos using AI, index them in a local vector store, chat with your video content from the terminal, or use the bundled Web UI served by the Atlas HTTP server.
 
 https://github.com/user-attachments/assets/d28fb343-5c74-462f-996e-f0e5dc51cdf8
 
@@ -14,6 +14,7 @@ https://github.com/user-attachments/assets/d28fb343-5c74-462f-996e-f0e5dc51cdf8
 - ⚡ **Real-time Streaming**: `extract` and `transcribe` stream results to the terminal as each segment completes — no waiting for the full video
 - 🔍 **Semantic Search**: Index videos and search through content semantically using a local vector store (powered by [zvec](https://github.com/alibaba/zvec))
 - 💬 **Video Chat**: Ask questions about indexed videos; context is drawn from the vector store and prior conversation history
+- 🌐 **Companion Web UI**: Browse indexed videos, queue jobs, inspect stats, and use Atlas from a browser at `/ui`
 - 🤖 **Powered by Gemini**: Uses Google's Gemini models for multimodal analysis and embeddings
 - 🎙️ **Groq Whisper Transcription**: High-quality fast-video transcription via the `transcribe` command
 - 💻 **CLI First**: Clean, ergonomic command-line interface
@@ -134,16 +135,33 @@ docker run --rm nwaughachukwuma/atlas-video queue list
 
 ### Run as HTTP server (Docker)
 
+The Docker image now starts the Atlas HTTP server and bundled Web UI by default.
+
 ```bash
-# Start Atlas API server on port 8000
+# Start Atlas API server + Web UI on port 8000
+docker run -p 8000:8000 -it \
+  -v atlas-data:/home/atlas/.atlas \
+  --env-file .env \
+  nwaughachukwuma/atlas-video
+
+# Open the Web UI
+# http://localhost:8000/ui
+
+# Dashboard
+# http://localhost:8000/ui/dashboard
+
+# Health check
+curl http://localhost:8000/health
+```
+
+If you prefer to pass the command explicitly, `serve` still works:
+
+```bash
 docker run --rm -d \
   -p 8000:8000 \
   --env-file .env \
   -v atlas-data:/home/atlas/.atlas \
   nwaughachukwuma/atlas-video serve -H 0.0.0.0 -p 8000
-
-# Health check
-curl http://localhost:8000/health
 ```
 
 Or specify the API keys inline:
@@ -156,6 +174,36 @@ docker run --rm -d \
   -v atlas-data:/home/atlas/.atlas \
   nwaughachukwuma/atlas-video serve -H 0.0.0.0 -p 8000
 ```
+
+### Web UI workflow
+
+After pulling the image, the shortest path to the browser experience is:
+
+```bash
+# 1. Create a .env file with your API keys
+cat > .env <<'EOF'
+GEMINI_API_KEY=your-key-here
+GROQ_API_KEY=your-key-here
+ENABLE_LOGGING=false
+EOF
+
+# 2. Start Atlas
+docker run -p 8000:8000 -it \
+  -v atlas-data:/home/atlas/.atlas \
+  --env-file .env \
+  nwaughachukwuma/atlas-video
+
+# 3. Open the UI
+# http://localhost:8000/ui
+```
+
+From the Web UI you can:
+
+- upload videos for `transcribe`, `extract`, and `index`
+- browse indexed videos and open a per-video detail page
+- chat with an indexed video
+- inspect queue state and task details
+- view dashboard health, collection stats, and storage paths
 
 ### Environment variables
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "atlas-video"
-version = "0.2.1"
+dynamic = ["version"]
 description = "A multimodal insights engine for video understanding"
 readme = "README.md"
 license = "Apache-2.0"
@@ -71,6 +71,9 @@ packages = ["src/atlas", "src/ui"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src/atlas", "src/ui", "README.md", "LICENSE"]
+
+[tool.hatch.version]
+path = "src/atlas/_meta.py"
 
 [tool.ruff]
 line-length = 120
