@@ -8,10 +8,11 @@ import asyncio
 import os
 from typing import TYPE_CHECKING, Literal
 
+from google import genai
+
 from .utils import RetryConfig, logger, process_time, retry
 
 if TYPE_CHECKING:
-    from google import genai
     from google.genai import types as genai_types
 
 
@@ -25,24 +26,15 @@ Model = Literal[
 ]
 
 
-class GeminiClient:
-    """Client for Google Gemini API"""
-
-    @classmethod
-    def get_client(cls) -> "genai.Client":
-        """Create a fresh Gemini client on every call."""
-        from google import genai
-
-        if api_key := os.environ.get("GEMINI_API_KEY"):
-            return genai.Client(api_key=api_key)
-        raise ValueError("GEMINI_API_KEY environment variable is required")
+api_key = os.environ["GEMINI_API_KEY"]
+gemini_client = genai.Client(api_key=api_key)
 
 
 class GeminiMediaEngine:
     """Engine for analyzing media using Gemini"""
 
     def __init__(self):
-        self.client = GeminiClient.get_client()
+        self.client = gemini_client
 
     @process_time()
     @retry(RetryConfig(max_retries=2, delay=5, backoff=1.5))

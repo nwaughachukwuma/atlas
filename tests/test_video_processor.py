@@ -2,8 +2,6 @@
 Unit tests for atlas.video_processor module
 """
 
-from unittest.mock import patch
-
 import pytest
 
 from atlas.utils import VideoAttrAnalysis
@@ -89,7 +87,12 @@ class TestVideoProcessorResult:
 class TestVideoProcessor:
     """Tests for VideoProcessor class"""
 
-    def test_initialization(self, tmp_path, monkeypatch):
+    def test_initialization(
+        self,
+        tmp_path,
+        mock_gemini_client,
+        monkeypatch,
+    ):
         """Test VideoProcessor initialization"""
         video_path = tmp_path / "test_video.mp4"
         video_path.touch()
@@ -97,16 +100,15 @@ class TestVideoProcessor:
         # Mock Gemini client to avoid API key requirement
         monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
 
-        with patch("atlas.gemini_client.GeminiClient.get_client"):
-            config = VideoProcessorConfig(video_path=str(video_path))
-            processor = VideoProcessor(config)
+        config = VideoProcessorConfig(video_path=str(video_path))
+        processor = VideoProcessor(config)
 
-            assert processor.video_path == str(video_path)
-            assert processor.chunk_duration == 15
-            assert processor.overlap == 1
+        assert processor.video_path == str(video_path)
+        assert processor.chunk_duration == 15
+        assert processor.overlap == 1
 
     @pytest.mark.asyncio
-    async def test_context_manager(self, tmp_path, monkeypatch):
+    async def test_context_manager(self, tmp_path, mock_gemini_client, monkeypatch):
         """Test VideoProcessor as context manager"""
         video_path = tmp_path / "test_video.mp4"
         video_path.touch()
@@ -114,9 +116,7 @@ class TestVideoProcessor:
         # Mock Gemini client to avoid API key requirement
         monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
 
-        with patch("atlas.gemini_client.GeminiClient.get_client"):
-            config = VideoProcessorConfig(video_path=str(video_path))
-
-            async with VideoProcessor(config) as processor:
-                assert processor is not None
-                assert processor.video_path == str(video_path)
+        config = VideoProcessorConfig(video_path=str(video_path))
+        async with VideoProcessor(config) as processor:
+            assert processor is not None
+            assert processor.video_path == str(video_path)

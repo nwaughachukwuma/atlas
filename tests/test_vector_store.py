@@ -282,6 +282,7 @@ class TestVideoIndex:
         shared = MagicMock()
         with (
             patch.object(BaseCollection, "_init_zvec", return_value=None),
+            patch.object(VideoIndex, "_build_schema", return_value=MagicMock()),
             patch.dict("src.atlas.vector_store.base._collection_cache", {}, clear=True),
             patch("src.atlas.vector_store.base.get_or_create_collection", return_value=shared) as open_collection,
         ):

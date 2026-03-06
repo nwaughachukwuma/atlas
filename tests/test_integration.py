@@ -85,7 +85,12 @@ class TestVideoProcessorIntegration:
         return str(video_path)
 
     @pytest.mark.asyncio
-    async def test_processor_config_flow(self, sample_video_path, monkeypatch):
+    async def test_processor_config_flow(
+        self,
+        sample_video_path,
+        mock_gemini_client,
+        monkeypatch,
+    ):
         monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
 
         config = VideoProcessorConfig(
@@ -95,15 +100,18 @@ class TestVideoProcessorIntegration:
             description_attrs=["visual_cues"],
         )
 
-        with patch("atlas.gemini_client.GeminiClient.get_client"):
-            processor = VideoProcessor(config)
-            processor._duration = 10.0
-
-            assert processor.chunk_duration == 5
-            assert processor.overlap == 1
+        processor = VideoProcessor(config)
+        processor._duration = 10.0
+        assert processor.chunk_duration == 5
+        assert processor.overlap == 1
 
     @pytest.mark.asyncio
-    async def test_chunk_slicing_with_overlap(self, sample_video_path, monkeypatch):
+    async def test_chunk_slicing_with_overlap(
+        self,
+        sample_video_path,
+        mock_gemini_client,
+        monkeypatch,
+    ):
         monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
 
         config = VideoProcessorConfig(
@@ -112,14 +120,12 @@ class TestVideoProcessorIntegration:
             overlap=1,
         )
 
-        with patch("atlas.gemini_client.GeminiClient.get_client"):
-            processor = VideoProcessor(config)
-            processor._duration = 15.0
-
-            slots = processor._slice_media_file(5, 1)
-            # With 15s duration, 5s chunks, 1s overlap:
-            # 0-5, 4-9, 8-13, 12-15 (approx)
-            assert len(slots) >= 3
+        processor = VideoProcessor(config)
+        processor._duration = 15.0
+        slots = processor._slice_media_file(5, 1)
+        # With 15s duration, 5s chunks, 1s overlap:
+        # 0-5, 4-9, 8-13, 12-15 (approx)
+        assert len(slots) >= 3
 
 
 class TestCLIIntegration:
