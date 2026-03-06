@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
@@ -272,7 +273,8 @@ class VideoChat(BaseCollection):
         ]
 
 
-def default_video_chat(embedding_dim: int = 768) -> VideoChat:
+@lru_cache(maxsize=16)
+def default_video_chat(embedding_dim=768) -> VideoChat:
     """Return a VideoChat object"""
     return VideoChat(
         col_path=DEFAULT_STORE_ROOT / COLLECTION_NAME,

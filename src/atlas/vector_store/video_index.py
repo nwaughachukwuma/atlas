@@ -17,6 +17,7 @@ import asyncio
 import json
 import os
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
@@ -378,6 +379,7 @@ class VideoIndex(BaseCollection):
             logger.error(f"Error deleting video_index doc {doc_id}: {e}")
 
 
+@lru_cache(maxsize=16)
 def default_video_index(embedding_dim: int = 768) -> VideoIndex:
     """Return a VideoIndex object"""
     return VideoIndex(
