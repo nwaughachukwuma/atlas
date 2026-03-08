@@ -55,8 +55,8 @@ class TaskStore:
         self.db_path = db_path
         self._local = threading.local()  # per-instance thread-local storage
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._conn() as conn:
-            self._ensure_schema(conn)
+        # Initialize the first connection eagerly so schema creation/migrations happen up front.
+        self._conn()
 
     # ── connection helpers ────────────────────────────────────────────
 

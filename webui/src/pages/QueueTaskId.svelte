@@ -34,6 +34,10 @@
       );
   }
 
+  function formatResult(value: unknown) {
+    return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  }
+
   onMount(() => {
     fetchTaskStatus();
 
@@ -144,10 +148,7 @@
         <summary class="cursor-pointer text-[0.88rem] text-muted">
           Persisted result
         </summary>
-        <pre class="max-h-96 overflow-y-auto m-0 mt-3 text-sm">{typeof task.result ===
-        "string"
-          ? task.result
-          : JSON.stringify(task.result, null, 2)}</pre>
+        <pre class="max-h-96 overflow-y-auto m-0 mt-3 text-sm">{formatResult(task.result)}</pre>
       </details>
     {/if}
 

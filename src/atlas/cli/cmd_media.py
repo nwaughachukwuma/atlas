@@ -287,7 +287,7 @@ def cmd_transcribe(args: argparse.Namespace) -> dict[str, object] | None:
                 output_path=output_path,
             )
             store.mark_failed(run_id, "No transcript content generated.", result_text=content, result_path=result_path)
-            return None
+            sys.exit(1)
 
         result = {"transcript": full_text, "format": fmt}
         from ..task_queue import persist_benchmark, persist_result
