@@ -140,19 +140,31 @@ export const health = (): Promise<HealthResponse> =>
 
 export const queueList = (
   status: string | null = null,
+): Promise<QueueListResponse> =>
+  get<QueueListResponse>(
+    withQuery("/queue/list", {
+      status,
+    }),
+  );
+
+export const queueStatus = (id: string): Promise<Task> =>
+  get<Task>(`/queue/status/${id}`);
+
+export const runsList = (
+  status: string | null = null,
   command: string | null = null,
   runType: "queued" | "direct" | null = null,
 ): Promise<QueueListResponse> =>
   get<QueueListResponse>(
-    withQuery("/queue/list", {
+    withQuery("/runs/list", {
       status,
       command,
       run_type: runType,
     }),
   );
 
-export const queueStatus = (id: string): Promise<Task> =>
-  get<Task>(`/queue/status/${id}`);
+export const runsStatus = (id: string): Promise<Task> =>
+  get<Task>(`/runs/status/${id}`);
 
 // ── SSE chat stream ───────────────────────────────────────────────────────────
 

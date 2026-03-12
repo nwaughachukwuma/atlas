@@ -81,6 +81,12 @@ from .cmd_media import (
 from .cmd_media import (
     cmd_transcribe as cmd_transcribe,
 )
+from .cmd_runs import (  # noqa: E402
+    cmd_runs_list as cmd_runs_list,
+)
+from .cmd_runs import (
+    cmd_runs_status as cmd_runs_status,
+)
 from .cmd_server import (  # noqa: E402
     cmd_serve as cmd_serve,
 )
@@ -141,7 +147,7 @@ def main() -> None:
 
     load_dotenv()
 
-    is_queue_cmd = getattr(args, "command", None) == "queue"
+    is_queue_cmd = getattr(args, "command", None) in {"queue", "runs"}
     is_queuing = False
     if getattr(args, "command", None) in ("extract", "transcribe", "index"):
         is_queuing = not getattr(args, "no_queue", False)

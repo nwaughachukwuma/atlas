@@ -307,7 +307,7 @@ atlas transcribe video.mp4 --format=srt --output=transcript.srt
 
 ### `atlas extract`
 
-Extract multimodal insights from a video without indexing. Tasks are **queued by default**; use `--no-queue` to run directly and stream results to the terminal in real time. Queued and direct runs are both persisted to disk and recorded in SQLite, so you can inspect them later with `atlas queue`.
+Extract multimodal insights from a video without indexing. Tasks are **queued by default**; use `--no-queue` to run directly and stream results to the terminal in real time. Queued and direct runs are both persisted to disk, and saved runs can be inspected later with `atlas runs`.
 
 ```
 atlas extract VIDEO_PATH [OPTIONS]
@@ -512,12 +512,21 @@ atlas stats
 
 ### `atlas queue`
 
-Manage the background task queue and inspect persisted direct runs. Long-running commands (`index`, `extract`) are queued by default; use `--no-queue` on any command to run immediately.
+Manage the background task queue. Long-running commands (`index`, `extract`) are queued by default; use `--no-queue` on any command to run immediately.
 
 ```
-atlas queue list                         # list queued tasks and direct runs
+atlas queue list                         # list queued tasks
 atlas queue status --task-id TASK_ID     # check status of a specific task
-atlas queue list --command transcribe --run-type direct
+```
+
+### `atlas runs`
+
+Inspect persisted run history for queued and direct media operations.
+
+```bash
+atlas runs list
+atlas runs list --command transcribe --run-type direct
+atlas runs status --run-id RUN_ID
 ```
 
 Use `--no-queue` on any command to bypass the queue and run synchronously:

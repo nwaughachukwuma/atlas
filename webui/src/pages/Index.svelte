@@ -146,7 +146,7 @@
       {#if taskInfo.benchmark_path}
         <br /><strong>Benchmark:</strong> {taskInfo.benchmark_path}
       {/if}
-      <br /><a href={toPath("/queue")} use:route>View Queue →</a>
+      <br /><a href={toPath(`/queue/${taskInfo.task_id ?? taskInfo.id}`)} use:route>View Task →</a>
     </div>
   {/if}
 
@@ -164,7 +164,7 @@
         <br /><strong>Benchmark:</strong> {result.benchmark_path}
       {/if}
       {#if result.id}
-        <br /><a href={toPath(`/queue/${result.id}`)} use:route>Inspect saved run →</a>
+        <br /><a href={toPath(`/runs/${result.id}`)} use:route>Inspect saved run →</a>
       {/if}
     </div>
     <div class="card mt-2">

@@ -178,8 +178,8 @@ def print_saved_run_info(
         console.print(f"  [cyan]Also at:[/cyan]    {requested_output_path}")
     if benchmark_path:
         console.print(f"  [cyan]Benchmark:[/cyan]  {benchmark_path}")
-    console.print(f"\n  [dim]Inspect this run:[/dim] atlas queue status --task-id {run_id}")
-    console.print("  [dim]Browse saved runs:[/dim] atlas queue list")
+    console.print(f"\n  [dim]Inspect this run:[/dim] atlas runs status --run-id {run_id}")
+    console.print("  [dim]Browse saved runs:[/dim] atlas runs list")
 
 
 def print_benchmark_summary() -> None:

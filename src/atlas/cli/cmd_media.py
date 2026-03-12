@@ -28,18 +28,18 @@ if TYPE_CHECKING:
 
 def _start_direct_run(command: str, video_path: Path, output_path: Optional[str], benchmark: bool) -> tuple[str, object]:
     """Create and mark running a persisted direct-run record."""
-    from ..task_queue import TaskStore
+    from ..task_queue.run_history_store import RunHistoryStore
     from ..uuid import uuid
 
     run_id = uuid(10)
-    store = TaskStore()
+    store = RunHistoryStore()
     store.add(
         run_id,
         command,
         f"{command} {video_path.name}",
+        run_type="direct",
         output_path=output_path,
         benchmark=benchmark,
-        run_type="direct",
     )
     store.mark_running(run_id)
     return run_id, store

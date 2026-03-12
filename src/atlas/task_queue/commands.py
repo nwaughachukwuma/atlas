@@ -27,12 +27,11 @@ def add_queue_commands(subparsers: Any) -> None:
     p_queue = subparsers.add_parser(
         "queue",
         help="Manage the task queue.",
-        description="View queued tasks and persisted direct runs (transcribe / extract / index).",
+        description="View queued tasks (transcribe / extract / index).",
         epilog=(
             "Examples:\n"
             "  atlas queue list\n"
             "  atlas queue list --status pending\n"
-            "  atlas queue list --command transcribe --run-type direct\n"
             "  atlas queue status --task-id abc12345\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -47,17 +46,6 @@ def add_queue_commands(subparsers: Any) -> None:
         "-s",
         choices=["pending", "running", "completed", "failed", "timeout"],
         help="Filter by status.",
-    )
-    p_list.add_argument(
-        "--command",
-        choices=["transcribe", "extract", "index"],
-        help="Filter by command.",
-    )
-    p_list.add_argument(
-        "--run-type",
-        choices=["queued", "direct"],
-        dest="run_type",
-        help="Filter by execution mode.",
     )
     p_list.set_defaults(func=cmd_queue_list)
 
@@ -114,16 +102,12 @@ def cmd_queue_list(args: argparse.Namespace) -> None:
 
     store = TaskStore()
     status = getattr(args, "status", None)
-    command = getattr(args, "command", None)
-    run_type = getattr(args, "run_type", None)
-    tasks = store.list_all(status, command=command, run_type=run_type)
+    tasks = store.list_all(status)
 
     output = {
         "status_filter": status,
-        "command_filter": command,
-        "run_type_filter": run_type,
         "count": len(tasks),
-        "tasks": tasks,
+        "tasks": [{**task, "run_type": "queued"} for task in tasks],
     }
     print(json.dumps(output, indent=2, default=str))
 
@@ -140,6 +124,7 @@ def cmd_queue_status(args: argparse.Namespace) -> None:
         return
 
     output = dict(task)
+    output["run_type"] = "queued"
     output["duration"] = _duration_str(task.get("started_at"), task.get("finished_at")) or None
     requested_output_path = output.get("output_path")
     artifacts = get_result_artifacts(task)

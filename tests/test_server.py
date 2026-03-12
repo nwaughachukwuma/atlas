@@ -190,13 +190,15 @@ class TestGetVideoEndpoint:
 
 
 class TestQueueListEndpoint:
-    """/queue/list calls TaskStore.list_all and returns structured JSON."""
+    """/queue/list delegates to the CLI queue command and returns queued tasks."""
 
     def test_queue_list_no_filter(self):
-        fake_store = MagicMock()
-        fake_store.list_all.return_value = [{"id": "t1", "status": "pending"}]
+        from atlas import server as server_module
 
-        with patch("atlas.task_queue.store.TaskStore", return_value=fake_store):
+        def fake_queue_list(_args):
+            print(json.dumps({"status_filter": None, "count": 1, "tasks": [{"id": "t1", "status": "pending"}]}))
+
+        with patch.object(server_module, "cmd_queue_list", fake_queue_list):
             client = TestClient(create_app())
             resp = client.get("/queue/list")
 
@@ -207,10 +209,15 @@ class TestQueueListEndpoint:
         assert body["tasks"][0]["id"] == "t1"
 
     def test_queue_list_with_status_filter(self):
-        fake_store = MagicMock()
-        fake_store.list_all.return_value = []
+        from atlas import server as server_module
 
-        with patch("atlas.task_queue.store.TaskStore", return_value=fake_store):
+        captured: dict[str, Any] = {}
+
+        def fake_queue_list(args):
+            captured.update(vars(args))
+            print(json.dumps({"status_filter": args.status, "count": 0, "tasks": []}))
+
+        with patch.object(server_module, "cmd_queue_list", fake_queue_list):
             client = TestClient(create_app())
             resp = client.get("/queue/list", params={"status": "running"})
 
@@ -218,43 +225,19 @@ class TestQueueListEndpoint:
         body = resp.json()
         assert body["status_filter"] == "running"
         assert body["count"] == 0
-        fake_store.list_all.assert_called_once_with("running", command=None, run_type=None)
-
-    def test_queue_list_with_command_and_run_type_filter(self):
-        fake_store = MagicMock()
-        fake_store.list_all.return_value = [{"id": "r1", "command": "transcribe", "run_type": "direct"}]
-
-        with patch("atlas.task_queue.store.TaskStore", return_value=fake_store):
-            client = TestClient(create_app())
-            resp = client.get("/queue/list", params={"command": "transcribe", "run_type": "direct"})
-
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["command_filter"] == "transcribe"
-        assert body["run_type_filter"] == "direct"
-        fake_store.list_all.assert_called_once_with(None, command="transcribe", run_type="direct")
+        assert captured == {"status": "running"}
 
 
 class TestQueueStatusEndpoint:
-    """/queue/status/{task_id} returns task details or 404."""
+    """/queue/status/{task_id} delegates to the CLI queue status command."""
 
-    def test_queue_status_found_no_output(self, tmp_path):
-        fake_store = MagicMock()
-        fake_store.get.return_value = {
-            "id": "abc123",
-            "status": "completed",
-            "started_at": "2024-01-01T00:00:00",
-            "finished_at": "2024-01-01T00:01:00",
-        }
+    def test_queue_status_found_no_output(self):
+        from atlas import server as server_module
 
-        results_dir = tmp_path / "queue_results"
-        results_dir.mkdir()
+        def fake_queue_status(_args):
+            print(json.dumps({"id": "abc123", "status": "completed"}))
 
-        with (
-            patch("atlas.task_queue.store.TaskStore", return_value=fake_store),
-            patch("atlas.task_queue.commands._duration_str", return_value="60.0s"),
-            patch("atlas.task_queue.config.RESULTS_DIR", results_dir),
-        ):
+        with patch.object(server_module, "cmd_queue_status", fake_queue_status):
             client = TestClient(create_app())
             resp = client.get("/queue/status/abc123")
 
@@ -263,29 +246,24 @@ class TestQueueStatusEndpoint:
         assert body["id"] == "abc123"
         assert body["status"] == "completed"
 
-    def test_queue_status_found_with_output_json(self, tmp_path):
-        fake_store = MagicMock()
-        fake_store.get.return_value = {
-            "id": "abc123",
-            "status": "completed",
-            "started_at": "2024-01-01T00:00:00",
-            "finished_at": "2024-01-01T00:01:00",
-        }
+    def test_queue_status_found_with_output_json(self):
+        from atlas import server as server_module
 
-        results_dir = tmp_path / "queue_results"
-        task_dir = results_dir / "abc123"
-        task_dir.mkdir(parents=True)
-        output_path = task_dir / "output.json"
-        output_path.write_text(json.dumps({"ok": True, "segments": 3}))
+        def fake_queue_status(_args):
+            print(
+                json.dumps(
+                    {
+                        "id": "abc123",
+                        "status": "completed",
+                        "output_path": "/tmp/output.json",
+                        "benchmark_path": "/tmp/benchmark.txt",
+                        "result": {"ok": True, "segments": 3},
+                        "benchmark_text": "|...|",
+                    }
+                )
+            )
 
-        benchmark_path = task_dir / "benchmark.txt"
-        benchmark_path.write_text("|...|")
-
-        with (
-            patch("atlas.task_queue.store.TaskStore", return_value=fake_store),
-            patch("atlas.task_queue.commands._duration_str", return_value="60.0s"),
-            patch("atlas.task_queue.config.RESULTS_DIR", results_dir),
-        ):
+        with patch.object(server_module, "cmd_queue_status", fake_queue_status):
             client = TestClient(create_app())
             resp = client.get("/queue/status/abc123")
 
@@ -293,23 +271,51 @@ class TestQueueStatusEndpoint:
         body = resp.json()
         assert body["id"] == "abc123"
         assert body["status"] == "completed"
-        assert body["output_path"] == str(output_path)
-        assert body["benchmark_path"] == str(benchmark_path)
+        assert body["output_path"] == "/tmp/output.json"
+        assert body["benchmark_path"] == "/tmp/benchmark.txt"
         assert body["result"] == {"ok": True, "segments": 3}
         assert body["benchmark_text"] == "|...|"
 
-        # verify the content of output_path
-        output_content = json.loads(output_path.read_text())
-        assert output_content["ok"] is True
-        assert output_content["segments"] == 3
-
     def test_queue_status_not_found(self):
-        fake_store = MagicMock()
-        fake_store.get.return_value = None
+        from atlas import server as server_module
 
-        with patch("atlas.task_queue.store.TaskStore", return_value=fake_store):
+        def fake_queue_status(_args):
+            print(json.dumps({"error": "Task missing not found"}))
+
+        with patch.object(server_module, "cmd_queue_status", fake_queue_status):
             client = TestClient(create_app())
             resp = client.get("/queue/status/missing")
+
+        assert resp.status_code == 404
+
+
+class TestRunsEndpoints:
+    def test_runs_list_with_filters(self):
+        from atlas import server as server_module
+
+        captured: dict[str, Any] = {}
+
+        def fake_runs_list(args):
+            captured.update(vars(args))
+            print(json.dumps({"count": 1, "tasks": [{"id": "run1", "run_type": "direct"}]}))
+
+        with patch.object(server_module, "cmd_runs_list", fake_runs_list):
+            client = TestClient(create_app())
+            resp = client.get("/runs/list", params={"command": "transcribe", "run_type": "direct"})
+
+        assert resp.status_code == 200
+        assert resp.json()["tasks"][0]["id"] == "run1"
+        assert captured == {"status": None, "command": "transcribe", "run_type": "direct"}
+
+    def test_runs_status_not_found(self):
+        from atlas import server as server_module
+
+        def fake_runs_status(_args):
+            print(json.dumps({"error": "Run missing not found"}))
+
+        with patch.object(server_module, "cmd_runs_status", fake_runs_status):
+            client = TestClient(create_app())
+            resp = client.get("/runs/status/missing")
 
         assert resp.status_code == 404
 

@@ -32,6 +32,8 @@ from atlas.cli import (
     cmd_serve,
     cmd_stats,
     cmd_transcribe,
+    cmd_runs_list,
+    cmd_runs_status,
     format_elapsed,
     parse_duration,
     short_name,
@@ -82,6 +84,7 @@ class TestParserConstruction:
             "list-chat",
             "stats",
             "queue",
+            "runs",
             "get-video",
             "serve",
         }
@@ -227,6 +230,18 @@ class TestParserConstruction:
             ns = parser.parse_args(cmd)
             assert ns.benchmark is True, f"--benchmark not set for: {cmd}"
 
+    def test_runs_list_filters(self, parser):
+        ns = parser.parse_args(
+            ["runs", "list", "--status", "completed", "--command", "transcribe", "--run-type", "direct"]
+        )
+        assert ns.status == "completed"
+        assert ns.command == "transcribe"
+        assert ns.run_type == "direct"
+
+    def test_runs_status(self, parser):
+        ns = parser.parse_args(["runs", "status", "--run-id", "run123"])
+        assert ns.run_id == "run123"
+
     # ---- shared --no-queue / --no-streaming flags ----
 
     def test_no_queue_flag(self, parser):
@@ -251,6 +266,8 @@ class TestParserConstruction:
             "list-videos": (cmd_list_videos, ["list-videos"]),
             "list-chat": (cmd_list_chat, ["list-chat", "vid1"]),
             "stats": (cmd_stats, ["stats"]),
+            "runs-list": (cmd_runs_list, ["runs", "list"]),
+            "runs-status": (cmd_runs_status, ["runs", "status", "--run-id", "run123"]),
             "get-video": (cmd_get_data, ["get-video", "vid1"]),
             "serve": (cmd_serve, ["serve"]),
         }
@@ -678,16 +695,16 @@ class TestCmdTranscribe:
             cmd_transcribe(self._args(str(video)))
 
     def test_success_persists_direct_run(self, tmp_path, progress_ctx, monkeypatch):
-        from atlas.task_queue.store import TaskStore
+        from atlas.task_queue.run_history_store import RunHistoryStore
 
         results_dir = tmp_path / "results"
         video = tmp_path / "v.mp4"
         video.touch()
-        store = TaskStore(db_path=tmp_path / "q.db")
+        store = RunHistoryStore(db_path=tmp_path / "q.db")
         monkeypatch.setattr("atlas.task_queue.helpers.RESULTS_DIR", results_dir)
 
         def fake_start_direct_run(command, video_path, output_path, benchmark):
-            store.add("run123", command, f"{command} {video_path.name}", output_path, benchmark, run_type="direct")
+            store.add("run123", command, f"{command} {video_path.name}", run_type="direct", output_path=output_path, benchmark=benchmark)
             store.mark_running("run123")
             return "run123", store
 
@@ -886,28 +903,6 @@ class TestTaskStore:
         assert ctask is not None
         assert ctask["status"] == "completed"
 
-    def test_status_transitions_store_result_metadata(self, tmp_path):
-        from atlas.task_queue import TaskStore
-
-        store = TaskStore(db_path=tmp_path / "test.db")
-        store.add("t1", "extract", "extract v.mp4", run_type="direct")
-        store.mark_running("t1")
-        store.mark_completed(
-            "t1",
-            result_text='{"ok": true}',
-            result_path="/tmp/output.json",
-            benchmark_text="Benchmark Summary",
-            benchmark_path="/tmp/benchmark.txt",
-        )
-
-        task = store.get("t1")
-        assert task is not None
-        assert task["run_type"] == "direct"
-        assert task["result_text"] == '{"ok": true}'
-        assert task["result_path"] == "/tmp/output.json"
-        assert task["benchmark_text"] == "Benchmark Summary"
-        assert task["benchmark_path"] == "/tmp/benchmark.txt"
-
     def test_mark_failed(self, tmp_path):
         from atlas.task_queue import TaskStore
 
@@ -946,17 +941,6 @@ class TestTaskStore:
         running = store.list_all("running")
         assert len(running) == 1
         assert running[0]["id"] == "t1"
-
-    def test_list_all_can_filter_by_command_and_run_type(self, tmp_path):
-        from atlas.task_queue import TaskStore
-
-        store = TaskStore(db_path=tmp_path / "test.db")
-        store.add("t1", "extract", "extract v1.mp4", run_type="queued")
-        store.add("t2", "transcribe", "transcribe v2.mp4", run_type="direct")
-
-        direct_transcribes = store.list_all(command="transcribe", run_type="direct")
-        assert len(direct_transcribes) == 1
-        assert direct_transcribes[0]["id"] == "t2"
 
     def test_active_count(self, tmp_path):
         from atlas.task_queue import TaskStore
@@ -1050,6 +1034,50 @@ class TestTaskQueueSubmit:
         assert (results_dir / task_id / "args.json").exists()
 
 
+class TestRunHistoryStore:
+    def test_add_and_get(self, tmp_path):
+        from atlas.task_queue.run_history_store import RunHistoryStore
+
+        store = RunHistoryStore(db_path=tmp_path / "runs.db")
+        store.add("r1", "transcribe", "transcribe video.mp4", run_type="direct")
+        run = store.get("r1")
+        assert run is not None
+        assert run["id"] == "r1"
+        assert run["run_type"] == "direct"
+
+    def test_status_transitions_store_result_metadata(self, tmp_path):
+        from atlas.task_queue.run_history_store import RunHistoryStore
+
+        store = RunHistoryStore(db_path=tmp_path / "runs.db")
+        store.add("r1", "extract", "extract v.mp4", run_type="queued")
+        store.mark_running("r1")
+        store.mark_completed(
+            "r1",
+            result_text='{"ok": true}',
+            result_path="/tmp/output.json",
+            benchmark_text="Benchmark Summary",
+            benchmark_path="/tmp/benchmark.txt",
+        )
+
+        run = store.get("r1")
+        assert run is not None
+        assert run["status"] == "completed"
+        assert run["run_type"] == "queued"
+        assert run["result_text"] == '{"ok": true}'
+        assert run["benchmark_path"] == "/tmp/benchmark.txt"
+
+    def test_list_all_can_filter_by_command_and_run_type(self, tmp_path):
+        from atlas.task_queue.run_history_store import RunHistoryStore
+
+        store = RunHistoryStore(db_path=tmp_path / "runs.db")
+        store.add("r1", "extract", "extract v1.mp4", run_type="queued")
+        store.add("r2", "transcribe", "transcribe v2.mp4", run_type="direct")
+
+        direct_transcribes = store.list_all(command="transcribe", run_type="direct")
+        assert len(direct_transcribes) == 1
+        assert direct_transcribes[0]["id"] == "r2"
+
+
 class TestSerializeResult:
     def test_none(self):
         from atlas.task_queue import serialize_result
@@ -1114,7 +1142,6 @@ class TestQueueCLICommands:
         from atlas.task_queue import TaskStore, cmd_queue_status
 
         db_path = tmp_path / "q.db"
-        monkeypatch.setattr("atlas.task_queue.commands.RESULTS_DIR", tmp_path / "results")
         store = TaskStore(db_path=db_path)
         store.add("abc12345", "index", "index v.mp4")
 
@@ -1125,11 +1152,34 @@ class TestQueueCLICommands:
     def test_queue_status_not_found(self, tmp_path, monkeypatch):
         from atlas.task_queue import TaskStore, cmd_queue_status
 
-        monkeypatch.setattr("atlas.task_queue.commands.RESULTS_DIR", tmp_path / "results")
         monkeypatch.setattr("atlas.task_queue.commands.TaskStore", lambda: TaskStore(db_path=tmp_path / "q.db"))
 
         args = argparse.Namespace(task_id="nonexistent")
         cmd_queue_status(args)  # should not raise, just prints "not found"
+
+
+class TestRunsCLICommands:
+    def test_runs_list_with_filters(self, tmp_path, monkeypatch):
+        from atlas.cli.cmd_runs import cmd_runs_list
+        from atlas.task_queue.run_history_store import RunHistoryStore
+
+        store = RunHistoryStore(db_path=tmp_path / "runs.db")
+        store.add("r1", "transcribe", "transcribe v.mp4", run_type="direct")
+        monkeypatch.setattr("atlas.cli.cmd_runs.RunHistoryStore", lambda: store)
+
+        args = argparse.Namespace(status=None, command="transcribe", run_type="direct")
+        cmd_runs_list(args)
+
+    def test_runs_status_found(self, tmp_path, monkeypatch):
+        from atlas.cli.cmd_runs import cmd_runs_status
+        from atlas.task_queue.run_history_store import RunHistoryStore
+
+        store = RunHistoryStore(db_path=tmp_path / "runs.db")
+        store.add("r1", "extract", "extract v.mp4", run_type="queued")
+        monkeypatch.setattr("atlas.cli.cmd_runs.RunHistoryStore", lambda: store)
+
+        args = argparse.Namespace(run_id="r1")
+        cmd_runs_status(args)
 
 
 class TestCmdTranscribeQueued:

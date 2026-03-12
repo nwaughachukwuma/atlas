@@ -25,6 +25,7 @@ from .config import RESULTS_DIR, TASK_TIMEOUT
 from .helpers import persist_benchmark, persist_result, worker_log_file_for
 from .notify import notify
 from .store import TaskStore
+from .run_history_store import RunHistoryStore
 from ..logger import get_logger
 
 logger = get_logger("atlas:worker")
@@ -70,6 +71,7 @@ def run_task(task_id: str) -> None:
     load_dotenv()
 
     store = TaskStore()
+    history = RunHistoryStore()
     task = store.get(task_id)
     if not task:
         logger.error("Task %s not found in database", task_id)
@@ -85,12 +87,14 @@ def run_task(task_id: str) -> None:
     func_path = _COMMANDS.get(command)
     if not func_path:
         store.mark_failed(task_id, f"Unknown command: {command}")
+        history.mark_failed(task_id, f"Unknown command: {command}")
         logger.error("Unknown command %r for task %s", command, task_id)
         return
 
     # Load serialised arguments.
     if not args_file.exists():
         store.mark_failed(task_id, "args.json missing — cannot reconstruct arguments")
+        history.mark_failed(task_id, "args.json missing — cannot reconstruct arguments")
         return
 
     args_dict = json.loads(args_file.read_text())
@@ -98,6 +102,7 @@ def run_task(task_id: str) -> None:
 
     func = _import_func(func_path)
     store.mark_running(task_id)
+    history.mark_running(task_id)
     logger.info("Worker started for task %s (%s)", task_id, command)
 
     t_start = perf_counter()
@@ -110,7 +115,8 @@ def run_task(task_id: str) -> None:
             # Timeout reached — the main thread is still blocked.
             error_payload = {"error": f"Exceeded {TASK_TIMEOUT}s timeout"}
             result_text, result_path = persist_result(task_id, error_payload, output_path=output_path)
-            store.mark_timeout(task_id, result_text=result_text, result_path=result_path)
+            store.mark_timeout(task_id)
+            history.mark_timeout(task_id, result_text=result_text, result_path=result_path)
             notify(
                 "Atlas Task Status",
                 f"[timeout]: {command} ({task_id}) — exceeded {TASK_TIMEOUT}s",
@@ -133,7 +139,8 @@ def run_task(task_id: str) -> None:
         benchmark_text, benchmark_path = (None, None)
         if benchmark:
             benchmark_text, benchmark_path = persist_benchmark(task_id, total_s=perf_counter() - t_start)
-        store.mark_completed(
+        store.mark_completed(task_id)
+        history.mark_completed(
             task_id,
             result_text=content,
             result_path=result_path,
@@ -152,7 +159,8 @@ def run_task(task_id: str) -> None:
 
         error_msg = f"{type(exc).__name__}: {exc}"
         content, result_path = persist_result(task_id, {"error": error_msg}, output_path=output_path)
-        store.mark_failed(task_id, error_msg, result_text=content, result_path=result_path)
+        store.mark_failed(task_id, error_msg)
+        history.mark_failed(task_id, error_msg, result_text=content, result_path=result_path)
         notify(
             "Atlas Task Status",
             f"[failed]: {command} ({task_id}) — {error_msg[:120]}",

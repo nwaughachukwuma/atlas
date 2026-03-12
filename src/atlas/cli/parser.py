@@ -10,6 +10,7 @@ import argparse
 
 from .cmd_explore import cmd_chat, cmd_get_data, cmd_list_chat, cmd_list_videos, cmd_search, cmd_stats
 from .cmd_media import cmd_extract, cmd_index, cmd_transcribe
+from .cmd_runs import add_run_history_commands
 from .cmd_server import cmd_serve
 from .._meta import PROGRAM_NAME, __version__
 
@@ -58,6 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  atlas stats\n"
             "  atlas queue list\n"
             "  atlas queue status --task-id abc123\n"
+            "  atlas runs list\n"
         ),
     )
     parser.add_argument("--version", action="version", version=f"{PROGRAM_NAME} {__version__}")
@@ -298,5 +300,6 @@ def build_parser() -> argparse.ArgumentParser:
     from ..task_queue import add_queue_commands
 
     add_queue_commands(sub)
+    add_run_history_commands(sub)
 
     return parser
