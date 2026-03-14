@@ -19,7 +19,7 @@ from src.atlas.vector_store import (
 )
 from src.atlas.vector_store.base import BaseCollection, get_or_create_collection
 from src.atlas.vector_store.video_chat import default_video_chat
-from src.atlas.vector_store.video_index import DEFAULT_STORE_ROOT, default_video_index
+from src.atlas.vector_store.video_index import default_video_index
 from src.atlas.video_processor import VideoDescription
 
 # ---------------------------------------------------------------------------
@@ -166,12 +166,7 @@ class TestVideoIndex:
 
     def test_initialization(self, tmp_path):
         vi = VideoIndex(col_path=tmp_path / "video_index")
-        assert vi.embedding_dim == 768
         assert vi.col_path == tmp_path / "video_index"
-
-    def test_custom_embedding_dim(self, tmp_path):
-        vi = VideoIndex(col_path=tmp_path / "vi", embedding_dim=3072)
-        assert vi.embedding_dim == 3072
 
     def test_uuid(self, tmp_path):
         vi = VideoIndex(col_path=tmp_path / "video_index")
@@ -274,9 +269,10 @@ class TestVideoIndex:
             assert vi.get_video_data("nonexistent") is None
 
     def testdefault_video_index_helper(self):
+        from src.atlas.settings import settings
+
         vi = default_video_index()
-        assert vi.col_path == DEFAULT_STORE_ROOT / "video_index"
-        assert vi.embedding_dim == 768
+        assert vi.col_path == settings.zvec_store_root / "video_index"
 
     def test_collection_reuses_shared_handle(self, tmp_path):
         shared = MagicMock()
@@ -335,7 +331,6 @@ class TestVideoChat:
 
     def test_initialization(self, tmp_path):
         vc = VideoChat(col_path=tmp_path / "video_chat")
-        assert vc.embedding_dim == 768
         assert vc.col_path == tmp_path / "video_chat"
 
     def test_get_history_from_zvec(self, tmp_path):
@@ -394,9 +389,10 @@ class TestVideoChat:
         assert len(history) == 6
 
     def testdefault_video_chat_helper(self):
+        from src.atlas.settings import settings
+
         vc = default_video_chat()
-        assert vc.col_path == DEFAULT_STORE_ROOT / "video_chat"
-        assert vc.embedding_dim == 768
+        assert vc.col_path == settings.zvec_store_root / "video_chat"
 
     def test_uuid(self, tmp_path):
         vc = VideoChat(col_path=tmp_path / "video_chat")

@@ -13,12 +13,11 @@ authors = [
     { name = "VeedoAI", email = "c.nwaugha@gmail.com" }
 ]
 keywords = [
-    "video",
-    "multimodal",
-    "ai",
-    "gemini",
-    "transcription",
+    "ai video",
+    "multimodal ai",
+    "video transcription",
     "video-analysis",
+    "video-search",
     "vector-search",
 ]
 classifiers = [
@@ -44,7 +43,8 @@ dependencies = [
     "uvicorn>=0.34.0",
     "python-dotenv",
     "python-multipart>=0.0.22",
-    "nanoid"
+    "nanoid",
+    "pydantic-settings>=2.12.0"
 ]
 
 [project.optional-dependencies]

@@ -39,3 +39,18 @@ def serialize_result(result: Any) -> str:
 def results_dir_for(task_id: str) -> Path:
     """Return the results directory for a given task ID."""
     return RESULTS_DIR / task_id
+
+
+def output_file_for(task_id: str) -> Path:
+    """Return the canonical stored output file for a given task/run ID."""
+    return results_dir_for(task_id) / "output.json"
+
+
+def benchmark_file_for(task_id: str) -> Path:
+    """Return the canonical stored benchmark file for a given task/run ID."""
+    return results_dir_for(task_id) / "benchmark.txt"
+
+
+def worker_log_file_for(task_id: str) -> Path:
+    """Return the worker log file path for a queued task."""
+    return results_dir_for(task_id) / "worker.log"

@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, List, Optional
 from ..uuid import uuid
 
 if TYPE_CHECKING:
-    from zvec import Collection, CollectionSchema
+    from zvec import Collection, CollectionSchema, VectorSchema
 
 
 _zvec_init_lock = threading.Lock()
@@ -74,14 +74,16 @@ def make_vector_query(embedding: List[float]):
     return VectorQuery("embedding", vector=embedding)
 
 
-def build_base_vector_schema(embedding_dim: int):
+def build_base_vector_schema() -> "VectorSchema":
     """Return the common VectorSchema used by every collection."""
     from zvec import DataType, HnswIndexParam, MetricType, VectorSchema
+
+    from ..settings import settings
 
     return VectorSchema(
         name="embedding",
         data_type=DataType.VECTOR_FP32,
-        dimension=embedding_dim,
+        dimension=settings.embedding_dim,
         index_param=HnswIndexParam(metric_type=MetricType.COSINE),
     )
 
@@ -99,12 +101,10 @@ class BaseCollection(ABC):
 
     Args:
         col_path: Directory path for this collection.
-        embedding_dim: Embedding dimension — 768 or 3072.
     """
 
-    def __init__(self, col_path: Path, embedding_dim=768) -> None:
+    def __init__(self, col_path: Path) -> None:
         self.col_path = col_path
-        self.embedding_dim = embedding_dim
         self._collection: Optional["Collection"] = None
         self._init_zvec()
 

@@ -15,10 +15,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 from datetime import datetime
 from functools import lru_cache
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from pydantic import BaseModel
@@ -34,7 +32,6 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Module-level convenience functions
 # ---------------------------------------------------------------------------
-DEFAULT_STORE_ROOT = Path(os.environ.get("ATLAS_HOME", Path.home() / ".atlas")) / "index"
 COLLECTION_NAME = "video_index"
 DEFAULT_EMBEDDING_CONCURRENCY = 10
 
@@ -88,7 +85,6 @@ class VideoIndex(BaseCollection):
 
     Args:
         col_path: Directory for this collection (e.g. ~/.atlas/index/video_index).
-        embedding_dim: Embedding dimension — 768 or 3072.
     """
 
     # ------------------------------------------------------------------
@@ -100,7 +96,7 @@ class VideoIndex(BaseCollection):
 
         return CollectionSchema(
             name=COLLECTION_NAME,
-            vectors=[build_base_vector_schema(self.embedding_dim)],
+            vectors=[build_base_vector_schema()],
             fields=[
                 FieldSchema(
                     "video_id",
@@ -223,7 +219,7 @@ class VideoIndex(BaseCollection):
 
         async def _guarded_embed(content: str) -> List[float]:
             async with semaphore:
-                return await embed_text(content, self.embedding_dim)
+                return await embed_text(content, "RETRIEVAL_DOCUMENT")
 
         async def _embed_description(desc: VideoDescription):
             content = self._create_searchable_content(desc).strip()
@@ -282,7 +278,7 @@ class VideoIndex(BaseCollection):
         """
         from ..text_embedding import embed_text
 
-        query_embedding = await embed_text(query, self.embedding_dim)
+        query_embedding = await embed_text(query, "RETRIEVAL_QUERY")
         try:
             vector_query = make_vector_query(query_embedding)
             if video_id:
@@ -380,12 +376,11 @@ class VideoIndex(BaseCollection):
 
 
 @lru_cache(maxsize=16)
-def default_video_index(embedding_dim: int = 768) -> VideoIndex:
+def default_video_index() -> VideoIndex:
     """Return a VideoIndex object"""
-    return VideoIndex(
-        col_path=DEFAULT_STORE_ROOT / COLLECTION_NAME,
-        embedding_dim=embedding_dim,
-    )
+    from ..settings import settings
+
+    return VideoIndex(col_path=settings.zvec_store_root / COLLECTION_NAME)
 
 
 async def index_video(
@@ -394,7 +389,6 @@ async def index_video(
     overlap=1,
     description_attrs: Optional[List[DescriptionAttr]] = None,
     include_summary=True,
-    embedding_dim=768,
     on_segment: Optional[Callable[[VideoDescription], None]] = None,
 ) -> tuple[str, int, "VideoProcessorResult"]:
     """Process a video file, index it, and register it.
@@ -405,7 +399,6 @@ async def index_video(
         overlap: Overlap between chunks in seconds.
         description_attrs: List of attributes to extract (e.g., ["visual_cues", "interactions"]).
         include_summary: Whether to generate summaries for each segment.
-        embedding_dim: Embedding dimension (768 or 3072).
 
     Returns:
         (video_id, number_of_docs_indexed, VideoProcessorResult)
@@ -424,7 +417,7 @@ async def index_video(
     async with VideoProcessor(config) as processor:
         result = await processor.process(on_segment)
 
-        vi = default_video_index(embedding_dim)
+        vi = default_video_index()
         vi.col_path.mkdir(parents=True, exist_ok=True)
 
         video_id = uuid(16)
@@ -437,7 +430,6 @@ async def search_video(
     query: str,
     top_k: int = 10,
     video_id: Optional[str] = None,
-    embedding_dim: int = 768,
 ) -> List[SearchResult]:
     """Semantic search over indexed video segments.
 
@@ -445,10 +437,9 @@ async def search_video(
         query: Natural-language query.
         top_k: Number of results.
         video_id: Restrict to this video (optional).
-        embedding_dim: Embedding dimension (768 or 3072).
 
     Returns:
         List of SearchResult ordered by relevance.
     """
-    vi = default_video_index(embedding_dim)
+    vi = default_video_index()
     return await vi.search(query, top_k, video_id)

@@ -14,10 +14,8 @@ VideoChat.get_history(video_id, last_n)           — read ordered history from 
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime
 from functools import lru_cache
-from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel
@@ -29,7 +27,6 @@ from ..utils import logger
 # Module-level convenience helper
 # ---------------------------------------------------------------------------
 
-DEFAULT_STORE_ROOT = Path(os.environ.get("ATLAS_HOME", Path.home() / ".atlas")) / "index"
 COLLECTION_NAME = "video_chat"
 ChatRole = Literal["user", "assistant"]
 
@@ -74,7 +71,6 @@ class VideoChat(BaseCollection):
 
     Args:
         col_path: Directory for this collection (e.g. ~/.atlas/index/video_chat).
-        embedding_dim: Embedding dimension — 768 or 3072.
     """
 
     # ------------------------------------------------------------------
@@ -86,7 +82,7 @@ class VideoChat(BaseCollection):
 
         return CollectionSchema(
             name=COLLECTION_NAME,
-            vectors=[build_base_vector_schema(self.embedding_dim)],
+            vectors=[build_base_vector_schema()],
             fields=[
                 FieldSchema(
                     "video_id",
@@ -192,7 +188,7 @@ class VideoChat(BaseCollection):
         """
         from ..text_embedding import embed_text
 
-        embedding = await embed_text(content, self.embedding_dim)
+        embedding = await embed_text(content, "RETRIEVAL_DOCUMENT")
         doc_id = self._uuid()
         metadata = {"timestamp": datetime.now().isoformat()}
         zvec_doc = self._make_doc(
@@ -247,7 +243,7 @@ class VideoChat(BaseCollection):
         """
         from ..text_embedding import embed_text
 
-        query_embedding = await embed_text(query, self.embedding_dim)
+        query_embedding = await embed_text(query, "QUESTION_ANSWERING")
         try:
             vector_query = make_vector_query(query_embedding)
             filter = f"video_id = '{video_id}' AND role = '{role}'" if role else f"video_id = '{video_id}'"
@@ -274,9 +270,8 @@ class VideoChat(BaseCollection):
 
 
 @lru_cache(maxsize=16)
-def default_video_chat(embedding_dim=768) -> VideoChat:
+def default_video_chat() -> VideoChat:
     """Return a VideoChat object"""
-    return VideoChat(
-        col_path=DEFAULT_STORE_ROOT / COLLECTION_NAME,
-        embedding_dim=embedding_dim,
-    )
+    from ..settings import settings
+
+    return VideoChat(col_path=settings.zvec_store_root / COLLECTION_NAME)

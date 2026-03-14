@@ -946,13 +946,15 @@ class TestTaskQueueSubmit:
     def test_submit_returns_task_id(self, tmp_path, monkeypatch):
         from atlas.task_queue import TaskQueue
 
-        # Redirect RESULTS_DIR to tmp
-        monkeypatch.setattr("atlas.task_queue.queue.RESULTS_DIR", tmp_path / "results")
+        # Redirect RESULTS_DIR to tmp in every module that holds a binding
+        results = tmp_path / "results"
+        monkeypatch.setattr("atlas.task_queue.queue.RESULTS_DIR", results)
+        monkeypatch.setattr("atlas.task_queue.helpers.RESULTS_DIR", results)
 
         # Prevent real subprocess spawn
         monkeypatch.setattr("atlas.task_queue.queue.subprocess.Popen", lambda *a, **kw: None)
 
-        queue = TaskQueue(max_workers=1, db_path=tmp_path / "q.db")
+        queue = TaskQueue(db_path=tmp_path / "q.db")
         task_id = queue.submit(
             argparse.Namespace(video_path="test.mp4"),
             command="transcribe",
@@ -970,9 +972,10 @@ class TestTaskQueueSubmit:
 
         results_dir = tmp_path / "results"
         monkeypatch.setattr("atlas.task_queue.queue.RESULTS_DIR", results_dir)
+        monkeypatch.setattr("atlas.task_queue.helpers.RESULTS_DIR", results_dir)
         monkeypatch.setattr("atlas.task_queue.queue.subprocess.Popen", lambda *a, **kw: None)
 
-        queue = TaskQueue(max_workers=1, db_path=tmp_path / "q.db")
+        queue = TaskQueue(db_path=tmp_path / "q.db")
         task_id = queue.submit(argparse.Namespace(), command="test")
         assert (results_dir / task_id).is_dir()
         # Verify args.json was written
@@ -1043,7 +1046,6 @@ class TestQueueCLICommands:
         from atlas.task_queue import TaskStore, cmd_queue_status
 
         db_path = tmp_path / "q.db"
-        monkeypatch.setattr("atlas.task_queue.commands.RESULTS_DIR", tmp_path / "results")
         store = TaskStore(db_path=db_path)
         store.add("abc12345", "index", "index v.mp4")
 
@@ -1083,5 +1085,4 @@ class TestCmdTranscribeQueued:
 
         with patch("atlas.cli.cmd_media.validate_api_keys"):
             cmd_transcribe(args)  # should queue and return without error
-
         mock_queue.submit.assert_called_once()

@@ -81,10 +81,10 @@ from .cmd_media import (
 from .cmd_media import (
     cmd_transcribe as cmd_transcribe,
 )
-from .cmd_server import (  # noqa: E402
+from .cmd_server import (
     cmd_serve as cmd_serve,
 )
-from .helpers import (  # noqa: E402
+from .helpers import (
     err as err,
 )
 from .helpers import (

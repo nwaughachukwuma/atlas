@@ -4,17 +4,15 @@ Task queue configuration — constants, paths, and status enum
 
 from __future__ import annotations
 
-import os
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
+from ..settings import settings
+
 # ── Worker & timeout knobs ────────────────────────────────────────────────────
 
-DEFAULT_WORKERS = 2
-MAX_WORKERS = 2
 TASK_TIMEOUT = 600  # seconds (10 minutes)
-ATLAS_HOME = Path(os.environ.get("ATLAS_HOME", Path.home() / ".atlas"))
 HEARTBEAT_INTERVAL = 10  # seconds between heartbeat checks
 
 # ── Concurrency policy ────────────────────────────────────────────────────────
@@ -30,7 +28,7 @@ HEAVY_COMMANDS: frozenset[str] = frozenset({"extract", "index"})
 
 # ── File-system paths ─────────────────────────────────────────────────────────
 
-QUEUE_DIR = ATLAS_HOME / "queue"
+QUEUE_DIR = Path(settings.atlas_home) / "queue"
 DB_PATH = QUEUE_DIR / "tasks.db"
 RESULTS_DIR = QUEUE_DIR / "queued_tasks" / "results"
 
@@ -38,7 +36,6 @@ RESULTS_DIR = QUEUE_DIR / "queued_tasks" / "results"
 
 MAX_FAILED_TASKS = 150
 MAX_COMPLETED_TASKS = 100
-
 
 # ── Task status ───────────────────────────────────────────────────────────────
 
