@@ -298,6 +298,5 @@ def build_parser() -> argparse.ArgumentParser:
     from ..task_queue import add_queue_commands
 
     add_queue_commands(sub)
-    add_run_history_commands(sub)
 
     return parser

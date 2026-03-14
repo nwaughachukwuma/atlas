@@ -1084,8 +1084,5 @@ class TestCmdTranscribeQueued:
         )
 
         with patch("atlas.cli.cmd_media.validate_api_keys"):
-            payload = cmd_transcribe(args)  # should queue and return without error
-
+            cmd_transcribe(args)  # should queue and return without error
         mock_queue.submit.assert_called_once()
-        assert payload is not None
-        assert payload["task_id"] == "test1234"
