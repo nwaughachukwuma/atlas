@@ -81,12 +81,6 @@ from .cmd_media import (
 from .cmd_media import (
     cmd_transcribe as cmd_transcribe,
 )
-from .cmd_runs import (
-    cmd_runs_list as cmd_runs_list,
-)
-from .cmd_runs import (
-    cmd_runs_status as cmd_runs_status,
-)
 from .cmd_server import (
     cmd_serve as cmd_serve,
 )

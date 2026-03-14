@@ -160,28 +160,6 @@ def print_queued_info(
     console.print("  [dim]You can keep using Atlas for new tasks.[/dim]")
 
 
-def print_saved_run_info(
-    console: "Console",
-    run_id: str,
-    command: str,
-    *,
-    output_path: str,
-    requested_output_path: Optional[str] = None,
-    benchmark_path: Optional[str] = None,
-) -> None:
-    """Print standardised information for a direct run persisted to disk."""
-    console.print("\n[bold green]✓ Result persisted[/bold green]")
-    console.print(f"  [cyan]Run ID:[/cyan]     {run_id}")
-    console.print(f"  [cyan]Command:[/cyan]    {command}")
-    console.print(f"  [cyan]Output:[/cyan]     {output_path}")
-    if requested_output_path:
-        console.print(f"  [cyan]Also at:[/cyan]    {requested_output_path}")
-    if benchmark_path:
-        console.print(f"  [cyan]Benchmark:[/cyan]  {benchmark_path}")
-    console.print(f"\n  [dim]Inspect this run:[/dim] atlas runs status --run-id {run_id}")
-    console.print("  [dim]Browse saved runs:[/dim] atlas runs list")
-
-
 def print_benchmark_summary() -> None:
     """Print benchmark timing table if --benchmark was requested (set by ``_state``)."""
     from . import _state, get_console
