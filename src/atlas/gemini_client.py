@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Literal
 
 from google import genai
 
+from .prompts import VideoAnalysisSchema
 from .utils import RetryConfig, logger, process_time, retry
 
 if TYPE_CHECKING:
@@ -75,25 +76,27 @@ class GeminiMediaEngine:
         file_part: "genai_types.Part",
         system_prompt: str,
         prompt: str = "Now, describe the video.",
-    ) -> str:
+    ) -> VideoAnalysisSchema:
         """Describe audio/video media file using Gemini"""
         from google.genai import types
 
         @retry(RetryConfig(max_retries=1, delay=3, backoff=1.5))
-        async def _handler(model_name: str) -> str:
+        async def _handler(model_name: str) -> VideoAnalysisSchema:
             response = await self.client.aio.models.generate_content(
                 model=model_name,
                 contents=[file_part, prompt],
                 config=types.GenerateContentConfig(
                     temperature=0.1,
-                    max_output_tokens=240,
-                    response_mime_type="text/plain",
+                    max_output_tokens=1024,
                     system_instruction=system_prompt,
+                    response_mime_type="application/json",
+                    response_schema=VideoAnalysisSchema.model_json_schema(),
                 ),
             )
+
             if not response.text:
                 raise ValueError("Error describing media using Gemini")
-            return response.text
+            return VideoAnalysisSchema.model_validate_json(response.text)
 
         try:
             return await _handler("gemini-3.1-flash-lite-preview")

@@ -41,6 +41,11 @@ def results_dir_for(task_id: str) -> Path:
     return RESULTS_DIR / task_id
 
 
+def input_file_for(task_id: str, source_path: Path) -> Path:
+    """Return the staged input file path for a queued task."""
+    return results_dir_for(task_id) / f"input{source_path.suffix}"
+
+
 def output_file_for(task_id: str) -> Path:
     """Return the canonical stored output file for a given task/run ID."""
     return results_dir_for(task_id) / "output.json"

@@ -212,7 +212,7 @@
               use:route
               class="text-[0.82rem] font-semibold"
             >
-              Queue task →
+              Task →
             </a>
           {/if}
         </div>

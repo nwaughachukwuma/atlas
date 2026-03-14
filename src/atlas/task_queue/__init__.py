@@ -32,6 +32,7 @@ from .config import (
 )
 from .helpers import (
     benchmark_file_for,
+    input_file_for,
     output_file_for,
     results_dir_for,
     serialize_result,
@@ -63,6 +64,7 @@ __all__ = [
     "get_queue",
     # helpers
     "benchmark_file_for",
+    "input_file_for",
     "output_file_for",
     "serialize_result",
     "worker_log_file_for",

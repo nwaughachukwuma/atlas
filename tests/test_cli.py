@@ -1104,6 +1104,34 @@ class TestTaskQueueSubmit:
         assert run["command"] == "transcribe"
         assert run["benchmark_path"].endswith("benchmark.txt")
 
+    def test_submit_stages_temp_upload_for_worker(self, tmp_path, monkeypatch):
+        from atlas.task_queue import TaskQueue
+
+        results_dir = tmp_path / "results"
+        upload_dir = tmp_path / "atlas_upload_case"
+        upload_dir.mkdir()
+        source_video = upload_dir / "upload_test.mp4"
+        source_video.write_bytes(b"video-bytes")
+
+        monkeypatch.setattr("atlas.task_queue.queue.RESULTS_DIR", results_dir)
+        monkeypatch.setattr("atlas.task_queue.helpers.RESULTS_DIR", results_dir)
+        monkeypatch.setattr("atlas.task_queue.queue.subprocess.Popen", lambda *a, **kw: None)
+
+        queue = TaskQueue(db_path=tmp_path / "q.db")
+        task_id = queue.submit(
+            argparse.Namespace(video_path=str(source_video), _queue_stage_input=True),
+            command="transcribe",
+            label="transcribe upload_test.mp4",
+        )
+
+        staged_input = results_dir / task_id / "input.mp4"
+        args_data = json.loads((results_dir / task_id / "args.json").read_text())
+
+        assert not source_video.exists()
+        assert staged_input.exists()
+        assert args_data["video_path"] == str(staged_input)
+        assert args_data["_video_path_resolved"] == str(staged_input.resolve())
+
 
 class TestSerializeResult:
     def test_none(self):

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from .gemini_client import GeminiMediaEngine
 from .media_manager import MediaFileManager
-from .prompts import VideoPrompt, video_analysis_prompts, video_system_prompt
+from .prompts import VideoAnalysisSchema, video_analysis_prompt, video_system_prompt
 from .transcript import get_video_transcript
 from .utils import (
     DEFAULT_DESCRIPTION_ATTRS,
@@ -173,30 +173,27 @@ class VideoProcessor(MediaFileManager, GeminiMediaEngine):
     async def analyze_chunk_content(self, file_part: types.Part, chunk_path: str) -> list[VideoAttrAnalysis]:
         """Analyze video content and extract features."""
 
-        async def handler(video_prompt: VideoPrompt) -> VideoAttrAnalysis:
+        async def _attrs_handler():
             try:
-                if video_prompt.attr == "transcript":
-                    description = await get_video_transcript(chunk_path)
-                else:
-                    description = await self.describe_media_from_file(
-                        file_part,
-                        video_system_prompt(
-                            video_prompt.value,
-                            video_prompt.attr,
-                        ),
-                    )
+                analysis_schema = await self.describe_media_from_file(
+                    file_part,
+                    video_system_prompt(video_analysis_prompt, self.description_attrs),
+                )
             except Exception as e:
                 logger.error(f"Error getting video chunk analysis: {e}")
-                description = ""
+                analysis_schema = VideoAnalysisSchema()
 
-            return VideoAttrAnalysis(
-                value=description,
-                attr=video_prompt.attr,
-            )
+            return analysis_schema._to_attr_list()
 
-        return await asyncio.gather(
-            *[handler(v) for v in video_analysis_prompts if v.attr in self.description_attrs],
-        )
+        async def _transcription_handler():
+            try:
+                description = await get_video_transcript(chunk_path)
+            except Exception as e:
+                logger.error(f"Error getting video chunk analysis: {e}")
+            return VideoAttrAnalysis(value=description or "", attr="transcript")
+
+        result0, result1 = await asyncio.gather(_attrs_handler(), _transcription_handler())
+        return [*result0, result1]
 
     @process_time()
     async def analyze_video_chunk(self, chunk: MediaChunk) -> VideoDescription:

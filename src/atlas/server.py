@@ -183,6 +183,7 @@ def create_app() -> FastAPI:
             benchmark=benchmark,
             no_queue=no_queue,
             no_streaming=no_streaming,
+            _queue_stage_input=not no_queue,
         )
         return _run_command(cmd_extract, args, tmp_dir=saved.parent)
 
@@ -207,6 +208,7 @@ def create_app() -> FastAPI:
             benchmark=benchmark,
             no_queue=no_queue,
             no_streaming=no_streaming,
+            _queue_stage_input=not no_queue,
         )
         return _run_command(cmd_index, args, tmp_dir=saved.parent)
 
@@ -227,6 +229,7 @@ def create_app() -> FastAPI:
             benchmark=benchmark,
             no_queue=no_queue,
             no_streaming=no_streaming,
+            _queue_stage_input=not no_queue,
         )
         return _run_command(cmd_transcribe, args, tmp_dir=saved.parent)
 

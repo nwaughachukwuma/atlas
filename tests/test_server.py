@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import io
 import json
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -435,9 +436,115 @@ class TestMediaPostEndpoints:
 
         assert resp.status_code == 200
         # The temp directory should have been cleaned up
-        from pathlib import Path
-
         assert not Path(saved_path[0]).parent.exists()
+
+    def test_transcribe_queued_real_command_submits_durable_path(self, monkeypatch, tmp_path):
+        submitted: list[Any] = []
+
+        class FakeQueue:
+            def submit(self, args, **kwargs):
+                submitted.append((args, kwargs))
+                return "queued_transcribe_1"
+
+        monkeypatch.setattr("atlas.cli.cmd_media.validate_api_keys", lambda **_: None)
+        monkeypatch.setattr("atlas.task_queue.get_queue", lambda: FakeQueue())
+
+        client = TestClient(create_app())
+        resp = client.post(
+            "/transcribe",
+            files={"video": _fake_video()},
+            data={"no_queue": "false", "format": "text"},
+        )
+
+        assert resp.status_code == 200
+        queued_args, queued_kwargs = submitted[0]
+        queued_path = Path(queued_args.video_path)
+        assert queued_kwargs["command"] == "transcribe"
+        assert queued_args._queue_stage_input is True
+        assert queued_path.parent.name.startswith("atlas_upload_")
+
+    def test_extract_queued_real_command_submits_durable_path(self, monkeypatch, tmp_path):
+        submitted: list[Any] = []
+
+        class FakeQueue:
+            def submit(self, args, **kwargs):
+                submitted.append((args, kwargs))
+                return "queued_extract_1"
+
+        monkeypatch.setattr("atlas.cli.cmd_media.validate_api_keys", lambda **_: None)
+        monkeypatch.setattr("atlas.task_queue.get_queue", lambda: FakeQueue())
+
+        client = TestClient(create_app())
+        resp = client.post(
+            "/extract",
+            files={"video": _fake_video()},
+            data={"no_queue": "false"},
+        )
+
+        assert resp.status_code == 200
+        queued_args, queued_kwargs = submitted[0]
+        queued_path = Path(queued_args.video_path)
+        assert queued_kwargs["command"] == "extract"
+        assert queued_args._queue_stage_input is True
+        assert queued_path.parent.name.startswith("atlas_upload_")
+
+    def test_index_queued_real_command_submits_durable_path(self, monkeypatch, tmp_path):
+        submitted: list[Any] = []
+
+        class FakeQueue:
+            def submit(self, args, **kwargs):
+                submitted.append((args, kwargs))
+                return "queued_index_1"
+
+        monkeypatch.setattr("atlas.cli.cmd_media.validate_api_keys", lambda **_: None)
+        monkeypatch.setattr("atlas.task_queue.get_queue", lambda: FakeQueue())
+
+        client = TestClient(create_app())
+        resp = client.post(
+            "/index",
+            files={"video": _fake_video()},
+            data={"no_queue": "false"},
+        )
+
+        assert resp.status_code == 200
+        queued_args, queued_kwargs = submitted[0]
+        queued_path = Path(queued_args.video_path)
+        assert queued_kwargs["command"] == "index"
+        assert queued_args._queue_stage_input is True
+        assert queued_path.parent.name.startswith("atlas_upload_")
+
+    def test_transcribe_queued_real_queue_serializes_durable_path(self, monkeypatch, tmp_path):
+        from atlas.task_queue import TaskQueue
+
+        results_dir = tmp_path / "results"
+        queue = TaskQueue(db_path=tmp_path / "queue.db")
+
+        monkeypatch.setattr("atlas.cli.cmd_media.validate_api_keys", lambda **_: None)
+        monkeypatch.setattr("atlas.task_queue.queue.RESULTS_DIR", results_dir)
+        monkeypatch.setattr("atlas.task_queue.helpers.RESULTS_DIR", results_dir)
+        monkeypatch.setattr("atlas.task_queue.queue.subprocess.Popen", lambda *a, **kw: None)
+        monkeypatch.setattr("atlas.task_queue.get_queue", lambda: queue)
+
+        client = TestClient(create_app())
+        resp = client.post(
+            "/transcribe",
+            files={"video": _fake_video()},
+            data={"no_queue": "false", "format": "text"},
+        )
+
+        assert resp.status_code == 200
+        task_id = resp.json()["task_id"]
+        args_file = results_dir / task_id / "args.json"
+        assert args_file.exists()
+
+        args_data = json.loads(args_file.read_text())
+        serialized_path = Path(args_data["video_path"])
+        resolved_path = Path(args_data["_video_path_resolved"])
+        assert serialized_path.exists()
+        assert serialized_path.parent == results_dir / task_id
+        assert serialized_path.name == "input.mp4"
+        assert resolved_path == serialized_path.resolve()
+        assert "atlas_upload_" not in str(serialized_path)
 
 
 class TestRunEndpoints:
