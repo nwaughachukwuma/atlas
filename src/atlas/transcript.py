@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Callable, Literal, Optional, TypedDict
 
 from .media_manager import MediaFileManager
+from .settings import settings
 from .utils import (
     ChunkSlot,
     MediaChunk,
@@ -55,7 +56,6 @@ class ProcessTranscriptResult:
 
 
 ReturnValue = Literal["text", "vtt", "srt"]
-WhisperModel = Literal["whisper-large-v3-turbo", "whisper-large-v3"]
 
 
 def get_groq_api_key() -> str:
@@ -189,7 +189,6 @@ class ProcessTranscript(MediaFileManager):
     @process_time()
     async def _run_transcription_groq(
         self,
-        model: WhisperModel,
         file_path: str,
         response_format: Literal["text", "json", "verbose_json"] = "verbose_json",
     ):
@@ -208,16 +207,14 @@ class ProcessTranscript(MediaFileManager):
             try:
                 return self.groq_client.audio.transcriptions.create(
                     file=file_ref,
-                    model=model,
+                    model=settings.whisper_models[0],
                     response_format=response_format,
                 )
             except Exception as e:
-                if model == "whisper-large-v3":
-                    raise e
-                # Fallback to whisper-large-v3
+                logger.info("Retrying transcription with fallback model due to error: %s", e)
                 return self.groq_client.audio.transcriptions.create(
                     file=file_ref,
-                    model="whisper-large-v3",
+                    model=settings.whisper_models[1],
                     response_format=response_format,
                 )
 
@@ -228,7 +225,6 @@ class ProcessTranscript(MediaFileManager):
         Get transcript for a media file chunk
         """
         transcription = await self._run_transcription_groq(
-            "whisper-large-v3-turbo",
             file_path,
             response_format="text" if self.return_value == "text" else "verbose_json",
         )

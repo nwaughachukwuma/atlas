@@ -17,27 +17,24 @@ class TextEmbedding:
     def __init__(self, content: str):
         self.content = content
 
-    async def get_embedding(
-        self,
-        task_type: TaskType,
-        dimensionality=768,
-    ) -> list[float]:
+    async def get_embedding(self, task_type: TaskType) -> list[float]:
         """Get text embedding using Gemini embedding model
         Args:
-            dimensionality: Output dimension (768 or 3072 for gemini-embedding-001)
+            task_type: The type of task for which the embedding will be used. Affects how Gemini processes the content.
         Returns:
             List of embedding values
         """
         from google.genai import types
 
         from .gemini_client import gemini_client
+        from .settings import settings
 
         try:
             result = await gemini_client.aio.models.embed_content(
-                model="gemini-embedding-001",
+                model=settings.embedding_model,
                 contents=self.content,
                 config=types.EmbedContentConfig(
-                    output_dimensionality=dimensionality,
+                    output_dimensionality=settings.embedding_dim,
                     task_type=task_type,
                 ),
             )
@@ -52,16 +49,12 @@ class TextEmbedding:
             raise
 
 
-async def embed_text(
-    content: str,
-    task_type: TaskType,
-    dimensionality=768,
-) -> list[float]:
+async def embed_text(content: str, task_type: TaskType) -> list[float]:
     """Convenience method to get text embedding
     Args:
         content: Text content to embed
-        dimensionality: Output dimension (768 or 3072)
+        task_type: The type of task for which the embedding will be used. Affects how Gemini processes the content.
     Returns:
         List of embedding values
     """
-    return await TextEmbedding(content).get_embedding(task_type, dimensionality)
+    return await TextEmbedding(content).get_embedding(task_type)
