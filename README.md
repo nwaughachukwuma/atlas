@@ -15,6 +15,7 @@ https://github.com/user-attachments/assets/d28fb343-5c74-462f-996e-f0e5dc51cdf8
 - 🔍 **Semantic Search**: Index videos and search through content semantically using a local vector store (powered by [zvec](https://github.com/alibaba/zvec))
 - 💬 **Video Chat**: Ask questions about indexed videos; context is drawn from the vector store and prior conversation history
 - 🌐 **Companion Web UI**: Browse indexed videos, queue jobs, inspect stats, and use Atlas from a browser at `/ui`
+- 🧾 **Persistent Run History**: `transcribe`, `extract`, and `index` now persist every run, queued or direct, so outputs and benchmarks remain accessible later
 - 🤖 **Powered by Gemini**: Uses Google's Gemini models for multimodal analysis and embeddings
 - 🎙️ **Groq Whisper Transcription**: High-quality fast-video transcription via the `transcribe` command
 - 💻 **CLI First**: Clean, ergonomic command-line interface
@@ -131,6 +132,9 @@ docker run --rm nwaughachukwuma/atlas-video --help
 docker run --rm nwaughachukwuma/atlas-video --version
 # list queued tasks
 docker run --rm nwaughachukwuma/atlas-video queue list
+
+# list persisted runs
+docker run --rm nwaughachukwuma/atlas-video runs list
 ```
 
 ### Run as HTTP server (Docker)
@@ -203,7 +207,28 @@ From the Web UI you can:
 - browse indexed videos and open a per-video detail page
 - chat with an indexed video
 - inspect queue state and task details
+- inspect persisted run history, outputs, and benchmarks for both queued and direct runs
 - view dashboard health, collection stats, and storage paths
+
+### Run history workflow
+
+`transcribe`, `extract`, and `index` now persist their outputs for both queued and `--no-queue` execution modes.
+
+```bash
+# inspect recent runs
+atlas runs list
+
+# inspect one run's metadata
+atlas runs show --run-id <run_id>
+
+# print stored output
+atlas runs output --run-id <run_id>
+
+# print stored benchmark, when available
+atlas runs benchmark --run-id <run_id>
+```
+
+Queued tasks still use `atlas queue list` and `atlas queue status --task-id <task_id>` for lifecycle tracking, but the persisted output and benchmark lookup now lives under `atlas runs ...` for both queued and direct execution.
 
 ### Environment variables
 

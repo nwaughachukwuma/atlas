@@ -205,6 +205,7 @@ class TestQueueListEndpoint:
         assert body["status_filter"] is None
         assert body["count"] == 1
         assert body["tasks"][0]["id"] == "t1"
+        assert body["tasks"][0]["run_id"] == "t1"
 
     def test_queue_list_with_status_filter(self):
         fake_store = MagicMock()
@@ -248,6 +249,7 @@ class TestQueueStatusEndpoint:
         body = resp.json()
         assert body["id"] == "abc123"
         assert body["status"] == "completed"
+        assert body["run_id"] == "abc123"
 
     def test_queue_status_found_with_output_json(self, tmp_path):
         fake_store = MagicMock()
@@ -281,6 +283,7 @@ class TestQueueStatusEndpoint:
         assert body["status"] == "completed"
         assert body["output_path"] == str(output_path)
         assert body["benchmark_path"] == str(benchmark_path)
+        assert body["run_id"] == "abc123"
 
         # verify the content of output_path
         output_content = json.loads(output_path.read_text())
@@ -306,6 +309,7 @@ class TestMediaPostEndpoints:
         from atlas import server as server_module
 
         def fake_extract(_args):
+            _args._response_payload = {"run_id": "run_extract_1", "queued": False, "status": "completed"}
             print(json.dumps({"segments_count": 5, "video_descriptions": []}))
 
         monkeypatch.setattr(server_module, "cmd_extract", fake_extract)
@@ -319,11 +323,13 @@ class TestMediaPostEndpoints:
         assert resp.status_code == 200
         body = resp.json()
         assert body["segments_count"] == 5
+        assert body["run_id"] == "run_extract_1"
 
     def test_transcribe_no_queue_returns_json(self, monkeypatch):
         from atlas import server as server_module
 
         def fake_transcribe(args):
+            args._response_payload = {"run_id": "run_transcribe_1", "queued": False, "status": "completed"}
             print(json.dumps({"transcript": "Hello world", "format": args.format}))
 
         monkeypatch.setattr(server_module, "cmd_transcribe", fake_transcribe)
@@ -338,11 +344,13 @@ class TestMediaPostEndpoints:
         body = resp.json()
         assert body["transcript"] == "Hello world"
         assert body["format"] == "text"
+        assert body["run_id"] == "run_transcribe_1"
 
     def test_index_no_queue_returns_json(self, monkeypatch):
         from atlas import server as server_module
 
         def fake_index(args):
+            args._response_payload = {"run_id": "run_index_1", "queued": False, "status": "completed"}
             print(json.dumps({"video_id": "vid1", "video_path": args.video_path, "indexed_count": 10}))
 
         monkeypatch.setattr(server_module, "cmd_index", fake_index)
@@ -357,12 +365,19 @@ class TestMediaPostEndpoints:
         body = resp.json()
         assert body["video_id"] == "vid1"
         assert body["indexed_count"] == 10
+        assert body["run_id"] == "run_index_1"
 
     def test_extract_queued_returns_command_result(self, monkeypatch):
         """When queued, output is text confirmation; server wraps it in CommandResult."""
         from atlas import server as server_module
 
         def fake_extract(args):
+            args._response_payload = {
+                "run_id": "queued_extract_1",
+                "task_id": "queued_extract_1",
+                "queued": True,
+                "status": "pending",
+            }
             print("Task queued: abc-123")
 
         monkeypatch.setattr(server_module, "cmd_extract", fake_extract)
@@ -377,6 +392,8 @@ class TestMediaPostEndpoints:
         # Non-JSON stdout falls back to CommandResult shape
         assert body["ok"] is True
         assert "Task queued" in body["output"]
+        assert body["run_id"] == "queued_extract_1"
+        assert body["task_id"] == "queued_extract_1"
 
     def test_extract_defaults_preserved(self, monkeypatch):
         from atlas import server as server_module
@@ -421,3 +438,63 @@ class TestMediaPostEndpoints:
         from pathlib import Path
 
         assert not Path(saved_path[0]).parent.exists()
+
+
+class TestRunEndpoints:
+    def test_runs_list(self):
+        fake_store = MagicMock()
+        fake_store.list_all.return_value = [{"id": "run1", "command": "transcribe", "mode": "direct"}]
+
+        with patch("atlas.task_queue.store.RunStore", return_value=fake_store):
+            client = TestClient(create_app())
+            resp = client.get("/runs/list", params={"command": "transcribe", "mode": "direct"})
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["count"] == 1
+        assert body["runs"][0]["id"] == "run1"
+        fake_store.list_all.assert_called_once_with(status=None, command="transcribe", mode="direct", limit=50)
+
+    def test_run_detail(self):
+        fake_store = MagicMock()
+        fake_store.get.return_value = {"id": "run1", "command": "extract", "status": "completed"}
+
+        with patch("atlas.task_queue.store.RunStore", return_value=fake_store):
+            client = TestClient(create_app())
+            resp = client.get("/runs/run1")
+
+        assert resp.status_code == 200
+        assert resp.json()["id"] == "run1"
+
+    def test_run_output(self, tmp_path):
+        output_path = tmp_path / "output.json"
+        output_path.write_text(json.dumps({"ok": True}))
+
+        fake_store = MagicMock()
+        fake_store.get.return_value = {"id": "run1", "output_path": str(output_path)}
+
+        with patch("atlas.task_queue.store.RunStore", return_value=fake_store):
+            client = TestClient(create_app())
+            resp = client.get("/runs/run1/output")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["run_id"] == "run1"
+        assert body["kind"] == "json"
+        assert body["content"]["ok"] is True
+
+    def test_run_benchmark(self, tmp_path):
+        benchmark_path = tmp_path / "benchmark.txt"
+        benchmark_path.write_text("Benchmark Summary")
+
+        fake_store = MagicMock()
+        fake_store.get.return_value = {"id": "run1", "benchmark_path": str(benchmark_path)}
+
+        with patch("atlas.task_queue.store.RunStore", return_value=fake_store):
+            client = TestClient(create_app())
+            resp = client.get("/runs/run1/benchmark")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["run_id"] == "run1"
+        assert body["content"] == "Benchmark Summary"

@@ -112,7 +112,15 @@
         style="display:inline;vertical-align:middle;"
       /> Task queued! <strong>Task ID:</strong>
       {taskInfo.task_id ?? taskInfo.id ?? JSON.stringify(taskInfo)}
+      {#if taskInfo.run_id}
+        <br /><strong>Run ID:</strong> {taskInfo.run_id}
+      {/if}
       <br /><a href={toPath("/queue")} use:route>View Queue →</a>
+      {#if taskInfo.run_id}
+        <br /><a href={toPath(`/runs/${taskInfo.run_id}`)} use:route
+          >View Persisted Run →</a
+        >
+      {/if}
     </div>
   {/if}
 
@@ -121,6 +129,12 @@
       <h3 class="mb-3 flex items-center gap-x-2">
         Transcript <span class="tag">{format}</span>
       </h3>
+      {#if result.run_id}
+        <p class="text-muted text-[0.85rem] mb-3">
+          Saved as run <code class="font-mono">{result.run_id}</code>.
+          <a href={toPath(`/runs/${result.run_id}`)} use:route>View run →</a>
+        </p>
+      {/if}
       <p
         class="text-wrap bg-neutral-500/3 max-h-80 overflow-y-auto p-1.5 font-mono text-sm text-muted"
       >

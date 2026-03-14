@@ -124,6 +124,26 @@ class BenchmarkRegistry:
             reverse=True,
         )
 
+    def snapshot(self) -> dict[str, int]:
+        """Return the current per-function sample counts."""
+        with self._lock:
+            return {name: len(times) for name, times in self._times.items()}
+
+    def delta_stats(self, snapshot: dict[str, int] | None = None) -> list[BenchmarkStats]:
+        """Return aggregated stats recorded after a previous snapshot."""
+        baseline = snapshot or {}
+        with self._lock:
+            deltas = {
+                name: list(times[baseline.get(name, 0) :])
+                for name, times in self._times.items()
+                if len(times) > baseline.get(name, 0)
+            }
+        return sorted(
+            (_make_stats(name, times) for name, times in deltas.items() if times),
+            key=lambda s: s.total_s,
+            reverse=True,
+        )
+
     def summary_table(self) -> str:
         """Render a plain-text table of all stats (useful for logging)."""
         stats = self.all_stats()

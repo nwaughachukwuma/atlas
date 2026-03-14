@@ -107,7 +107,7 @@ def cmd_queue_list(args: argparse.Namespace) -> None:
     output = {
         "status_filter": status,
         "count": len(tasks),
-        "tasks": tasks,
+        "tasks": [{**task, "run_id": task["id"]} for task in tasks],
     }
     print(json.dumps(output, indent=2, default=str))
 
@@ -128,6 +128,7 @@ def cmd_queue_status(args: argparse.Namespace) -> None:
     benchmark_file = results_dir / "benchmark.txt"
 
     output = dict(task)
+    output["run_id"] = task["id"]
     output["duration"] = _duration_str(task.get("started_at"), task.get("finished_at")) or None
 
     output["output_path"] = str(output_file)

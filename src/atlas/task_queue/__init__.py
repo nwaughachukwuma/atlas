@@ -39,7 +39,7 @@ from .helpers import (
     write_file,
 )
 from .queue import TaskQueue, get_queue
-from .store import TaskStore
+from .store import RunStore, TaskStore
 
 __all__ = [
     # config
@@ -56,6 +56,7 @@ __all__ = [
     "TRANSCRIBE_CONCURRENCY",
     "TaskStatus",
     # store
+    "RunStore",
     "TaskStore",
     # queue
     "TaskQueue",

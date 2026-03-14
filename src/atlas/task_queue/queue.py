@@ -21,7 +21,7 @@ from .config import (
     TRANSCRIBE_CONCURRENCY,
 )
 from .helpers import worker_log_file_for
-from .store import TaskStore
+from .store import RunStore, TaskStore
 from ..logger import get_logger
 
 logger = get_logger("atlas:queue")
@@ -87,6 +87,26 @@ class TaskQueue:
         )
 
         self._store.add(task_id, command, label, output_path, benchmark)
+        RunStore(db_path=self._store.db_path).add(
+            task_id,
+            command,
+            label,
+            mode="queued",
+            status="pending",
+            task_id=task_id,
+            input_path=getattr(args, "_video_path_resolved", getattr(args, "video_path", None)),
+            output_path=str(results_dir / "output.json"),
+            user_output_path=output_path,
+            benchmark_path=str(results_dir / "benchmark.txt") if benchmark else None,
+            log_path=str(worker_log_file_for(task_id)),
+            fmt=getattr(args, "format", None),
+            metadata={
+                "include_summary": getattr(args, "include_summary", None),
+                "chunk_duration": getattr(args, "chunk_duration", None),
+                "overlap": getattr(args, "overlap", None),
+                "attrs": getattr(args, "attrs", None),
+            },
+        )
 
         # Dispatch immediately if a slot is open; otherwise the task stays
         # pending and will be picked up when a running worker finishes.

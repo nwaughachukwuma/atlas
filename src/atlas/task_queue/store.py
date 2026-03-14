@@ -4,11 +4,12 @@ SQLite-backed task store with WAL mode for concurrent reads
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
 from contextlib import contextmanager
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from .config import (
     DB_PATH,
@@ -19,7 +20,7 @@ from .config import (
     now_iso,
 )
 
-_DDL = """\
+_TASK_DDL = """\
 CREATE TABLE IF NOT EXISTS tasks (
     id          TEXT PRIMARY KEY,
     command     TEXT NOT NULL,
@@ -34,18 +35,47 @@ CREATE TABLE IF NOT EXISTS tasks (
 );
 """
 
+_RUN_DDL = """\
+CREATE TABLE IF NOT EXISTS runs (
+    id               TEXT PRIMARY KEY,
+    task_id          TEXT,
+    command          TEXT NOT NULL,
+    label            TEXT NOT NULL DEFAULT '',
+    mode             TEXT NOT NULL DEFAULT 'direct',
+    status           TEXT NOT NULL DEFAULT 'pending',
+    created_at       TEXT NOT NULL,
+    started_at       TEXT,
+    finished_at      TEXT,
+    input_path       TEXT,
+    output_path      TEXT,
+    user_output_path TEXT,
+    benchmark_path   TEXT,
+    log_path         TEXT,
+    format           TEXT,
+    error            TEXT,
+    metadata_json    TEXT
+);
 
-class TaskStore:
-    """SQLite-backed task store. WAL mode allows concurrent reads from any thread."""
+CREATE INDEX IF NOT EXISTS idx_runs_created_at ON runs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_runs_command ON runs(command);
+CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);
+CREATE INDEX IF NOT EXISTS idx_runs_mode ON runs(mode);
+"""
 
-    def __init__(self, db_path: Path = DB_PATH) -> None:
-        self.db_path = db_path
-        self._local = threading.local()  # per-instance thread-local storage
+
+class _SQLiteStoreBase:
+    """Base SQLite store with WAL-enabled thread-local connections."""
+
+    def __init__(self, db_path: Path | None = None) -> None:
+        self.db_path = db_path or DB_PATH
+        self._local = threading.local()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._conn() as conn:
-            conn.executescript(_DDL)
+            conn.executescript(self._ddl)
 
-    # ── connection helpers ────────────────────────────────────────────
+    @property
+    def _ddl(self) -> str:
+        raise NotImplementedError
 
     def _conn(self) -> sqlite3.Connection:
         """Return a thread-local connection with WAL enabled."""
@@ -67,6 +97,14 @@ class TaskStore:
         except Exception as e:
             conn.rollback()
             raise e
+
+
+class TaskStore(_SQLiteStoreBase):
+    """SQLite-backed task store. WAL mode allows concurrent reads from any thread."""
+
+    @property
+    def _ddl(self) -> str:
+        return _TASK_DDL
 
     # ── mutations ─────────────────────────────────────────────────────
 
@@ -189,3 +227,188 @@ class TaskStore:
             ")",
             (MAX_FAILED_TASKS,),
         )
+
+
+class RunStore(_SQLiteStoreBase):
+    """SQLite-backed store for all transcribe/extract/index runs."""
+
+    @property
+    def _ddl(self) -> str:
+        return _RUN_DDL
+
+    def add(
+        self,
+        run_id: str,
+        command: str,
+        label: str,
+        *,
+        mode: str = "direct",
+        status: str = TaskStatus.PENDING,
+        task_id: str | None = None,
+        input_path: str | None = None,
+        output_path: str | None = None,
+        user_output_path: str | None = None,
+        benchmark_path: str | None = None,
+        log_path: str | None = None,
+        fmt: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Insert a new run row."""
+        with self._tx() as conn:
+            conn.execute(
+                "INSERT INTO runs ("
+                "id, task_id, command, label, mode, status, created_at, input_path, output_path, "
+                "user_output_path, benchmark_path, log_path, format, metadata_json"
+                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    run_id,
+                    task_id,
+                    command,
+                    label,
+                    mode,
+                    status,
+                    now_iso(),
+                    input_path,
+                    output_path,
+                    user_output_path,
+                    benchmark_path,
+                    log_path,
+                    fmt,
+                    json.dumps(metadata, default=str) if metadata is not None else None,
+                ),
+            )
+
+    def mark_running(self, run_id: str) -> None:
+        with self._tx() as conn:
+            conn.execute(
+                "UPDATE runs SET status=?, started_at=? WHERE id=?",
+                (TaskStatus.RUNNING, now_iso(), run_id),
+            )
+
+    def mark_completed(
+        self,
+        run_id: str,
+        *,
+        output_path: str | None = None,
+        benchmark_path: str | None = None,
+        log_path: str | None = None,
+        user_output_path: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        with self._tx() as conn:
+            conn.execute(
+                "UPDATE runs SET status=?, finished_at=?, output_path=COALESCE(?, output_path), "
+                "benchmark_path=COALESCE(?, benchmark_path), log_path=COALESCE(?, log_path), "
+                "user_output_path=COALESCE(?, user_output_path), metadata_json=COALESCE(?, metadata_json) "
+                "WHERE id=?",
+                (
+                    TaskStatus.COMPLETED,
+                    now_iso(),
+                    output_path,
+                    benchmark_path,
+                    log_path,
+                    user_output_path,
+                    json.dumps(metadata, default=str) if metadata is not None else None,
+                    run_id,
+                ),
+            )
+
+    def mark_failed(
+        self,
+        run_id: str,
+        error: str,
+        *,
+        output_path: str | None = None,
+        benchmark_path: str | None = None,
+        log_path: str | None = None,
+        user_output_path: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        with self._tx() as conn:
+            conn.execute(
+                "UPDATE runs SET status=?, finished_at=?, error=?, output_path=COALESCE(?, output_path), "
+                "benchmark_path=COALESCE(?, benchmark_path), log_path=COALESCE(?, log_path), "
+                "user_output_path=COALESCE(?, user_output_path), metadata_json=COALESCE(?, metadata_json) "
+                "WHERE id=?",
+                (
+                    TaskStatus.FAILED,
+                    now_iso(),
+                    error,
+                    output_path,
+                    benchmark_path,
+                    log_path,
+                    user_output_path,
+                    json.dumps(metadata, default=str) if metadata is not None else None,
+                    run_id,
+                ),
+            )
+
+    def mark_timeout(
+        self,
+        run_id: str,
+        error: str,
+        *,
+        output_path: str | None = None,
+        benchmark_path: str | None = None,
+        log_path: str | None = None,
+        user_output_path: str | None = None,
+    ) -> None:
+        with self._tx() as conn:
+            conn.execute(
+                "UPDATE runs SET status=?, finished_at=?, error=?, output_path=COALESCE(?, output_path), "
+                "benchmark_path=COALESCE(?, benchmark_path), log_path=COALESCE(?, log_path), "
+                "user_output_path=COALESCE(?, user_output_path) WHERE id=?",
+                (
+                    TaskStatus.TIMEOUT,
+                    now_iso(),
+                    error,
+                    output_path,
+                    benchmark_path,
+                    log_path,
+                    user_output_path,
+                    run_id,
+                ),
+            )
+
+    def get(self, run_id: str) -> Optional[dict]:
+        row = self._conn().execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
+        return self._decode_row(row)
+
+    def list_all(
+        self,
+        *,
+        status: str | None = None,
+        command: str | None = None,
+        mode: str | None = None,
+        limit: int | None = None,
+    ) -> List[dict]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        if status:
+            clauses.append("status=?")
+            params.append(status)
+        if command:
+            clauses.append("command=?")
+            params.append(command)
+        if mode:
+            clauses.append("mode=?")
+            params.append(mode)
+
+        query = "SELECT * FROM runs"
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        query += " ORDER BY created_at DESC"
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
+
+        rows = self._conn().execute(query, tuple(params)).fetchall()
+        return [self._decode_row(r) for r in rows]
+
+    def _decode_row(self, row: sqlite3.Row | None) -> Optional[dict]:
+        if row is None:
+            return None
+        output = dict(row)
+        metadata_json = output.pop("metadata_json", None)
+        output["metadata"] = json.loads(metadata_json) if metadata_json else None
+        return output

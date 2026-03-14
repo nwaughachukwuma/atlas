@@ -1,10 +1,6 @@
 <script lang="ts">
   import { route } from "@mateothegreat/svelte5-router";
-  import {
-    FlaskConicalIcon,
-    CircleCheckIcon,
-    LoaderCircleIcon,
-  } from "lucide-svelte";
+  import { FlaskConical, CircleCheck, LoaderCircle } from "lucide-svelte";
   import VideoUpload from "../components/VideoUpload.svelte";
   import { extract } from "../lib/api.ts";
   import type { ExtractResult, TaskQueuedResult } from "../lib/types.ts";
@@ -57,7 +53,7 @@
 
 <div class="p-8 max-w-[760px]">
   <h2 class="flex items-center gap-1.5">
-    <FlaskConicalIcon
+    <FlaskConical
       size={20}
       strokeWidth={2}
       style="display:inline;vertical-align:middle;"
@@ -133,7 +129,7 @@
     disabled={!file || loading}
   >
     {#if loading}
-      <LoaderCircleIcon
+      <LoaderCircle
         class="w-5 h-5 animate-spin"
         style="animation-duration: 0.3s"
       /> Extracting…
@@ -144,19 +140,33 @@
 
   {#if taskInfo}
     <div class="success-box">
-      <CircleCheckIcon
+      <CircleCheck
         size={16}
         strokeWidth={2}
         style="display:inline;vertical-align:middle;"
       /> Task queued! <strong>Task ID:</strong>
       {taskInfo.task_id ?? taskInfo.id ?? JSON.stringify(taskInfo)}
+      {#if taskInfo.run_id}
+        <br /><strong>Run ID:</strong> {taskInfo.run_id}
+      {/if}
       <br /><a href={toPath("/queue")} use:route>View Queue →</a>
+      {#if taskInfo.run_id}
+        <br /><a href={toPath(`/runs/${taskInfo.run_id}`)} use:route
+          >View Persisted Run →</a
+        >
+      {/if}
     </div>
   {/if}
 
   {#if result}
     <div class="card mt-2">
       <h3>Extracted Insights</h3>
+      {#if result.run_id}
+        <p class="text-muted text-[0.85rem] mb-3">
+          Saved as run <code class="font-mono">{result.run_id}</code>.
+          <a href={toPath(`/runs/${result.run_id}`)} use:route>View run →</a>
+        </p>
+      {/if}
       {#if result.chunks}
         <p class="text-muted text-[0.85rem]">
           {result.chunks.length} segments extracted

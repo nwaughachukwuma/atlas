@@ -5,7 +5,13 @@
 <script lang="ts">
   import { route } from "@mateothegreat/svelte5-router";
   import { onMount } from "svelte";
-  import { stats, health, queueList, listVideos } from "../lib/api.ts";
+  import {
+    stats,
+    health,
+    queueList,
+    listVideos,
+    runsList,
+  } from "../lib/api.ts";
   import { LayoutDashboardIcon, LoaderCircleIcon } from "lucide-svelte";
   import { toPath } from "../lib/routing.ts";
   import type {
@@ -13,6 +19,7 @@
     HealthResponse,
     QueueListResponse,
     ListVideosResponse,
+    RunListResponse,
     TaskStatus,
   } from "../lib/types.ts";
   import { toast } from "svelte-sonner";
@@ -21,6 +28,7 @@
   let healthData = $state<HealthResponse | null>(null);
   let queueData = $state<QueueListResponse | null>(null);
   let videosData = $state<ListVideosResponse | null>(null);
+  let runsData = $state<RunListResponse | null>(null);
   let loading = $state<boolean>(true);
 
   async function loadData() {
@@ -36,6 +44,11 @@
         .then((d) => (videosData = d))
         .catch((e) =>
           toast.error("Error fetching videos", { description: e.message }),
+        ),
+      runsList(null, null, null, 8)
+        .then((d) => (runsData = d))
+        .catch((e) =>
+          toast.error("Error fetching runs", { description: e.message }),
         ),
     ])
       .catch((e) => toast.error((e as Error).message))
@@ -224,6 +237,42 @@
               +{videosData.videos.length - 8} more
             </p>
           {/if}
+        </div>
+      </div>
+    {/if}
+
+    {#if runsData?.runs?.length}
+      <div class="card mb-4">
+        <div class="flex justify-between items-center mb-3">
+          <h3
+            class="text-[0.85rem] uppercase tracking-[0.05em] text-muted mb-0"
+          >
+            Recent Runs
+          </h3>
+          <a
+            href={toPath("/runs")}
+            use:route
+            class="text-[0.8rem] font-semibold">View all →</a
+          >
+        </div>
+        <div class="flex flex-col gap-2">
+          {#each runsData.runs as run}
+            <a
+              href={toPath(`/runs/${run.id}`)}
+              use:route
+              class="flex justify-between items-center py-[0.45rem] border-b border-line text-ink text-[0.85rem] hover:text-cobalt last:border-b-0 gap-3"
+            >
+              <div class="flex items-center gap-2">
+                <span class={badgeClass(run.status)}>{run.status}</span>
+                <span class="tag text-[0.74rem]">{run.command}</span>
+                <span class="tag text-[0.74rem]">{run.mode}</span>
+              </div>
+              <code
+                class="text-[0.78rem] bg-surface-alt px-[0.4em] py-[0.1em] font-mono break-all"
+                >{run.id}</code
+              >
+            </a>
+          {/each}
         </div>
       </div>
     {/if}
