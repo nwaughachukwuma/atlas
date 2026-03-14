@@ -12,6 +12,7 @@
   } from "lucide-svelte";
   import { onMount } from "svelte";
   import { runBenchmark, runDetail, runOutput, runsList } from "../lib/api.ts";
+  import CopyButton from "../components/CopyButton.svelte";
   import type {
     Run,
     RunBenchmarkResponse,
@@ -271,9 +272,18 @@
 
       <div class="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
         <div class="card">
-          <h3 class="mb-3 flex items-center gap-2">
-            <FileTextIcon size={16} strokeWidth={2} /> Output
-          </h3>
+          <div class="flex items-center justify-between gap-2 mb-3">
+            <h3 class="mb-0 flex items-center gap-2">
+              <FileTextIcon size={16} strokeWidth={2} /> Output
+            </h3>
+            {#if outputData}
+              <CopyButton
+                text={outputData.kind === "json"
+                  ? JSON.stringify(outputData.content, null, 2)
+                  : String(outputData.content)}
+              />
+            {/if}
+          </div>
           {#if outputData}
             <pre
               class="max-h-96 overflow-y-auto m-0 text-[0.78rem]">{outputData.kind ===
@@ -288,9 +298,14 @@
         </div>
 
         <div class="card">
-          <h3 class="mb-3 flex items-center gap-2">
-            <GaugeIcon size={16} strokeWidth={2} /> Benchmark
-          </h3>
+          <div class="flex items-center justify-between gap-2 mb-3">
+            <h3 class="mb-0 flex items-center gap-2">
+              <GaugeIcon size={16} strokeWidth={2} /> Benchmark
+            </h3>
+            {#if benchmarkData}
+              <CopyButton text={benchmarkData.content} />
+            {/if}
+          </div>
           {#if benchmarkData}
             <pre
               class="max-h-96 overflow-y-auto m-0 text-[0.78rem]">{benchmarkData.content}</pre>

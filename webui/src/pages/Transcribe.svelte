@@ -2,6 +2,7 @@
   import { route } from "@mateothegreat/svelte5-router";
   import { MicIcon, CircleCheckIcon, LoaderCircleIcon } from "lucide-svelte";
   import VideoUpload from "../components/VideoUpload.svelte";
+  import CopyButton from "../components/CopyButton.svelte";
   import { transcribe } from "../lib/api.ts";
   import type { TranscribeResult, TaskQueuedResult } from "../lib/types.ts";
   import { toPath } from "../lib/routing.ts";
@@ -134,9 +135,14 @@
 
   {#if result}
     <div class="card mt-2">
-      <h3 class="mb-3 flex items-center gap-x-2">
-        Transcript <span class="tag">{format}</span>
-      </h3>
+      <div class="flex items-center justify-between gap-2 mb-3">
+        <h3 class="mb-0 flex items-center gap-x-2">
+          Transcript <span class="tag">{format}</span>
+        </h3>
+        <CopyButton
+          text={result.transcript ?? JSON.stringify(result, null, 2)}
+        />
+      </div>
       {#if result.run_id}
         <p class="text-muted text-[0.85rem] mb-3">
           Saved as run <code class="font-mono">{result.run_id}</code>.

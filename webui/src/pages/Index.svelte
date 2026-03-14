@@ -2,6 +2,7 @@
   import { route } from "@mateothegreat/svelte5-router";
   import { Database, CircleCheck, LoaderCircle } from "lucide-svelte";
   import VideoUpload from "../components/VideoUpload.svelte";
+  import CopyButton from "../components/CopyButton.svelte";
   import { indexVideo } from "../lib/api.ts";
   import type { IndexResult, TaskQueuedResult } from "../lib/types.ts";
   import { toPath } from "../lib/routing.ts";
@@ -183,6 +184,9 @@
           <summary class="cursor-pointer text-[0.88rem] text-muted">
             Full result JSON
           </summary>
+          <div class="flex justify-end mt-1 mb-1">
+            <CopyButton text={JSON.stringify(result.result, null, 2)} />
+          </div>
           <pre class="max-h-96 overflow-y-auto m-0">{JSON.stringify(
               result.result,
               null,
