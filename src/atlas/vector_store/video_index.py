@@ -16,7 +16,6 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import datetime
-from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from pydantic import BaseModel
@@ -375,7 +374,6 @@ class VideoIndex(BaseCollection):
             logger.error(f"Error deleting video_index doc {doc_id}: {e}")
 
 
-@lru_cache(maxsize=1)
 def default_video_index() -> VideoIndex:
     """Return a process-global VideoIndex instance."""
     from ..settings import settings

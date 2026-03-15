@@ -196,6 +196,7 @@ export function chatStream(
         buf = lines.pop() ?? "";
         for (const line of lines) onChunk(line);
       }
+      if (buf) onChunk(buf);
       onDone();
     })
     .catch((err: unknown) => {

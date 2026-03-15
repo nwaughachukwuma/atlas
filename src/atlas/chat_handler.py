@@ -15,10 +15,22 @@ Pipeline for chat_with_video()
 
 from __future__ import annotations
 
+import asyncio
 from typing import AsyncGenerator
 
+from .utils import logger
 from .vector_store.video_chat import default_video_chat
 from .vector_store.video_index import default_video_index
+
+
+async def _persist_turns(video_id: str, query: str, answer: str) -> None:
+    """Persist user and assistant turns in the background."""
+    try:
+        vc = default_video_chat()
+        await vc.record_turn(video_id, "user", query)
+        await vc.record_turn(video_id, "assistant", answer)
+    except Exception:
+        logger.exception("Failed to persist chat turns for video %s", video_id)
 
 
 async def chat_with_video(
@@ -29,7 +41,9 @@ async def chat_with_video(
 ) -> AsyncGenerator[str, None]:
     """Stream a single-turn chat response against an indexed video.
 
-    Yields text chunks as they arrive from Gemini.
+    Yields text chunks as they arrive from Gemini.  Persistence of
+    the turns is kicked off as a background task so it never blocks
+    the stream from completing.
 
     Args:
         video_id: The video to chat about.
@@ -66,13 +80,10 @@ async def chat_with_video(
         answer_parts.append(chunk)
         yield chunk
 
-    # 5. Persist both turns after streaming completes
+    # 5. Persist both turns in the background — never blocks the stream
     answer = "".join(answer_parts)
-    if not answer.strip():
-        raise ValueError("Empty response from Gemini")
-
-    await vc.record_turn(video_id, "user", query)
-    await vc.record_turn(video_id, "assistant", answer)
+    if answer.strip():
+        asyncio.create_task(_persist_turns(video_id, query, answer))
 
 
 async def _stream_response(
