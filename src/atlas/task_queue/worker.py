@@ -25,13 +25,14 @@ from time import perf_counter
 from .config import RESULTS_DIR, TASK_TIMEOUT
 from .helpers import serialize_result, write_file
 from .notify import notify
-from .store import TaskStore
+from .store import RunStore, TaskStore
 from ..logger import get_logger
+from ..run_history import build_benchmark_summary
 
 logger = get_logger("atlas:worker")
 
 
-def _trigger_dispatch() -> None:
+def _trigger_dispatch():
     """Attempt to start the next pending task after a worker slot opens."""
     try:
         from .queue import get_queue
@@ -61,7 +62,7 @@ def _import_func(dotted_path: str):
     return getattr(module, func_name)
 
 
-def _write_benchmark(task_id: str, total_s: float | None = None) -> None:
+def _write_benchmark(task_id: str, total_s: float | None = None) -> bool:
     """Write a benchmark summary as an ASCII table to benchmark.txt.
 
     Args:
@@ -73,44 +74,13 @@ def _write_benchmark(task_id: str, total_s: float | None = None) -> None:
 
         stats = registry.all_stats()
         if not stats:
-            return
+            return False
 
-        headers = ("Function", "Calls", "Total (s)", "Avg (s)", "Min (s)", "Max (s)")
-        rows = [
-            (
-                s.name,
-                str(s.calls),
-                f"{s.total_s:.3f}",
-                f"{s.avg_s:.3f}",
-                f"{s.min_s:.3f}",
-                f"{s.max_s:.3f}",
-            )
-            for s in stats
-        ]
-
-        # Compute column widths from headers and data.
-        col_widths = [len(h) for h in headers]
-        for row in rows:
-            for i, cell in enumerate(row):
-                col_widths[i] = max(col_widths[i], len(cell))
-
-        def _fmt_row(cells: tuple[str, ...]) -> str:
-            return "| " + " | ".join(c.ljust(col_widths[i]) for i, c in enumerate(cells)) + " |"
-
-        sep = "+-" + "-+-".join("-" * w for w in col_widths) + "-+"
-        lines = [
-            "Benchmark Summary",
-            sep,
-            _fmt_row(headers),
-            sep,
-            *[_fmt_row(r) for r in rows],
-            sep,
-        ]
-        if total_s is not None:
-            lines.append(f"\nTotal runtime: {total_s:.2f}s")
-        write_file(RESULTS_DIR / task_id / "benchmark.txt", "\n".join(lines))
+        write_file(RESULTS_DIR / task_id / "benchmark.txt", build_benchmark_summary(stats, total_s=total_s))
+        return True
     except Exception as exc:
         logger.warning("Failed to write benchmark for task %s: %s", task_id, exc)
+        return False
 
 
 # ── main entry point ─────────────────────────────────────────────────────────
@@ -123,6 +93,7 @@ def run_task(task_id: str) -> None:
     load_dotenv()
 
     store = TaskStore()
+    run_store = RunStore(db_path=store.db_path)
     task = store.get(task_id)
     if not task:
         logger.error("Task %s not found in database", task_id)
@@ -152,6 +123,7 @@ def run_task(task_id: str) -> None:
 
     func = _import_func(func_path)
     store.mark_running(task_id)
+    run_store.mark_running(task_id)
     logger.info("Worker started for task %s (%s)", task_id, command)
 
     t_start = perf_counter()
@@ -163,6 +135,14 @@ def run_task(task_id: str) -> None:
         if not timed_out.is_set():
             # Timeout reached — the main thread is still blocked.
             store.mark_timeout(task_id)
+            run_store.mark_timeout(
+                task_id,
+                f"Exceeded {TASK_TIMEOUT}s timeout",
+                output_path=str(output_file),
+                benchmark_path=str(results_dir / "benchmark.txt") if benchmark else None,
+                log_path=str(results_dir / "worker.log"),
+                user_output_path=output_path,
+            )
             write_file(output_file, json.dumps({"error": f"Exceeded {TASK_TIMEOUT}s timeout"}))
             if output_path:
                 write_file(Path(output_path), json.dumps({"error": f"Exceeded {TASK_TIMEOUT}s timeout"}))
@@ -189,8 +169,17 @@ def run_task(task_id: str) -> None:
         write_file(output_file, content)
         if output_path:
             write_file(Path(output_path), content)
+        benchmark_written = False
         if benchmark:
-            _write_benchmark(task_id, total_s=perf_counter() - t_start)
+            benchmark_written = _write_benchmark(task_id, total_s=perf_counter() - t_start)
+        run_store.mark_completed(
+            task_id,
+            output_path=str(output_file),
+            benchmark_path=str(results_dir / "benchmark.txt") if benchmark and benchmark_written else None,
+            log_path=str(results_dir / "worker.log"),
+            user_output_path=output_path,
+            metadata=result if isinstance(result, dict) else None,
+        )
         notify(
             "Atlas Task Status",
             f"[completed]: {command} ({task_id}) finished successfully",
@@ -203,6 +192,14 @@ def run_task(task_id: str) -> None:
 
         error_msg = f"{type(exc).__name__}: {exc}"
         store.mark_failed(task_id, error_msg)
+        run_store.mark_failed(
+            task_id,
+            error_msg,
+            output_path=str(output_file),
+            benchmark_path=str(results_dir / "benchmark.txt") if benchmark else None,
+            log_path=str(results_dir / "worker.log"),
+            user_output_path=output_path,
+        )
         write_file(output_file, json.dumps({"error": error_msg}))
         if output_path:
             write_file(Path(output_path), json.dumps({"error": error_msg}))

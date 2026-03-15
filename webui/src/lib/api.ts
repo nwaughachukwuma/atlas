@@ -8,6 +8,11 @@ import type {
   ListChatResponse,
   ListVideosResponse,
   QueueListResponse,
+  Run,
+  RunBenchmarkResponse,
+  RunListResponse,
+  RunMode,
+  RunOutputResponse,
   SearchResponse,
   StatsResponse,
   Task,
@@ -137,6 +142,29 @@ export const queueList = (
 export const queueStatus = (id: string): Promise<Task> =>
   get<Task>(`/queue/status/${id}`);
 
+export const runsList = (
+  status: string | null = null,
+  command: string | null = null,
+  mode: RunMode | null = null,
+  limit = 50,
+): Promise<RunListResponse> => {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (command) params.set("command", command);
+  if (mode) params.set("mode", mode);
+  params.set("limit", String(limit));
+  const query = params.toString();
+  return get<RunListResponse>(`/runs/list${query ? `?${query}` : ""}`);
+};
+
+export const runDetail = (id: string): Promise<Run> => get<Run>(`/runs/${id}`);
+
+export const runOutput = (id: string): Promise<RunOutputResponse> =>
+  get<RunOutputResponse>(`/runs/${id}/output`);
+
+export const runBenchmark = (id: string): Promise<RunBenchmarkResponse> =>
+  get<RunBenchmarkResponse>(`/runs/${id}/benchmark`);
+
 // ── SSE chat stream ───────────────────────────────────────────────────────────
 
 export function chatStream(
@@ -168,6 +196,7 @@ export function chatStream(
         buf = lines.pop() ?? "";
         for (const line of lines) onChunk(line);
       }
+      if (buf) onChunk(buf);
       onDone();
     })
     .catch((err: unknown) => {

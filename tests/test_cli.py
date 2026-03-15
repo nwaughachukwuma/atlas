@@ -28,6 +28,7 @@ from atlas.cli import (
     cmd_index,
     cmd_list_chat,
     cmd_list_videos,
+    cmd_runs_list,
     cmd_search,
     cmd_serve,
     cmd_stats,
@@ -61,6 +62,16 @@ def progress_ctx():
     return ctx
 
 
+@pytest.fixture()
+def isolated_run_history(tmp_path, monkeypatch):
+    db_path = tmp_path / "runs.db"
+    results_dir = tmp_path / "run_results"
+    monkeypatch.setattr("atlas.task_queue.store.DB_PATH", db_path)
+    monkeypatch.setattr("atlas.run_history.RUNS_DIR", tmp_path / "runs")
+    monkeypatch.setattr("atlas.run_history.DIRECT_RESULTS_DIR", results_dir)
+    return {"db_path": db_path, "results_dir": results_dir}
+
+
 # ---------------------------------------------------------------------------
 # TestParserConstruction — every subcommand + key flags
 # ---------------------------------------------------------------------------
@@ -82,6 +93,7 @@ class TestParserConstruction:
             "list-chat",
             "stats",
             "queue",
+            "runs",
             "get-video",
             "serve",
         }
@@ -251,6 +263,7 @@ class TestParserConstruction:
             "list-videos": (cmd_list_videos, ["list-videos"]),
             "list-chat": (cmd_list_chat, ["list-chat", "vid1"]),
             "stats": (cmd_stats, ["stats"]),
+            "runs": (cmd_runs_list, ["runs", "list"]),
             "get-video": (cmd_get_data, ["get-video", "vid1"]),
             "serve": (cmd_serve, ["serve"]),
         }
@@ -409,6 +422,30 @@ class TestCmdIndex:
         ):
             with pytest.raises(SystemExit):
                 cmd_index(self._args(str(video)))
+
+    def test_persists_direct_run(self, tmp_path, progress_ctx, mock_model_dump, isolated_run_history):
+        from atlas.task_queue.store import RunStore
+
+        video = tmp_path / "v.mp4"
+        video.touch()
+        args = self._args(video_path=str(video))
+        mock_result = mock_model_dump(duration=30.0, video_descriptions=[])
+
+        with (
+            patch("atlas.cli.cmd_media.validate_api_keys"),
+            patch("atlas.cli.cmd_media.make_progress", return_value=progress_ctx),
+            patch(
+                "atlas.cli.cmd_media.asyncio.run",
+                side_effect=mock_asyncio_run(return_value=("vid_001", 3, mock_result)),
+            ),
+        ):
+            cmd_index(args)
+
+        run = RunStore(db_path=isolated_run_history["db_path"]).get(args._response_payload["run_id"])
+        assert run is not None
+        assert run["command"] == "index"
+        assert run["status"] == "completed"
+        assert json.loads(Path(run["output_path"]).read_text())["video_id"] == "vid_001"
 
 
 # ---------------------------------------------------------------------------
@@ -677,6 +714,29 @@ class TestCmdTranscribe:
         ):
             cmd_transcribe(self._args(str(video)))
 
+    def test_persists_direct_run(self, tmp_path, isolated_run_history):
+        from atlas.task_queue.store import RunStore
+
+        video = tmp_path / "v.mp4"
+        video.touch()
+        args = self._args(str(video))
+
+        with (
+            patch("atlas.cli.cmd_media.validate_api_keys"),
+            patch(
+                "atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(return_value="Hello world transcript")
+            ),
+        ):
+            cmd_transcribe(args)
+
+        run_id = args._response_payload["run_id"]
+        run = RunStore(db_path=isolated_run_history["db_path"]).get(run_id)
+        assert run is not None
+        assert run["command"] == "transcribe"
+        assert run["status"] == "completed"
+        assert Path(run["output_path"]).exists()
+        assert json.loads(Path(run["output_path"]).read_text())["transcript"] == "Hello world transcript"
+
     def test_success_saves_to_file(self, tmp_path):
         video = tmp_path / "v.mp4"
         video.touch()
@@ -775,6 +835,27 @@ class TestCmdExtract:
         ):
             cmd_extract(self._args(str(video), fmt="json", output=str(out)))
         assert out.exists()
+
+    def test_persists_direct_run(self, tmp_path, mock_model_dump_json, isolated_run_history):
+        from atlas.task_queue.store import RunStore
+
+        video = tmp_path / "v.mp4"
+        video.touch()
+        args = self._args(str(video), fmt="json")
+        mock_result = mock_model_dump_json({"duration": 10.0, "video_descriptions": []})
+        mock_result.model_dump = MagicMock(return_value={"duration": 10.0, "video_descriptions": []})
+
+        with (
+            patch("atlas.cli.cmd_media.validate_api_keys"),
+            patch("atlas.cli.cmd_media.asyncio.run", side_effect=mock_asyncio_run(return_value=mock_result)),
+        ):
+            cmd_extract(args)
+
+        run = RunStore(db_path=isolated_run_history["db_path"]).get(args._response_payload["run_id"])
+        assert run is not None
+        assert run["command"] == "extract"
+        assert run["status"] == "completed"
+        assert json.loads(Path(run["output_path"]).read_text())["duration"] == 10.0
 
     def test_invalid_attr_exits(self, tmp_path):
         video = tmp_path / "v.mp4"
@@ -940,6 +1021,23 @@ class TestTaskStore:
         assert store.get("no-such-id") is None
 
 
+class TestRunStore:
+    def test_add_and_get(self, tmp_path):
+        from atlas.task_queue.store import RunStore
+
+        store = RunStore(db_path=tmp_path / "runs.db")
+        store.add("r1", "transcribe", "transcribe v.mp4", mode="direct", input_path="/tmp/v.mp4")
+        store.mark_running("r1")
+        store.mark_completed("r1", output_path="/tmp/output.json")
+
+        run = store.get("r1")
+        assert run is not None
+        assert run["id"] == "r1"
+        assert run["command"] == "transcribe"
+        assert run["status"] == "completed"
+        assert run["output_path"] == "/tmp/output.json"
+
+
 class TestTaskQueueSubmit:
     """Test TaskQueue.submit (mocks subprocess.Popen to avoid real workers)."""
 
@@ -980,6 +1078,59 @@ class TestTaskQueueSubmit:
         assert (results_dir / task_id).is_dir()
         # Verify args.json was written
         assert (results_dir / task_id / "args.json").exists()
+
+    def test_submit_creates_matching_run_record(self, tmp_path, monkeypatch):
+        from atlas.task_queue import TaskQueue
+        from atlas.task_queue.store import RunStore
+
+        results_dir = tmp_path / "results"
+        monkeypatch.setattr("atlas.task_queue.queue.RESULTS_DIR", results_dir)
+        monkeypatch.setattr("atlas.task_queue.helpers.RESULTS_DIR", results_dir)
+        monkeypatch.setattr("atlas.task_queue.queue.subprocess.Popen", lambda *a, **kw: None)
+
+        db_path = tmp_path / "q.db"
+        queue = TaskQueue(db_path=db_path)
+        task_id = queue.submit(
+            argparse.Namespace(video_path="test.mp4", format="text"),
+            command="transcribe",
+            label="transcribe test.mp4",
+            benchmark=True,
+        )
+
+        run = RunStore(db_path=db_path).get(task_id)
+        assert run is not None
+        assert run["id"] == task_id
+        assert run["mode"] == "queued"
+        assert run["command"] == "transcribe"
+        assert run["benchmark_path"].endswith("benchmark.txt")
+
+    def test_submit_stages_temp_upload_for_worker(self, tmp_path, monkeypatch):
+        from atlas.task_queue import TaskQueue
+
+        results_dir = tmp_path / "results"
+        upload_dir = tmp_path / "atlas_upload_case"
+        upload_dir.mkdir()
+        source_video = upload_dir / "upload_test.mp4"
+        source_video.write_bytes(b"video-bytes")
+
+        monkeypatch.setattr("atlas.task_queue.queue.RESULTS_DIR", results_dir)
+        monkeypatch.setattr("atlas.task_queue.helpers.RESULTS_DIR", results_dir)
+        monkeypatch.setattr("atlas.task_queue.queue.subprocess.Popen", lambda *a, **kw: None)
+
+        queue = TaskQueue(db_path=tmp_path / "q.db")
+        task_id = queue.submit(
+            argparse.Namespace(video_path=str(source_video), _queue_stage_input=True),
+            command="transcribe",
+            label="transcribe upload_test.mp4",
+        )
+
+        staged_input = results_dir / task_id / "input.mp4"
+        args_data = json.loads((results_dir / task_id / "args.json").read_text())
+
+        assert not source_video.exists()
+        assert staged_input.exists()
+        assert args_data["video_path"] == str(staged_input)
+        assert args_data["_video_path_resolved"] == str(staged_input.resolve())
 
 
 class TestSerializeResult:

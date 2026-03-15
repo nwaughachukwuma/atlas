@@ -4,7 +4,7 @@
 
 <script lang="ts">
   import { route } from "@mateothegreat/svelte5-router";
-  import { ClipboardListIcon, LoaderCircleIcon } from "lucide-svelte";
+  import { ClipboardList, LoaderCircle } from "lucide-svelte";
   import type { Task } from "../lib/types";
   import { toPath } from "../lib/routing";
   import { onMount } from "svelte";
@@ -54,7 +54,7 @@
   <a href={toPath("/queue")} use:route>← All Tasks</a>
 </div>
 <h2>
-  <ClipboardListIcon
+  <ClipboardList
     size={20}
     strokeWidth={2}
     style="display:inline;vertical-align:middle;"
@@ -62,7 +62,7 @@
 </h2>
 {#if loading}
   <p class="flex items-center gap-x-2">
-    <LoaderCircleIcon
+    <LoaderCircle
       class="w-5 h-5 animate-spin"
       style="animation-duration: 0.3s"
     />
@@ -120,9 +120,17 @@
       </div>
     {/if}
 
+    {#if task.run_id}
+      <div class="mt-3 text-[0.88rem]">
+        <a href={toPath(`/runs/${task.run_id}`)} use:route
+          >View Persisted Run →</a
+        >
+      </div>
+    {/if}
+
     {#if task.status === "pending" || task.status === "running"}
       <p class="text-muted flex items-center gap-x-2 text-[0.85rem] mt-4">
-        <LoaderCircleIcon
+        <LoaderCircle
           class="w-5 h-5 animate-spin"
           style="animation-duration: 0.3s"
         />

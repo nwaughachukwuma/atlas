@@ -1,11 +1,8 @@
 <script lang="ts">
   import { route } from "@mateothegreat/svelte5-router";
-  import {
-    DatabaseIcon,
-    CircleCheckIcon,
-    LoaderCircleIcon,
-  } from "lucide-svelte";
+  import { Database, CircleCheck, LoaderCircle } from "lucide-svelte";
   import VideoUpload from "../components/VideoUpload.svelte";
+  import CopyButton from "../components/CopyButton.svelte";
   import { indexVideo } from "../lib/api.ts";
   import type { IndexResult, TaskQueuedResult } from "../lib/types.ts";
   import { toPath } from "../lib/routing.ts";
@@ -53,7 +50,7 @@
 
 <div class="p-8 max-w-[760px]">
   <h2 class="flex items-center gap-1.5">
-    <DatabaseIcon
+    <Database
       size={20}
       strokeWidth={2}
       style="display:inline;vertical-align:middle;"
@@ -122,7 +119,7 @@
     disabled={!file || loading}
   >
     {#if loading}
-      <LoaderCircleIcon
+      <LoaderCircle
         class="w-5 h-5 animate-spin"
         style="animation-duration: 0.3s"
       />
@@ -134,20 +131,28 @@
 
   {#if taskInfo}
     <div class="success-box">
-      <CircleCheckIcon
+      <CircleCheck
         size={16}
         strokeWidth={2}
         style="display:inline;vertical-align:middle;"
       /> Task queued! <strong>Task ID:</strong>
       {taskInfo.task_id ?? taskInfo.id ?? JSON.stringify(taskInfo)}
+      {#if taskInfo.run_id}
+        <br /><strong>Run ID:</strong> {taskInfo.run_id}
+      {/if}
       <br /><a href={toPath("/queue")} use:route>View Queue →</a>
+      {#if taskInfo.run_id}
+        <br /><a href={toPath(`/runs/${taskInfo.run_id}`)} use:route
+          >View Persisted Run →</a
+        >
+      {/if}
     </div>
   {/if}
 
   {#if result}
     <div class="card mt-2">
       <h3>
-        <CircleCheckIcon
+        <CircleCheck
           size={18}
           strokeWidth={2}
           style="display:inline;vertical-align:middle;"
@@ -161,6 +166,12 @@
         >
       </p>
       <p><strong>Indexed chunks:</strong> {result.indexed_count}</p>
+      {#if result.run_id}
+        <p class="text-muted text-[0.85rem]">
+          Saved as run <code class="font-mono">{result.run_id}</code>.
+          <a href={toPath(`/runs/${result.run_id}`)} use:route>View run →</a>
+        </p>
+      {/if}
       <a
         href={toPath(`/video/${result.video_id}`)}
         use:route
@@ -173,6 +184,9 @@
           <summary class="cursor-pointer text-[0.88rem] text-muted">
             Full result JSON
           </summary>
+          <div class="flex justify-end mt-1 mb-1">
+            <CopyButton text={JSON.stringify(result.result, null, 2)} />
+          </div>
           <pre class="max-h-96 overflow-y-auto m-0">{JSON.stringify(
               result.result,
               null,

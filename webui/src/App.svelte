@@ -9,6 +9,7 @@
   import Videos from "./pages/Videos.svelte";
   import VideoDetail from "./pages/VideoDetail.svelte";
   import Queue from "./pages/Queue.svelte";
+  import Runs from "./pages/Runs.svelte";
   import Dashboard from "./pages/Dashboard.svelte";
   import { BASE_PATH } from "./lib/routing.ts";
   import { Toaster } from "svelte-sonner";
@@ -16,12 +17,18 @@
   const routes: RouteConfig[] = [
     { path: "/", component: Home },
     { path: "/transcribe", component: Transcribe },
+    { path: "/transcribe/runs/(?<id>[^/]+)", component: Runs },
+    { path: "/transcribe/runs", component: Runs },
     { path: "/extract", component: Extract },
+    { path: "/extract/runs/(?<id>[^/]+)", component: Runs },
+    { path: "/extract/runs", component: Runs },
     { path: "/index", component: Index },
     { path: "/video/(?<id>[^/]+)", component: VideoDetail },
     { path: "/videos", component: Videos },
     { path: "/queue/(?<id>[^/]+)", component: Queue },
     { path: "/queue", component: Queue },
+    { path: "/runs/(?<id>[^/]+)", component: Runs },
+    { path: "/runs", component: Runs },
     { path: "/dashboard", component: Dashboard },
   ];
 </script>

@@ -42,12 +42,58 @@ export interface Task {
   duration?: string | number;
   error?: string;
   output_path?: string;
+  run_id?: string;
   /** Present on some queue responses that mirror the task */
   task_id?: string;
 }
 
 export interface QueueListResponse {
   tasks: Task[];
+}
+
+// ── Runs ─────────────────────────────────────────────────────────────────────
+
+export type RunMode = "queued" | "direct";
+
+export interface Run {
+  id: string;
+  task_id?: string | null;
+  command: "transcribe" | "extract" | "index";
+  label: string;
+  mode: RunMode;
+  status: TaskStatus;
+  created_at?: string;
+  started_at?: string;
+  finished_at?: string;
+  input_path?: string | null;
+  output_path?: string | null;
+  user_output_path?: string | null;
+  benchmark_path?: string | null;
+  log_path?: string | null;
+  format?: string | null;
+  error?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface RunListResponse {
+  runs: Run[];
+  count: number;
+  status_filter?: TaskStatus | null;
+  command_filter?: Run["command"] | null;
+  mode_filter?: RunMode | null;
+}
+
+export interface RunOutputResponse {
+  run_id: string;
+  path: string;
+  kind: "json" | "text";
+  content: unknown;
+}
+
+export interface RunBenchmarkResponse {
+  run_id: string;
+  path: string;
+  content: string;
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────
@@ -134,6 +180,11 @@ export interface IndexOptions {
 
 /** Returned when a task is enqueued instead of run immediately. */
 export interface TaskQueuedResult {
+  run_id?: string;
+  queued?: boolean;
+  status?: TaskStatus;
+  output_path?: string;
+  benchmark_path?: string | null;
   task_id?: string;
   id?: string;
   error?: string;

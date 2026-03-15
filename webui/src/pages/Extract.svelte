@@ -1,11 +1,8 @@
 <script lang="ts">
   import { route } from "@mateothegreat/svelte5-router";
-  import {
-    FlaskConicalIcon,
-    CircleCheckIcon,
-    LoaderCircleIcon,
-  } from "lucide-svelte";
+  import { FlaskConical, CircleCheck, LoaderCircle } from "lucide-svelte";
   import VideoUpload from "../components/VideoUpload.svelte";
+  import CopyButton from "../components/CopyButton.svelte";
   import { extract } from "../lib/api.ts";
   import type { ExtractResult, TaskQueuedResult } from "../lib/types.ts";
   import { toPath } from "../lib/routing.ts";
@@ -57,7 +54,7 @@
 
 <div class="p-8 max-w-[760px]">
   <h2 class="flex items-center gap-1.5">
-    <FlaskConicalIcon
+    <FlaskConical
       size={20}
       strokeWidth={2}
       style="display:inline;vertical-align:middle;"
@@ -67,6 +64,14 @@
     Derive rich multimodal understanding — scene descriptions, visual context,
     and summaries.
   </p>
+
+  <div class="mb-5 text-[0.9rem]">
+    <a
+      class="px-3 py-2 border-cobalt/40 border"
+      href={toPath("/extract/runs")}
+      use:route>View Previous Runs →</a
+    >
+  </div>
 
   <div class="card mb-4">
     <VideoUpload
@@ -133,7 +138,7 @@
     disabled={!file || loading}
   >
     {#if loading}
-      <LoaderCircleIcon
+      <LoaderCircle
         class="w-5 h-5 animate-spin"
         style="animation-duration: 0.3s"
       /> Extracting…
@@ -144,35 +149,56 @@
 
   {#if taskInfo}
     <div class="success-box">
-      <CircleCheckIcon
+      <CircleCheck
         size={16}
         strokeWidth={2}
         style="display:inline;vertical-align:middle;"
       /> Task queued! <strong>Task ID:</strong>
       {taskInfo.task_id ?? taskInfo.id ?? JSON.stringify(taskInfo)}
+      {#if taskInfo.run_id}
+        <br /><strong>Run ID:</strong> {taskInfo.run_id}
+      {/if}
       <br /><a href={toPath("/queue")} use:route>View Queue →</a>
+      {#if taskInfo.run_id}
+        <br /><a href={toPath(`/runs/${taskInfo.run_id}`)} use:route
+          >View Persisted Run →</a
+        >
+      {/if}
     </div>
   {/if}
 
   {#if result}
     <div class="card mt-2">
-      <h3>Extracted Insights</h3>
+      <div class="flex items-center justify-between gap-2 mb-1">
+        <h3 class="mb-0">Extracted Insights</h3>
+        <CopyButton text={JSON.stringify(result, null, 2)} />
+      </div>
+
+      {#if result.run_id}
+        <p class="text-muted text-[0.85rem] mb-3">
+          Saved as run <code class="font-mono">{result.run_id}</code>.
+          <a href={toPath(`/runs/${result.run_id}`)} use:route>View run →</a>
+        </p>
+      {/if}
       {#if result.chunks}
         <p class="text-muted text-[0.85rem]">
           {result.chunks.length} segments extracted
         </p>
-        {#each result.chunks as chunk, i}
-          <details class="border border-line mb-2 p-2">
-            <summary
-              class="cursor-pointer text-[0.88rem] text-muted hover:text-cobalt"
-              >Segment {i + 1} — {chunk.start_time ?? ""}s – {chunk.end_time ??
-                ""}s</summary
-            >
-            <pre class="text-sm">
+
+        <div class="max-h-[32rem] overflow-y-auto">
+          {#each result.chunks as chunk, i}
+            <details class="border border-line mb-2 p-2">
+              <summary
+                class="cursor-pointer text-[0.88rem] text-muted hover:text-cobalt"
+                >Segment {i + 1} — {chunk.start_time ?? ""}s – {chunk.end_time ??
+                  ""}s</summary
+              >
+              <pre class="text-sm">
               {JSON.stringify(chunk, null, 2)}
             </pre>
-          </details>
-        {/each}
+            </details>
+          {/each}
+        </div>
         {#if result.summary}
           <div class="mt-4 pt-4 border-t border-line">
             <h4 class="mb-[0.4rem]">Summary</h4>
@@ -180,7 +206,7 @@
           </div>
         {/if}
       {:else}
-        <pre class="text-sm">
+        <pre class="text-sm max-h-96 overflow-y-auto">
           {JSON.stringify(result, null, 2)}
         </pre>
       {/if}

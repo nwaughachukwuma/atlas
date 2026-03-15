@@ -37,7 +37,10 @@ _collection_cache: dict[str, "Collection"] = {}
 # ---------------------------------------------------------------------------
 
 
-def get_or_create_collection(path: str, schema: "CollectionSchema") -> "Collection":
+def get_or_create_collection(
+    path: str,
+    schema: "CollectionSchema",
+) -> "Collection":
     """Open an existing zvec collection or create a new one at *path*."""
     import zvec
 
@@ -45,15 +48,22 @@ def get_or_create_collection(path: str, schema: "CollectionSchema") -> "Collecti
 
     p = Path(path)
     if not p.exists() or (p.is_dir() and not any(p.iterdir())):
-        return zvec.create_and_open(path=path, schema=schema)
+        return zvec.create_and_open(
+            path=path,
+            schema=schema,
+        )
     try:
         return zvec.open(path=path)
     except Exception as e:
-        logger.warning("Error in zvec.open %s - path: %s", e, path)
-        raise RuntimeError(f"Unable to open zvec collection at {path}") from e
+        error_messsage = f"Unable to open zvec collection - path: {path}; error: {e}"
+        logger.warning(error_messsage)
+        raise RuntimeError(error_messsage) from e
 
 
-def get_shared_collection(path: str, schema: "CollectionSchema") -> "Collection":
+def get_shared_collection(
+    path: str,
+    schema: "CollectionSchema",
+) -> "Collection":
     """Return a process-global zvec collection handle for *path*."""
     cached = _collection_cache.get(path)
     if cached is not None:
@@ -63,8 +73,24 @@ def get_shared_collection(path: str, schema: "CollectionSchema") -> "Collection"
         cached = _collection_cache.get(path)
         if cached is not None:
             return cached
-        _collection_cache[path] = get_or_create_collection(path=path, schema=schema)
+        _collection_cache[path] = get_or_create_collection(
+            path=path,
+            schema=schema,
+        )
         return _collection_cache[path]
+
+
+def close_shared_collection(path: str) -> None:
+    """Close and remove a cached collection handle for *path*.
+    Safe to call even if *path* has no cached handle.
+    """
+    with _collection_lock:
+        col = _collection_cache.pop(path, None)
+        if col is not None:
+            try:
+                col.close()
+            except Exception:
+                pass
 
 
 def make_vector_query(embedding: List[float]):
@@ -99,11 +125,16 @@ class BaseCollection(ABC):
     Subclasses must implement ``_build_schema`` to return the
     zvec CollectionSchema appropriate for their collection.
 
+    Supports the context-manager protocol for automatic lock release::
+
+        with VideoIndex(col_path=p) as vi:
+            vi.search(...)
+
     Args:
         col_path: Directory path for this collection.
     """
 
-    def __init__(self, col_path: Path) -> None:
+    def __init__(self, col_path: Path):
         self.col_path = col_path
         self._collection: Optional["Collection"] = None
         self._init_zvec()
@@ -147,6 +178,19 @@ class BaseCollection(ABC):
                 self._build_schema(),
             )
         return self._collection
+
+    def close(self) -> None:
+        """Release the shared collection handle and remove it from cache."""
+        if self._collection is not None:
+            close_shared_collection(str(self.col_path))
+            self._collection = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
 
     # ------------------------------------------------------------------
     # Shared utilities

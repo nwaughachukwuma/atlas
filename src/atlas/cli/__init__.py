@@ -81,6 +81,18 @@ from .cmd_media import (
 from .cmd_media import (
     cmd_transcribe as cmd_transcribe,
 )
+from .cmd_runs import (  # noqa: E402
+    cmd_runs_benchmark as cmd_runs_benchmark,
+)
+from .cmd_runs import (
+    cmd_runs_list as cmd_runs_list,
+)
+from .cmd_runs import (
+    cmd_runs_output as cmd_runs_output,
+)
+from .cmd_runs import (
+    cmd_runs_show as cmd_runs_show,
+)
 from .cmd_server import (
     cmd_serve as cmd_serve,
 )

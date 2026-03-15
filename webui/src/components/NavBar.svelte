@@ -6,6 +6,7 @@
     DatabaseIcon,
     FilmIcon,
     ClipboardListIcon,
+    HistoryIcon,
     LayoutDashboardIcon,
     ZapIcon,
   } from "lucide-svelte";
@@ -36,6 +37,12 @@
       icon: FilmIcon,
       label: "Videos",
       title: "Indexed Videos",
+    },
+    {
+      path: "/runs",
+      icon: HistoryIcon,
+      label: "Runs",
+      title: "Run History",
     },
     {
       path: "/queue",

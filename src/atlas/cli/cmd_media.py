@@ -16,9 +16,12 @@ from .helpers import (
     make_progress,
     parse_duration,
     print_queued_info,
+    print_run_info,
     validate_api_keys,
     validate_video_path,
 )
+from ..run_history import complete_direct_run, fail_direct_run, start_direct_run
+from ..task_queue import output_file_for
 
 if TYPE_CHECKING:
     from ..utils import DescriptionAttr
@@ -58,6 +61,14 @@ def cmd_extract(args: argparse.Namespace) -> None:
             output_path=output_path,
             benchmark=benchmark,
         )
+        args._response_payload = {
+            "run_id": task_id,
+            "task_id": task_id,
+            "queued": True,
+            "status": "pending",
+            "command": "extract",
+            "output_path": str(output_file_for(task_id)),
+        }
         print_queued_info(
             console,
             task_id,
@@ -90,6 +101,21 @@ def cmd_extract(args: argparse.Namespace) -> None:
     console.print(f"\n[bold blue]Processing video:[/bold blue] {video_path}")
     console.print(f"[dim]Chunk duration: {chunk_sec}s, Overlap: {overlap_sec}s[/dim]\n")
 
+    run_context = start_direct_run(
+        command="extract",
+        label=f"extract {video_path.name}",
+        input_path=str(video_path),
+        requested_output_path=output_path,
+        fmt=fmt,
+        metadata={
+            "chunk_duration": chunk_sec,
+            "overlap": overlap_sec,
+            "include_summary": args.include_summary,
+            "attrs": description_attrs,
+        },
+        benchmark=benchmark,
+    )
+
     def _on_segment(desc: VideoDescription) -> None:
         if not no_streaming:
             segment_str = desc.model_dump_json(indent=2)
@@ -110,16 +136,57 @@ def cmd_extract(args: argparse.Namespace) -> None:
 
         result = asyncio.run(_run())
         if not result:
+            fail_direct_run(run_context, "No insights extracted from the video.")
             err("No insights extracted from the video.")
             return
 
-        output_str = result.model_dump_json(indent=2)
+        output = None
+        if hasattr(result, "model_dump"):
+            dumped = result.model_dump()
+            if isinstance(dumped, (dict, list, str, int, float, bool)) or dumped is None:
+                output = dumped
+        if output is None and hasattr(result, "model_dump_json"):
+            dumped_json = result.model_dump_json()
+            if isinstance(dumped_json, (str, bytes, bytearray)):
+                output = json.loads(dumped_json)
+        if output is None:
+            output = {}
+            for key in ("duration", "video_descriptions", "summary", "segments_count"):
+                if not hasattr(result, key):
+                    continue
+                value = getattr(result, key)
+                try:
+                    json.dumps(value)
+                except TypeError:
+                    continue
+                output[key] = value
+            if not output:
+                output = {"result": str(result)}
+        args._response_payload = complete_direct_run(
+            run_context,
+            output,
+            metadata={
+                "chunk_count": len(output.get("video_descriptions", [])),
+                "summary_present": bool(output.get("summary")),
+            },
+        )
+        output_str = json.dumps(output, indent=2)
         if output_path:
             Path(output_path).write_text(output_str)
             console.print(f"[green]Results saved to:[/green] {output_path}")
         else:
             print(output_str)
+        print_run_info(
+            console,
+            args._response_payload["run_id"],
+            "extract",
+            queued=False,
+            output_path=args._response_payload["output_path"],
+            benchmark_path=args._response_payload.get("benchmark_path"),
+            user_output_path=output_path,
+        )
     except Exception as e:
+        args._response_payload = fail_direct_run(run_context, f"{type(e).__name__}: {e}")
         console.print(f"[red]Error processing video: {e}[/red]")
         get_logger().exception("Error in extract command")
         sys.exit(1)
@@ -162,6 +229,14 @@ def cmd_transcribe(args: argparse.Namespace) -> None:
             output_path=output_path,
             benchmark=benchmark,
         )
+        args._response_payload = {
+            "run_id": task_id,
+            "task_id": task_id,
+            "queued": True,
+            "status": "pending",
+            "command": "transcribe",
+            "output_path": str(output_file_for(task_id)),
+        }
         print_queued_info(
             console,
             task_id,
@@ -181,6 +256,16 @@ def cmd_transcribe(args: argparse.Namespace) -> None:
     console.print(f"\n[bold blue]Transcribing:[/bold blue] {video_path}")
     console.print(f"[dim]Output format: {fmt}[/dim]\n")
 
+    run_context = start_direct_run(
+        command="transcribe",
+        label=f"transcribe {video_path.name}",
+        input_path=str(video_path),
+        requested_output_path=output_path,
+        fmt=fmt,
+        metadata={"format": fmt},
+        benchmark=benchmark,
+    )
+
     def _on_chunk(text: str) -> None:
         if not no_streaming:
             console.print("STREAMED CHUNK:", text)
@@ -199,16 +284,36 @@ def cmd_transcribe(args: argparse.Namespace) -> None:
             progress.update(task, completed=True)
 
         if not full_text.strip():
+            args._response_payload = complete_direct_run(
+                run_context,
+                {"transcript": "", "format": fmt},
+                metadata={"empty_output": True, "format": fmt},
+            )
             console.print("[yellow]No transcript content generated.[/yellow]")
             return
 
+        result = {"transcript": full_text, "format": fmt}
+        args._response_payload = complete_direct_run(
+            run_context,
+            result,
+            metadata={"format": fmt, "transcript_length": len(full_text)},
+        )
         if output_path:
             Path(output_path).write_text(full_text)
             console.print(f"\n[green]Transcript saved to:[/green] {output_path}")
         else:
-            result = {"transcript": full_text, "format": fmt}
             print(json.dumps(result, indent=2))
+        print_run_info(
+            console,
+            args._response_payload["run_id"],
+            "transcribe",
+            queued=False,
+            output_path=args._response_payload["output_path"],
+            benchmark_path=args._response_payload.get("benchmark_path"),
+            user_output_path=output_path,
+        )
     except Exception as e:
+        args._response_payload = fail_direct_run(run_context, f"{type(e).__name__}: {e}")
         console.print(f"[red]Error transcribing: {e}[/red]")
         get_logger().exception("Error in transcribe command")
         sys.exit(1)
@@ -247,6 +352,14 @@ def cmd_index(args: argparse.Namespace) -> None:
             label=f"index {video_path.name}",
             benchmark=benchmark,
         )
+        args._response_payload = {
+            "run_id": task_id,
+            "task_id": task_id,
+            "queued": True,
+            "status": "pending",
+            "command": "index",
+            "output_path": str(output_file_for(task_id)),
+        }
         print_queued_info(console, task_id, "index", benchmark=benchmark)
         return
 
@@ -261,6 +374,20 @@ def cmd_index(args: argparse.Namespace) -> None:
 
     console.print(f"\n[bold blue]Indexing video:[/bold blue] {video_path}")
     console.print(f"[dim]Chunk duration: {chunk_sec}s, Overlap: {overlap_sec}s[/dim]")
+
+    run_context = start_direct_run(
+        command="index",
+        label=f"index {video_path.name}",
+        input_path=str(video_path),
+        fmt="json",
+        metadata={
+            "chunk_duration": chunk_sec,
+            "overlap": overlap_sec,
+            "include_summary": args.include_summary,
+            "attrs": list(args.attrs) if args.attrs else None,
+        },
+        benchmark=benchmark,
+    )
 
     def _on_segment(desc: VideoDescription) -> None:
         if not no_streaming:
@@ -296,8 +423,22 @@ def cmd_index(args: argparse.Namespace) -> None:
             "indexed_count": indexed_count,
             "result": result.model_dump(),
         }
+        args._response_payload = complete_direct_run(
+            run_context,
+            output,
+            metadata={"video_id": video_id, "indexed_count": indexed_count},
+        )
         print(json.dumps(output, indent=2))
+        print_run_info(
+            console,
+            args._response_payload["run_id"],
+            "index",
+            queued=False,
+            output_path=args._response_payload["output_path"],
+            benchmark_path=args._response_payload.get("benchmark_path"),
+        )
     except Exception as e:
+        args._response_payload = fail_direct_run(run_context, f"{type(e).__name__}: {e}")
         console.print(f"[red]Error indexing video: {e}[/red]")
         get_logger().exception("Error in index command")
         sys.exit(1)

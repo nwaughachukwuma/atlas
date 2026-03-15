@@ -32,6 +32,7 @@ from .config import (
 )
 from .helpers import (
     benchmark_file_for,
+    input_file_for,
     output_file_for,
     results_dir_for,
     serialize_result,
@@ -39,7 +40,7 @@ from .helpers import (
     write_file,
 )
 from .queue import TaskQueue, get_queue
-from .store import TaskStore
+from .store import RunStore, TaskStore
 
 __all__ = [
     # config
@@ -56,12 +57,14 @@ __all__ = [
     "TRANSCRIBE_CONCURRENCY",
     "TaskStatus",
     # store
+    "RunStore",
     "TaskStore",
     # queue
     "TaskQueue",
     "get_queue",
     # helpers
     "benchmark_file_for",
+    "input_file_for",
     "output_file_for",
     "serialize_result",
     "worker_log_file_for",

@@ -2,6 +2,7 @@
   import { route } from "@mateothegreat/svelte5-router";
   import { MicIcon, CircleCheckIcon, LoaderCircleIcon } from "lucide-svelte";
   import VideoUpload from "../components/VideoUpload.svelte";
+  import CopyButton from "../components/CopyButton.svelte";
   import { transcribe } from "../lib/api.ts";
   import type { TranscribeResult, TaskQueuedResult } from "../lib/types.ts";
   import { toPath } from "../lib/routing.ts";
@@ -54,6 +55,14 @@
     Convert your video's audio to text. Supports plain text, WebVTT, and SRT
     formats.
   </p>
+
+  <div class="mb-5 text-[0.9rem]">
+    <a
+      class="px-3 py-2 border-cobalt/40 border"
+      href={toPath("/transcribe/runs")}
+      use:route>View Previous Runs →</a
+    >
+  </div>
 
   <div class="card mb-4">
     <VideoUpload
@@ -112,15 +121,34 @@
         style="display:inline;vertical-align:middle;"
       /> Task queued! <strong>Task ID:</strong>
       {taskInfo.task_id ?? taskInfo.id ?? JSON.stringify(taskInfo)}
+      {#if taskInfo.run_id}
+        <br /><strong>Run ID:</strong> {taskInfo.run_id}
+      {/if}
       <br /><a href={toPath("/queue")} use:route>View Queue →</a>
+      {#if taskInfo.run_id}
+        <br /><a href={toPath(`/runs/${taskInfo.run_id}`)} use:route
+          >View Persisted Run →</a
+        >
+      {/if}
     </div>
   {/if}
 
   {#if result}
     <div class="card mt-2">
-      <h3 class="mb-3 flex items-center gap-x-2">
-        Transcript <span class="tag">{format}</span>
-      </h3>
+      <div class="flex items-center justify-between gap-2 mb-3">
+        <h3 class="mb-0 flex items-center gap-x-2">
+          Transcript <span class="tag">{format}</span>
+        </h3>
+        <CopyButton
+          text={result.transcript ?? JSON.stringify(result, null, 2)}
+        />
+      </div>
+      {#if result.run_id}
+        <p class="text-muted text-[0.85rem] mb-3">
+          Saved as run <code class="font-mono">{result.run_id}</code>.
+          <a href={toPath(`/runs/${result.run_id}`)} use:route>View run →</a>
+        </p>
+      {/if}
       <p
         class="text-wrap bg-neutral-500/3 max-h-80 overflow-y-auto p-1.5 font-mono text-sm text-muted"
       >

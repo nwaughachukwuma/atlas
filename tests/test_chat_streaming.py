@@ -1,5 +1,6 @@
 # ruff: noqa: D102
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -78,11 +79,14 @@ class TestChatWorkflow:
 
     @pytest.mark.asyncio
     async def test_persists_both_turns(self, patch_stores):
-        """After streaming, record_turn is called for user then assistant."""
+        """After streaming, record_turn is called for user then assistant via background task."""
         _, mock_vc = patch_stores
 
         with patch("atlas.chat_handler._stream_response", return_value=async_gen("Great video!")):
             _ = [chunk async for chunk in chat_with_video("vid_001", "Describe the video")]
+
+        # Let the background task run
+        await asyncio.sleep(0)
 
         assert mock_vc.record_turn.await_count == 2
         calls = mock_vc.record_turn.await_args_list
@@ -90,11 +94,15 @@ class TestChatWorkflow:
         assert calls[1].args == ("vid_001", "assistant", "Great video!")
 
     @pytest.mark.asyncio
-    async def test_raises_on_empty_response(self, patch_stores):
-        """chat_with_video raises ValueError when Gemini returns an empty string."""
+    async def test_skips_persistence_on_empty_response(self, patch_stores):
+        """chat_with_video skips persistence when Gemini returns only whitespace."""
+        _, mock_vc = patch_stores
+
         with patch("atlas.chat_handler._stream_response", return_value=async_gen("   ")):
-            with pytest.raises(ValueError, match="Empty response"):
-                _ = [chunk async for chunk in chat_with_video("vid_001", "anything")]
+            _ = [chunk async for chunk in chat_with_video("vid_001", "anything")]
+
+        await asyncio.sleep(0)
+        mock_vc.record_turn.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_deduplicates_semantic_hits(self, patch_stores):
@@ -145,7 +153,7 @@ class TestStreamResponse:
         """_stream_response yields .text from each Gemini chunk."""
         chunks = [self._make_chunk("Hello"), self._make_chunk(" world")]
         mock_gemini_client = mock_gemini_client_with_chunks(chunks)
-        with patch("atlas.chat_handler.gemini_client", mock_gemini_client, create=True):
+        with patch("atlas.gemini_client.get_gemini_aio_client", return_value=mock_gemini_client.aio):
             result = [
                 chunk
                 async for chunk in _stream_response(
@@ -169,7 +177,7 @@ class TestStreamResponse:
         ]
         mock_gemini_client = mock_gemini_client_with_chunks(chunks)
         with (
-            patch("atlas.chat_handler.gemini_client", mock_gemini_client, create=True),
+            patch("atlas.gemini_client.get_gemini_aio_client", return_value=mock_gemini_client.aio),
         ):
             result = [
                 chunk

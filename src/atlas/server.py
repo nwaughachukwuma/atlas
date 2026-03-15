@@ -30,6 +30,7 @@ from pydantic import BaseModel
 from ._meta import DISPLAY_NAME, __version__
 from .cli.cmd_media import cmd_extract, cmd_index, cmd_transcribe
 from .file_extension import get_ext_from_mimetype
+from .run_history import parse_output_content
 from .ui_router import ui_router
 from .uuid import uuid
 
@@ -115,10 +116,16 @@ def _run_command(func, args: argparse.Namespace, *, tmp_dir: Path | None = None)
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
     raw = stdout.getvalue()
+    response_payload = getattr(args, "_response_payload", None)
     try:
-        return json.loads(raw)
+        parsed = json.loads(raw)
+        if response_payload and isinstance(parsed, dict):
+            return {**parsed, **response_payload}
+        return parsed
     except (json.JSONDecodeError, ValueError):
         pass
+    if response_payload:
+        return {**CommandResult(ok=True, output=raw, error=stderr.getvalue()).model_dump(), **response_payload}
     return CommandResult(ok=True, output=raw, error=stderr.getvalue())
 
 
@@ -176,6 +183,7 @@ def create_app() -> FastAPI:
             benchmark=benchmark,
             no_queue=no_queue,
             no_streaming=no_streaming,
+            _queue_stage_input=not no_queue,
         )
         return _run_command(cmd_extract, args, tmp_dir=saved.parent)
 
@@ -200,6 +208,7 @@ def create_app() -> FastAPI:
             benchmark=benchmark,
             no_queue=no_queue,
             no_streaming=no_streaming,
+            _queue_stage_input=not no_queue,
         )
         return _run_command(cmd_index, args, tmp_dir=saved.parent)
 
@@ -220,6 +229,7 @@ def create_app() -> FastAPI:
             benchmark=benchmark,
             no_queue=no_queue,
             no_streaming=no_streaming,
+            _queue_stage_input=not no_queue,
         )
         return _run_command(cmd_transcribe, args, tmp_dir=saved.parent)
 
@@ -263,10 +273,7 @@ def create_app() -> FastAPI:
 
         vc = default_video_chat()
         history = vc.get_history(video_id, last_n=last_n)
-        return {
-            "count": len(history),
-            "messages": history,
-        }
+        return {"count": len(history), "messages": history}
 
     @app.get("/stats")
     def stats() -> dict[str, Any]:
@@ -304,7 +311,7 @@ def create_app() -> FastAPI:
         return {
             "status_filter": status,
             "count": len(tasks),
-            "tasks": tasks,
+            "tasks": [{**task, "run_id": task["id"]} for task in tasks],
         }
 
     @app.get("/queue/status/{task_id}")
@@ -331,7 +338,74 @@ def create_app() -> FastAPI:
         if benchmark_file.exists():
             output["benchmark_path"] = str(benchmark_file)
 
+        output["run_id"] = task_id
+
         return output
+
+    @app.get("/runs/list")
+    def runs_list(
+        status: Literal["pending", "running", "completed", "failed", "timeout"] | None = None,
+        command: Literal["transcribe", "extract", "index"] | None = None,
+        mode: Literal["queued", "direct"] | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        from .task_queue.store import RunStore
+
+        runs = RunStore().list_all(status=status, command=command, mode=mode, limit=limit)
+        return {
+            "status_filter": status,
+            "command_filter": command,
+            "mode_filter": mode,
+            "count": len(runs),
+            "runs": runs,
+        }
+
+    @app.get("/runs/{run_id}")
+    def run_detail(run_id: str) -> dict[str, Any]:
+        from .task_queue.store import RunStore
+
+        run = RunStore().get(run_id)
+        if not run:
+            raise HTTPException(404, detail=f"Run {run_id} not found")
+        return run
+
+    @app.get("/runs/{run_id}/output")
+    def run_output(run_id: str) -> dict[str, Any]:
+        from .task_queue.store import RunStore
+
+        run = RunStore().get(run_id)
+        if not run:
+            raise HTTPException(404, detail=f"Run {run_id} not found")
+
+        output_path = run.get("output_path")
+        if not output_path or not Path(output_path).exists():
+            raise HTTPException(404, detail=f"No stored output found for run {run_id}")
+
+        content, kind = parse_output_content(Path(output_path))
+        return {
+            "run_id": run_id,
+            "path": output_path,
+            "kind": kind,
+            "content": content,
+        }
+
+    @app.get("/runs/{run_id}/benchmark")
+    def run_benchmark(run_id: str) -> dict[str, Any]:
+        from .task_queue.store import RunStore
+
+        run = RunStore().get(run_id)
+        if not run:
+            raise HTTPException(404, detail=f"Run {run_id} not found")
+
+        benchmark_path = run.get("benchmark_path")
+        if not benchmark_path or not Path(benchmark_path).exists():
+            raise HTTPException(404, detail=f"No stored benchmark found for run {run_id}")
+
+        return {
+            "run_id": run_id,
+            "path": benchmark_path,
+            "content": Path(benchmark_path).read_text(),
+        }
 
     ui_router(app)
     return app

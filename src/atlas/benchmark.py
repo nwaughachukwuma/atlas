@@ -68,7 +68,7 @@ class BenchmarkRegistry:
     _global: "BenchmarkRegistry | None" = None
     _cls_lock = threading.Lock()
 
-    def __init__(self) -> None:
+    def __init__(self):
         self._times: dict[str, list[float]] = defaultdict(list)
         self._lock = threading.Lock()
 
@@ -120,6 +120,26 @@ class BenchmarkRegistry:
             snapshot = {k: list(v) for k, v in self._times.items()}
         return sorted(
             (_make_stats(name, times) for name, times in snapshot.items()),
+            key=lambda s: s.total_s,
+            reverse=True,
+        )
+
+    def snapshot(self) -> dict[str, int]:
+        """Return the current per-function sample counts."""
+        with self._lock:
+            return {name: len(times) for name, times in self._times.items()}
+
+    def delta_stats(self, snapshot: dict[str, int] | None = None) -> list[BenchmarkStats]:
+        """Return aggregated stats recorded after a previous snapshot."""
+        baseline = snapshot or {}
+        with self._lock:
+            deltas = {
+                name: list(times[baseline.get(name, 0) :])
+                for name, times in self._times.items()
+                if len(times) > baseline.get(name, 0)
+            }
+        return sorted(
+            (_make_stats(name, times) for name, times in deltas.items() if times),
             key=lambda s: s.total_s,
             reverse=True,
         )

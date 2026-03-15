@@ -135,10 +135,7 @@ def cmd_list_chat(args: argparse.Namespace) -> None:
         history = vc.get_history(video_id, last_n=args.last_n)
         progress.update(task, completed=True)
 
-    output = {
-        "count": len(history),
-        "messages": history,
-    }
+    output = {"count": len(history), "messages": history}
     print(json.dumps(output, indent=2))
 
 

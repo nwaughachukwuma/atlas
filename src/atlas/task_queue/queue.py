@@ -5,6 +5,7 @@ Subprocess-backed task queue — each task runs in its own Python process
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -20,8 +21,8 @@ from .config import (
     TASK_TIMEOUT,
     TRANSCRIBE_CONCURRENCY,
 )
-from .helpers import worker_log_file_for
-from .store import TaskStore
+from .helpers import input_file_for, worker_log_file_for
+from .store import RunStore, TaskStore
 from ..logger import get_logger
 
 logger = get_logger("atlas:queue")
@@ -48,7 +49,7 @@ class TaskQueue:
         # and fires a system notification on completion/failure.
     """
 
-    def __init__(self, *, db_path: Path | None = None) -> None:
+    def __init__(self, *, db_path: Path | None = None):
         self._store = TaskStore(db_path) if db_path else TaskStore()
         from ..settings import settings
 
@@ -82,11 +83,42 @@ class TaskQueue:
         # Prepare the results directory and serialise arguments.
         results_dir = RESULTS_DIR / task_id
         results_dir.mkdir(parents=True, exist_ok=True)
+
+        video_path = getattr(args, "video_path", None)
+        should_stage_input = bool(getattr(args, "_queue_stage_input", False))
+        if isinstance(video_path, str) and video_path:
+            source_path = Path(video_path)
+            if source_path.exists() and (should_stage_input or source_path.parent.name.startswith("atlas_upload_")):
+                staged_input = input_file_for(task_id, source_path)
+                shutil.move(str(source_path), staged_input)
+                args.video_path = str(staged_input)
+                args._video_path_resolved = str(staged_input.resolve())
+
         (results_dir / "args.json").write_text(
             json.dumps(vars(args) if hasattr(args, "__dict__") else {}, default=str),
         )
 
         self._store.add(task_id, command, label, output_path, benchmark)
+        RunStore(db_path=self._store.db_path).add(
+            task_id,
+            command,
+            label,
+            mode="queued",
+            status="pending",
+            task_id=task_id,
+            input_path=getattr(args, "_video_path_resolved", getattr(args, "video_path", None)),
+            output_path=str(results_dir / "output.json"),
+            user_output_path=output_path,
+            benchmark_path=str(results_dir / "benchmark.txt") if benchmark else None,
+            log_path=str(worker_log_file_for(task_id)),
+            fmt=getattr(args, "format", None),
+            metadata={
+                "include_summary": getattr(args, "include_summary", None),
+                "chunk_duration": getattr(args, "chunk_duration", None),
+                "overlap": getattr(args, "overlap", None),
+                "attrs": getattr(args, "attrs", None),
+            },
+        )
 
         # Dispatch immediately if a slot is open; otherwise the task stays
         # pending and will be picked up when a running worker finishes.

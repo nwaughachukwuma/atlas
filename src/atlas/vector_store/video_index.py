@@ -16,7 +16,6 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import datetime
-from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from pydantic import BaseModel
@@ -360,14 +359,14 @@ class VideoIndex(BaseCollection):
     # Delete
     # ------------------------------------------------------------------
 
-    def delete_by_video(self, video_id: str) -> None:
+    def delete_by_video(self, video_id: str):
         """Delete all documents for *video_id*."""
         try:
             self.collection.delete_by_filter(filter=f"video_id = '{video_id}'")
         except Exception as e:
             logger.error(f"Error deleting video_index docs for video_id={video_id}: {e}")
 
-    def delete(self, doc_id: str) -> None:
+    def delete(self, doc_id: str):
         """Delete a single document by ID."""
         try:
             self.collection.delete(ids=doc_id)
@@ -375,12 +374,13 @@ class VideoIndex(BaseCollection):
             logger.error(f"Error deleting video_index doc {doc_id}: {e}")
 
 
-@lru_cache(maxsize=16)
 def default_video_index() -> VideoIndex:
-    """Return a VideoIndex object"""
+    """Return a process-global VideoIndex instance."""
     from ..settings import settings
 
-    return VideoIndex(col_path=settings.zvec_store_root / COLLECTION_NAME)
+    return VideoIndex(
+        col_path=settings.zvec_store_root / COLLECTION_NAME,
+    )
 
 
 async def index_video(
@@ -419,7 +419,6 @@ async def index_video(
 
         vi = default_video_index()
         vi.col_path.mkdir(parents=True, exist_ok=True)
-
         video_id = uuid(16)
         indexed = await vi.index_video_result(result, video_id=video_id)
 

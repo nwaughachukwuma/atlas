@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from functools import lru_cache
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel
@@ -269,9 +268,10 @@ class VideoChat(BaseCollection):
         ]
 
 
-@lru_cache(maxsize=16)
 def default_video_chat() -> VideoChat:
-    """Return a VideoChat object"""
+    """Return a process-global VideoChat instance."""
     from ..settings import settings
 
-    return VideoChat(col_path=settings.zvec_store_root / COLLECTION_NAME)
+    return VideoChat(
+        col_path=settings.zvec_store_root / COLLECTION_NAME,
+    )
