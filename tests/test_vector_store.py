@@ -321,6 +321,38 @@ class TestVideoIndex:
         assert open_collection.call_args_list[1].kwargs["read_only"] is False
 
 
+class TestDefaultHelperCaching:
+    """Tests that default_video_index / default_video_chat lru_cache returns same object for same args."""
+
+    def setup_method(self):
+        default_video_index.cache_clear()
+        default_video_chat.cache_clear()
+
+    def teardown_method(self):
+        default_video_index.cache_clear()
+        default_video_chat.cache_clear()
+
+    def test_video_index_same_args_same_instance(self):
+        a = default_video_index(read_only=False)
+        b = default_video_index(read_only=False)
+        assert a is b
+
+    def test_video_index_different_args_different_instance(self):
+        writer = default_video_index(read_only=False)
+        reader = default_video_index(read_only=True)
+        assert writer is not reader
+
+    def test_video_chat_same_args_same_instance(self):
+        a = default_video_chat(read_only=False)
+        b = default_video_chat(read_only=False)
+        assert a is b
+
+    def test_video_chat_different_args_different_instance(self):
+        writer = default_video_chat(read_only=False)
+        reader = default_video_chat(read_only=True)
+        assert writer is not reader
+
+
 class TestBaseCollectionHelpers:
     def test_get_or_create_collection_creates_for_empty_existing_directory(self, tmp_path):
         collection_path = tmp_path / "video_index"
@@ -451,6 +483,43 @@ class TestVideoChat:
         vc = default_video_chat(read_only=True)
         assert vc.col_path == settings.zvec_store_root / "video_chat"
         assert vc.read_only is True
+
+    def test_collection_reuses_shared_handle(self, tmp_path):
+        shared = MagicMock()
+        with (
+            patch.object(BaseCollection, "_init_zvec", return_value=None),
+            patch.object(VideoChat, "_build_schema", return_value=MagicMock()),
+            patch.dict("src.atlas.vector_store.base._collection_cache", {}, clear=True),
+            patch("src.atlas.vector_store.base.get_or_create_collection", return_value=shared) as open_collection,
+        ):
+            first = VideoChat(col_path=tmp_path / "video_chat")
+            second = VideoChat(col_path=tmp_path / "video_chat")
+            assert first.collection is shared
+            assert second.collection is shared
+
+        open_collection.assert_called_once()
+
+    def test_collection_separates_read_only_and_writer_handles(self, tmp_path):
+        read_shared = MagicMock()
+        write_shared = MagicMock()
+        with (
+            patch.object(BaseCollection, "_init_zvec", return_value=None),
+            patch.object(VideoChat, "_build_schema", return_value=MagicMock()),
+            patch.dict("src.atlas.vector_store.base._collection_cache", {}, clear=True),
+            patch(
+                "src.atlas.vector_store.base.get_or_create_collection",
+                side_effect=[read_shared, write_shared],
+            ) as open_collection,
+        ):
+            reader = VideoChat(col_path=tmp_path / "video_chat", read_only=True)
+            writer = VideoChat(col_path=tmp_path / "video_chat")
+
+            assert reader.collection is read_shared
+            assert writer.collection is write_shared
+
+        assert open_collection.call_count == 2
+        assert open_collection.call_args_list[0].kwargs["read_only"] is True
+        assert open_collection.call_args_list[1].kwargs["read_only"] is False
 
     def test_uuid(self, tmp_path):
         vc = VideoChat(col_path=tmp_path / "video_chat")

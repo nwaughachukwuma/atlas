@@ -387,7 +387,7 @@ class RunStore(_SQLiteStoreBase):
         mode: str | None = None,
         limit: int | None = None,
     ) -> List[dict]:
-        """list all"""
+        """List all runs"""
         clauses: list[str] = []
         params: list[Any] = []
         if status:
@@ -409,7 +409,8 @@ class RunStore(_SQLiteStoreBase):
             params.append(limit)
 
         rows = self._conn().execute(query, tuple(params)).fetchall()
-        return [self._decode_row(r) for r in rows]
+        res = [self._decode_row(r) for r in rows]
+        return [v for v in res if v is not None]
 
     def _decode_row(self, row: sqlite3.Row | None) -> Optional[dict]:
         if row is None:

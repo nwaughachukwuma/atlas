@@ -61,8 +61,9 @@ def get_or_create_collection(
             option=zvec.CollectionOption(read_only=read_only),
         )
     except Exception as e:
-        logger.warning("Error in zvec.open %s - path: %s", e, path)
-        raise RuntimeError(f"Unable to open zvec collection at {path}") from e
+        error_messsage = f"Unable to open zvec collection - path: {path}; error: {e}"
+        logger.warning(error_messsage)
+        raise RuntimeError(error_messsage) from e
 
 
 def get_shared_collection(
@@ -78,6 +79,7 @@ def get_shared_collection(
         return cached
 
     with _collection_lock:
+        # thread safe check
         cached = _collection_cache.get(cache_key)
         if cached is not None:
             return cached
