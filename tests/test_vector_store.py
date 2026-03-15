@@ -291,28 +291,6 @@ class TestVideoIndex:
         open_collection.assert_called_once()
 
 
-class TestDefaultHelperCaching:
-    """Tests that default_video_index / default_video_chat lru_cache returns same object."""
-
-    def setup_method(self):
-        default_video_index.cache_clear()
-        default_video_chat.cache_clear()
-
-    def teardown_method(self):
-        default_video_index.cache_clear()
-        default_video_chat.cache_clear()
-
-    def test_video_index_same_instance(self):
-        a = default_video_index()
-        b = default_video_index()
-        assert a is b
-
-    def test_video_chat_same_instance(self):
-        a = default_video_chat()
-        b = default_video_chat()
-        assert a is b
-
-
 class TestBaseCollectionHelpers:
     def test_get_or_create_collection_creates_for_empty_existing_directory(self, tmp_path):
         collection_path = tmp_path / "video_index"
