@@ -269,12 +269,11 @@ class VideoChat(BaseCollection):
         ]
 
 
-@lru_cache(maxsize=32)
-def default_video_chat(*, read_only=False) -> VideoChat:
-    """Return a VideoChat object"""
+@lru_cache(maxsize=1)
+def default_video_chat() -> VideoChat:
+    """Return a process-global VideoChat instance."""
     from ..settings import settings
 
     return VideoChat(
         col_path=settings.zvec_store_root / COLLECTION_NAME,
-        read_only=read_only,
     )

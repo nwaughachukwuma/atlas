@@ -375,14 +375,13 @@ class VideoIndex(BaseCollection):
             logger.error(f"Error deleting video_index doc {doc_id}: {e}")
 
 
-@lru_cache(maxsize=32)
-def default_video_index(*, read_only=False) -> VideoIndex:
-    """Return a VideoIndex object"""
+@lru_cache(maxsize=1)
+def default_video_index() -> VideoIndex:
+    """Return a process-global VideoIndex instance."""
     from ..settings import settings
 
     return VideoIndex(
         col_path=settings.zvec_store_root / COLLECTION_NAME,
-        read_only=read_only,
     )
 
 
@@ -443,5 +442,5 @@ async def search_video(
     Returns:
         List of SearchResult ordered by relevance.
     """
-    vi = default_video_index(read_only=True)
+    vi = default_video_index()
     return await vi.search(query, top_k, video_id)

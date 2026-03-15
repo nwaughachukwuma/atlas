@@ -40,7 +40,7 @@ async def chat_with_video(
     Yields:
         Incremental text chunks from the model.
     """
-    vi = default_video_index(read_only=True)
+    vi = default_video_index()
     vc = default_video_chat()
 
     # 1. Multimodal context from video segments
