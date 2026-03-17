@@ -297,7 +297,7 @@ def create_app() -> FastAPI:
         vi = default_video_index()
         data = vi.get_video_data(video_id)
         if not data:
-            raise HTTPException(status_code=404, detail=f"No data found for video_id={video_id}")
+            raise HTTPException(404, f"No data found for video_id={video_id}")
         return {"data": data}
 
     @app.get("/queue/list")

@@ -315,7 +315,7 @@ class VideoIndex(BaseCollection):
         try:
             results = self.collection.query(topk=1024, filter=f"video_id = '{video_id}'")
             if not results:
-                return None
+                raise ValueError(f"No data found for video_id={video_id}")
         except Exception as e:
             logger.error(f"Error fetching video data: {e}")
             return None
@@ -352,8 +352,8 @@ class VideoIndex(BaseCollection):
         return {
             "video_id": video_id,
             "duration": duration,
-            "video_descriptions": sorted_segments,
             "segments_count": len(sorted_segments),
+            "video_descriptions": sorted_segments,
         }
 
     # ------------------------------------------------------------------

@@ -1,20 +1,28 @@
-// ── Domain models ─────────────────────────────────────────────────────────────
+export type DescriptionAttr =
+  | "visual_cues"
+  | "audio_analysis"
+  | "transcript"
+  | "interactions"
+  | "contextual_information";
+
+export interface VideoAnalysisAttr {
+  attr: DescriptionAttr;
+  value: string;
+}
 
 export interface VideoChunk {
-  start_time?: string | number;
-  end_time?: string | number;
-  description?: string;
-  transcript?: string;
+  start?: number;
+  end?: number;
   summary?: string;
-  [key: string]: unknown;
+  video_analysis?: VideoAnalysisAttr[];
 }
 
 export interface Video {
   video_id: string;
+  duration: number;
+  segments_count: number;
+  video_descriptions?: VideoChunk[];
   indexed_at?: string;
-  chunk_count?: number;
-  chunks?: VideoChunk[];
-  [key: string]: unknown;
 }
 
 export interface ListVideosResponse {

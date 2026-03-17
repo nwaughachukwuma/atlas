@@ -3,9 +3,11 @@
   import { FilmIcon, LoaderCircleIcon } from "lucide-svelte";
   import { onMount } from "svelte";
   import { getVideo } from "../lib/api.ts";
-  import type { Video } from "../lib/types.ts";
+  import type { Video, VideoChunk } from "../lib/types.ts";
   import ChatPanel from "../components/ChatPanel.svelte";
   import VideoSearch from "../components/VideoSearch.svelte";
+  import SegmentGrid from "../components/SegmentGrid.svelte";
+  import SegmentSheet from "../components/SegmentSheet.svelte";
   import { toPath } from "../lib/routing.ts";
   import { toast } from "svelte-sonner";
 
@@ -17,6 +19,9 @@
   let loading = $state(true);
   let pollInterval = $state<number | null>(null);
   let taskStatus = $state<string | null>(null);
+  let selectedChunk = $state<VideoChunk | null>(null);
+  let selectedChunkIndex = $state<number | null>(null);
+  let sheetOpen = $state(false);
 
   async function loadVideoData() {
     if (!videoId) throw new Error("videoId not found");
@@ -104,20 +109,37 @@
           {/if}
         {/each}
       </div>
-      {#if videoData.chunks}
-        <h4 class="mt-4">Segments ({videoData.chunks.length})</h4>
-        {#each videoData.chunks as chunk, i (`${i}:${chunk.start_time}`)}
-          <details class="border border-line mb-[0.4rem] p-[0.4rem]">
-            <summary
-              class="cursor-pointer text-[0.85rem] text-muted hover:text-cobalt"
-              >Segment {i + 1}</summary
-            >
-            <pre>{JSON.stringify(chunk, null, 2)}</pre>
-          </details>
-        {/each}
-      {/if}
     </div>
 
+    {#if videoData.video_descriptions && videoData.video_descriptions.length > 0}
+      <div class="card mb-4 mt-5">
+        <h4 class="mt-4 mb-3">
+          Segments ({videoData.video_descriptions.length})
+        </h4>
+        <SegmentGrid
+          chunks={videoData.video_descriptions}
+          onSegmentClick={(chunk, index) => {
+            selectedChunk = chunk;
+            selectedChunkIndex = index;
+            sheetOpen = true;
+          }}
+        />
+      </div>
+    {/if}
+
     <ChatPanel {videoId} />
+  {/if}
+
+  {#if selectedChunk && selectedChunkIndex != null}
+    <SegmentSheet
+      open={sheetOpen}
+      chunk={selectedChunk}
+      index={selectedChunkIndex}
+      onClose={() => {
+        sheetOpen = false;
+        selectedChunk = null;
+        selectedChunkIndex = null;
+      }}
+    />
   {/if}
 </div>
