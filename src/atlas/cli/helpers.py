@@ -6,13 +6,26 @@ bodies so that importing this module is essentially free.
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from rich.console import Console
+
+from ..settings import settings
+
+_console: Optional["Console"] = None
+
+
+def get_console() -> "Console":
+    """Return (or create) the process-wide rich ``Console`` instance."""
+    global _console
+    if _console is None:
+        from rich.console import Console
+
+        _console = Console()
+    return _console
 
 
 # ── Logger ────────────────────────────────────────────────────────────────────
@@ -39,8 +52,6 @@ def short_name(full: str) -> str:
 
 def err(msg: str):
     """Print a red error message and exit with code 2 (client/validation error)."""
-    from . import get_console
-
     get_console().print(f"[red]Error: {msg}[/red]")
     sys.exit(2)
 
@@ -66,9 +77,9 @@ def format_elapsed(seconds: float) -> str:
 
 def validate_api_keys(require_gemini: bool = True, require_groq: bool = False) -> None:
     """Exit with a helpful message if required API keys are missing."""
-    if require_gemini and not os.environ.get("GEMINI_API_KEY"):
+    if require_gemini and not settings.groq_api_key:
         err("GEMINI_API_KEY environment variable is required.\nSet it with: export GEMINI_API_KEY=your-api-key")
-    if require_groq and not os.environ.get("GROQ_API_KEY"):
+    if require_groq and not settings.groq_api_key:
         err(
             "GROQ_API_KEY environment variable is required for transcription.\n"
             "Set it with: export GROQ_API_KEY=your-api-key"
@@ -122,8 +133,6 @@ def validate_video_path(video_path: str) -> Path:
 def make_progress():
     """Create a rich ``Progress`` instance for indeterminate tasks."""
     from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
-
-    from . import get_console
 
     return Progress(
         SpinnerColumn(),
@@ -197,10 +206,8 @@ def print_run_info(
         console.print("  [dim]You can keep using Atlas for new tasks.[/dim]")
 
 
-def print_benchmark_summary() -> None:
+def print_benchmark_summary(_state: dict, _console: Console) -> None:
     """Print benchmark timing table if --benchmark was requested (set by ``_state``)."""
-    from . import _state, get_console
-
     if not _state.get("benchmark"):
         return
 
@@ -212,8 +219,7 @@ def print_benchmark_summary() -> None:
     if not stats:
         return
 
-    console = get_console()
-    console.print("\n[bold yellow]⏱  Benchmark Summary[/bold yellow]")
+    _console.print("\n[bold yellow]⏱  Benchmark Summary[/bold yellow]")
     table = Table(show_header=True, header_style="bold cyan", show_lines=False)
     table.add_column("Function", style="cyan", ratio=1, no_wrap=True, min_width=20)
     table.add_column("Runs", justify="right", width=5, style="dim")
@@ -230,4 +236,4 @@ def print_benchmark_summary() -> None:
             f"{s.min_s:.2f}s",
             f"{s.max_s:.2f}s",
         )
-    console.print(table)
+    _console.print(table)

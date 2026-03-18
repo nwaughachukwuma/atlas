@@ -1,4 +1,6 @@
-"""CLI sub-commands for inspecting persisted run history."""
+"""
+CLI sub-commands for inspecting transcribe/extract/index run
+"""
 
 from __future__ import annotations
 
@@ -15,8 +17,8 @@ def add_run_commands(subparsers: Any) -> None:
     """Register atlas runs list/show/output/benchmark sub-commands."""
     p_runs = subparsers.add_parser(
         "runs",
-        help="Inspect persisted transcribe/extract/index runs.",
-        description="View persisted run history and retrieve stored output or benchmarks.",
+        help="Inspect transcribe/extract/index runs.",
+        description="View run history and retrieve stored output and benchmarks.",
         epilog=(
             "Examples:\n"
             "  atlas runs list\n"
@@ -30,7 +32,7 @@ def add_run_commands(subparsers: Any) -> None:
     sub = p_runs.add_subparsers(dest="runs_command", metavar="<action>")
     sub.required = True
 
-    p_list = sub.add_parser("list", help="List persisted runs.")
+    p_list = sub.add_parser("list", help="List all runs.")
     p_list.add_argument("--status", choices=["pending", "running", "completed", "failed", "timeout"])
     p_list.add_argument("--command", choices=["transcribe", "extract", "index"])
     p_list.add_argument("--mode", choices=["queued", "direct"])
@@ -58,33 +60,30 @@ def _get_run_or_error(run_id: str) -> dict | None:
     return run
 
 
-def cmd_runs_list(args: argparse.Namespace) -> None:
+def cmd_runs_list(args: argparse.Namespace) -> dict[str, Any]:
     runs = RunStore().list_all(
         status=getattr(args, "status", None),
         command=getattr(args, "command", None),
         mode=getattr(args, "mode", None),
         limit=getattr(args, "limit", None),
     )
-    print(
-        json.dumps(
-            {
-                "count": len(runs),
-                "status_filter": getattr(args, "status", None),
-                "command_filter": getattr(args, "command", None),
-                "mode_filter": getattr(args, "mode", None),
-                "runs": runs,
-            },
-            indent=2,
-            default=str,
-        )
-    )
+    result = {
+        "count": len(runs),
+        "status_filter": getattr(args, "status", None),
+        "command_filter": getattr(args, "command", None),
+        "mode_filter": getattr(args, "mode", None),
+        "runs": runs,
+    }
+    print(json.dumps(result, indent=2, default=str))
+    return result
 
 
-def cmd_runs_show(args: argparse.Namespace) -> None:
+def cmd_runs_show(args: argparse.Namespace) -> dict[str, Any] | None:
     run = _get_run_or_error(args.run_id)
     if run is None:
         return
     print(json.dumps(run, indent=2, default=str))
+    return run
 
 
 def cmd_runs_output(args: argparse.Namespace) -> None:

@@ -27,12 +27,9 @@ if TYPE_CHECKING:
     from ..utils import DescriptionAttr
 
 
-# ── extract ───────────────────────────────────────────────────────────────────
-
-
 def cmd_extract(args: argparse.Namespace) -> None:
     """Extract multimodal insights, optionally queuing the task."""
-    from . import get_console, get_logger
+    from .helpers import get_console, get_logger
 
     console = get_console()
     use_queue = not getattr(args, "no_queue", False)
@@ -199,7 +196,7 @@ def cmd_extract(args: argparse.Namespace) -> None:
 
 def cmd_transcribe(args: argparse.Namespace) -> None:
     """Transcribe a video, optionally queuing the task."""
-    from . import get_console, get_logger
+    from .helpers import get_console, get_logger
     from ..utils import TempPath
 
     console = get_console()
@@ -326,7 +323,7 @@ def cmd_transcribe(args: argparse.Namespace) -> None:
 
 def cmd_index(args: argparse.Namespace) -> None:
     """Index a video for semantic search, optionally queuing the task."""
-    from . import get_console, get_logger
+    from .helpers import get_console, get_logger
     from ..utils import TempPath
 
     console = get_console()

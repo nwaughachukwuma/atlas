@@ -15,14 +15,12 @@ from typing import Any, Literal, Optional, TypeVar
 from pydantic import BaseModel
 
 from .logger import logger
+from .settings import settings
 
 T = TypeVar("T")
 
 
-enable_logging = os.environ.get("ENABLE_LOGGING", False)
-
-
-def process_time(label: str | None = None, debug=enable_logging):
+def process_time(label: str | None = None, debug=settings.enable_logging):
     """Decorator that records wall-clock execution time per function.
 
     Timing is accumulated in the global BenchmarkRegistry.  To see the
