@@ -63,7 +63,9 @@
   const runId: string | null = $derived.by(
     () =>
       routeResult.result.path.params?.id ??
-      originalPath.match(/^\/(?:transcribe|extract|index)\/runs\/([^/]+)$/)?.[1] ??
+      originalPath.match(
+        /^\/(?:transcribe|extract|index)\/runs\/([^/]+)$/,
+      )?.[1] ??
       originalPath.match(/^\/runs\/([^/]+)$/)?.[1] ??
       null,
   );
@@ -134,6 +136,12 @@
     return runDetail(runId)
       .then(async (data) => {
         currentRun = data;
+        const hasFinished =
+          data.status === "completed" ||
+          data.status === "failed" ||
+          data.status === "timeout";
+        if (!hasFinished) return;
+
         void runOutput(runId)
           .then((d) => (outputData = d))
           .catch(() => null);
@@ -269,13 +277,13 @@
               <FileTextIcon size={16} strokeWidth={2} /> Output
             </h3>
             {#if outputData}
-              <CopyButton text={JSON.stringify(outputData, null, 2)} />
+              <CopyButton text={JSON.stringify(outputData.content, null, 2)} />
             {/if}
           </div>
           {#if outputData}
             <pre
               class="max-h-96 overflow-y-auto m-0 text-[0.78rem]">{JSON.stringify(
-                outputData,
+                outputData.content,
                 null,
                 2,
               )}</pre>

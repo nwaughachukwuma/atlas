@@ -16,10 +16,31 @@ from .task_queue.store import RunStore
 from .uuid import uuid
 
 RUNS_DIR = Path(settings.atlas_home) / "runs"
+RESULTS_DIR = RUNS_DIR / "results"
+
 
 def create_run_id(size: int = 10) -> str:
     """Return a unique run ID for non-queued media operations."""
     return uuid(size)
+
+
+def results_dir_for(run_id: str) -> Path:
+    """Return the persisted results directory for a direct run."""
+    return RESULTS_DIR / run_id
+
+
+def output_file_for(run_id: str) -> Path:
+    """Return the canonical output file path for a direct run."""
+    return results_dir_for(run_id) / "output.json"
+
+
+def parse_output_content(path: Path):
+    """Return stored output content and its content kind."""
+    content = path.read_text()
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        return content
 
 
 def build_benchmark_summary(stats: list[BenchmarkStats], total_s: float | None = None) -> str:
@@ -68,6 +89,7 @@ class DirectRunContext:
     command: str
     label: str
     input_path: str
+    output_path: Path
     requested_output_path: str | None
     fmt: str | None
     benchmark_requested: bool
@@ -87,6 +109,7 @@ def start_direct_run(
 ) -> DirectRunContext:
     """Create and mark a new direct run as running."""
     run_id = create_run_id()
+    output_path = output_file_for(run_id)
     store = RunStore()
     store.add(
         run_id,
@@ -97,6 +120,7 @@ def start_direct_run(
         input_path=input_path,
         user_output_path=requested_output_path,
         fmt=fmt,
+        output_path=str(output_path),
         metadata=metadata,
     )
     store.mark_running(run_id)
@@ -105,6 +129,7 @@ def start_direct_run(
         command=command,
         label=label,
         input_path=input_path,
+        output_path=output_path,
         requested_output_path=requested_output_path,
         fmt=fmt,
         benchmark_requested=benchmark,
@@ -121,6 +146,7 @@ def complete_direct_run(
 ) -> dict[str, Any]:
     """Persist direct-run output and optional benchmark data."""
     content = serialize_result(result)
+    write_file(context.output_path, content)
     if context.requested_output_path:
         write_file(Path(context.requested_output_path), content)
 
@@ -131,7 +157,7 @@ def complete_direct_run(
 
     RunStore().mark_completed(
         context.run_id,
-        output_text=content,
+        output_path=str(context.output_path),
         benchmark_text=benchmark_content,
         user_output_path=context.requested_output_path,
         metadata=metadata,
@@ -153,13 +179,14 @@ def fail_direct_run(
 ) -> dict[str, Any]:
     """Persist a direct-run failure for later inspection."""
     error_content = json.dumps({"error": error}, indent=2)
+    write_file(context.output_path, error_content)
     if context.requested_output_path:
         write_file(Path(context.requested_output_path), error_content)
 
     RunStore().mark_failed(
         context.run_id,
         error,
-        output_text=error_content,
+        output_path=str(context.output_path),
         user_output_path=context.requested_output_path,
         metadata=metadata,
     )

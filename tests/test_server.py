@@ -262,7 +262,7 @@ class TestQueueStatusEndpoint:
         fake_run = {
             "id": "abc123",
             "status": "completed",
-            "output_text": '{"ok": true, "segments": 3}',
+            "output_path": str(tmp_path / "output.json"),
             "benchmark_text": "|...|",
         }
 
@@ -572,17 +572,15 @@ class TestRunEndpoints:
         assert resp.json()["id"] == "run1"
 
     def test_run_output(self, tmp_path):
-        fake_store = MagicMock()
-        fake_store.get.return_value = {"id": "run1", "output_text": json.dumps({"ok": True, "kind": "text"})}
 
-        with patch("atlas.cli.cmd_runs.RunStore", return_value=fake_store):
+        expected_result = {"path": "/fake/path", "content": {"ok": True}}
+        with patch("atlas.cli.cmd_runs.cmd_runs_output", return_value=expected_result):
             client = TestClient(create_app())
             resp = client.get("/runs/run1/output")
 
         assert resp.status_code == 200
         body = resp.json()
-        assert body["kind"] == "text"
-        assert body["ok"] is True
+        assert body["content"] == {"ok": True}
 
     def test_run_benchmark(self, tmp_path):
         fake_store = MagicMock()

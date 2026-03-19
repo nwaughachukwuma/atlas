@@ -343,7 +343,6 @@ def create_app() -> FastAPI:
         result = cmd_runs_output(argparse.Namespace(run_id=run_id))
         if not result:
             raise HTTPException(404, f"No stored output found for run {run_id}")
-
         return result
 
     @app.get("/runs/{run_id}/benchmark")

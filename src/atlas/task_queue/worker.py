@@ -103,17 +103,18 @@ def run_task(task_id: str) -> None:
     user_output_path: str | None = run_entry.get("user_output_path") if run_entry else None
     benchmark: bool = bool(task.get("benchmark"))
     work_dir = WORK_DIR / task_id
+    output_file = work_dir / "output.json"
 
     # Resolve the worker function.
     func_path = _COMMANDS.get(command)
     if not func_path:
-        store.mark_failed(task_id, f"Unknown command: {command}")
+        store.mark_failed(task_id, f"Unknown command: {command}", output_path=str(output_file))
         logger.error("Unknown command %r for task %s", command, task_id)
         return
 
     args_json = task.get("args_json")
     if not args_json:
-        store.mark_failed(task_id, "args_json missing from database — cannot reconstruct arguments")
+        store.mark_failed(task_id, "args_json missing from database — cannot reconstruct arguments", output_path=str(output_file))
         return
 
     args_dict = json.loads(args_json)
@@ -132,14 +133,15 @@ def run_task(task_id: str) -> None:
         timed_out.wait(TASK_TIMEOUT)
         if not timed_out.is_set():
             # Timeout reached — the main thread is still blocked.
-            store.mark_timeout(task_id)
+            store.mark_timeout(task_id, output_path=str(output_file))
             run_store.mark_timeout(
                 task_id,
                 f"Exceeded {TASK_TIMEOUT}s timeout",
-                output_text=json.dumps({"error": f"Exceeded {TASK_TIMEOUT}s timeout"}),
+                output_path=str(output_file),
                 log_path=str(work_dir / "worker.log"),
                 user_output_path=user_output_path,
             )
+            write_file(output_file, json.dumps({"error": f"Exceeded {TASK_TIMEOUT}s timeout"}))
             if user_output_path:
                 write_file(Path(user_output_path), json.dumps({"error": f"Exceeded {TASK_TIMEOUT}s timeout"}))
             notify(
@@ -161,7 +163,8 @@ def run_task(task_id: str) -> None:
         timed_out.set()
 
         content = serialize_result(result)
-        store.mark_completed(task_id)
+        store.mark_completed(task_id, output_path=str(output_file))
+        write_file(output_file, content)
         if user_output_path:
             write_file(Path(user_output_path), content)
 
@@ -171,7 +174,7 @@ def run_task(task_id: str) -> None:
 
         run_store.mark_completed(
             task_id,
-            output_text=content,
+            output_path=str(output_file),
             benchmark_text=benchmark_text,
             log_path=str(work_dir / "worker.log"),
             user_output_path=user_output_path,
@@ -188,14 +191,15 @@ def run_task(task_id: str) -> None:
         timed_out.set()  # cancel watchdog
 
         error_msg = f"{type(exc).__name__}: {exc}"
-        store.mark_failed(task_id, error_msg)
+        store.mark_failed(task_id, error_msg, output_path=str(output_file))
         run_store.mark_failed(
             task_id,
             error_msg,
-            output_text=json.dumps({"error": error_msg}),
+            output_path=str(output_file),
             log_path=str(work_dir / "worker.log"),
             user_output_path=user_output_path,
         )
+        write_file(output_file, json.dumps({"error": error_msg}))
         if user_output_path:
             write_file(Path(user_output_path), json.dumps({"error": error_msg}))
         notify(

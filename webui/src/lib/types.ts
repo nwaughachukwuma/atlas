@@ -73,7 +73,7 @@ export interface Run {
   started_at?: string;
   finished_at?: string;
   input_path?: string | null;
-  output_text?: string | null;
+  output_path?: string | null;
   user_output_path?: string | null;
   benchmark_text?: string | null;
   log_path?: string | null;
@@ -90,7 +90,10 @@ export interface RunListResponse {
   mode_filter?: RunMode | null;
 }
 
-export type RunOutputResponse = Record<string, unknown> | string;
+export interface RunOutputResponse {
+  path: string;
+  content: Record<string, unknown> | string;
+}
 
 // ── Search ────────────────────────────────────────────────────────────────────
 

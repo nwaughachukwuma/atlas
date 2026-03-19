@@ -6,8 +6,10 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 from typing import Any, Dict, cast
 
+from ..run_history import parse_output_content
 from ..task_queue import RunStore
 
 
@@ -68,7 +70,6 @@ def cmd_runs_list(args: argparse.Namespace) -> dict[str, Any]:
     _runs = [
         {
             **v,
-            "output_text": f"Get output using <atlas runs output --run-id {v['id']}>",
             "benchmark_text": f"Get benchmark using <atlas runs benchmark --run-id {v['id']}>",
         }
         for v in runs
@@ -97,18 +98,18 @@ def cmd_runs_output(args: argparse.Namespace) -> str | Dict | None:
     if run is None:
         return
 
-    output_text = run.get("output_text")
-    if not output_text:
+    output_path = run.get("output_path")
+    if not output_path or not Path(output_path).exists():
         print(json.dumps({"error": f"No stored output found for run {args.run_id}"}))
         return
 
-    try:
-        content = json.loads(output_text)
-        print(json.dumps(content, indent=2, default=str))
-        return content
-    except json.JSONDecodeError:
-        print(output_text)
-        return output_text
+    content = parse_output_content(Path(output_path))
+    result = {"path": output_path, "content": content}
+    if isinstance(content, dict):
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        print(result)
+    return result
 
 
 def cmd_runs_benchmark(args: argparse.Namespace):

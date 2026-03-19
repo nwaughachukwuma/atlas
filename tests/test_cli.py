@@ -440,11 +440,13 @@ class TestCmdIndex:
         ):
             cmd_index(args)
 
-        run = RunStore(db_path=isolated_run_history["db_path"]).get(args._response_payload["run_id"])
+        run_id = args._response_payload["run_id"]
+        run = RunStore(db_path=isolated_run_history["db_path"]).get(run_id)
         assert run is not None
         assert run["command"] == "index"
         assert run["status"] == "completed"
-        assert json.loads(run["output_text"])["video_id"] == "vid_001"
+        with open(run["output_path"]) as f:
+            assert json.load(f)["video_id"] == "vid_001"
 
 
 # ---------------------------------------------------------------------------
@@ -733,8 +735,9 @@ class TestCmdTranscribe:
         assert run is not None
         assert run["command"] == "transcribe"
         assert run["status"] == "completed"
-        assert run["output_text"] is not None
-        assert json.loads(run["output_text"])["transcript"] == "Hello world transcript"
+        assert run["output_path"] is not None
+        with open(run["output_path"]) as f:
+            assert json.load(f)["transcript"] == "Hello world transcript"
 
     def test_success_saves_to_file(self, tmp_path):
         video = tmp_path / "v.mp4"
@@ -854,7 +857,8 @@ class TestCmdExtract:
         assert run is not None
         assert run["command"] == "extract"
         assert run["status"] == "completed"
-        assert json.loads(run["output_text"])["duration"] == 10.0
+        with open(run["output_path"]) as f:
+            assert json.load(f)["duration"] == 10.0
 
     def test_invalid_attr_exits(self, tmp_path):
         video = tmp_path / "v.mp4"
@@ -1024,17 +1028,20 @@ class TestRunStore:
     def test_add_and_get(self, tmp_path):
         from atlas.task_queue.store import RunStore
 
+        out_path = tmp_path / "out.json"
+        out_path.write_text('{"ok": true}')
+
         store = RunStore(db_path=tmp_path / "runs.db")
         store.add("r1", "transcribe", "transcribe v.mp4", mode="direct", input_path="/tmp/v.mp4")
         store.mark_running("r1")
-        store.mark_completed("r1", output_text='{"ok": true}')
+        store.mark_completed("r1", output_path=str(out_path))
 
         run = store.get("r1")
         assert run is not None
         assert run["id"] == "r1"
         assert run["command"] == "transcribe"
         assert run["status"] == "completed"
-        assert run["output_text"] == '{"ok": true}'
+        assert run["output_path"] == str(out_path)
 
 
 class TestTaskQueueSubmit:
