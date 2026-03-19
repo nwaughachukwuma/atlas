@@ -262,19 +262,16 @@
               <FileTextIcon size={16} strokeWidth={2} /> Output
             </h3>
             {#if outputData}
-              <CopyButton
-                text={outputData.kind === "json"
-                  ? JSON.stringify(outputData.content, null, 2)
-                  : String(outputData.content)}
-              />
+              <CopyButton text={JSON.stringify(outputData, null, 2)} />
             {/if}
           </div>
           {#if outputData}
             <pre
-              class="max-h-96 overflow-y-auto m-0 text-[0.78rem]">{outputData.kind ===
-              "json"
-                ? JSON.stringify(outputData.content, null, 2)
-                : String(outputData.content)}</pre>
+              class="max-h-96 overflow-y-auto m-0 text-[0.78rem]">{JSON.stringify(
+                outputData,
+                null,
+                2,
+              )}</pre>
           {:else}
             <p class="text-muted mb-0 text-[0.85rem]">
               No stored output available.

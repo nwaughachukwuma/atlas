@@ -340,11 +340,11 @@ def create_app() -> FastAPI:
     def run_output(run_id: str) -> str | dict[str, Any]:
         from .cli.cmd_runs import cmd_runs_output
 
-        output_text = cmd_runs_output(argparse.Namespace(run_id=run_id))
-        if not output_text:
+        result = cmd_runs_output(argparse.Namespace(run_id=run_id))
+        if not result:
             raise HTTPException(404, f"No stored output found for run {run_id}")
 
-        return output_text
+        return result
 
     @app.get("/runs/{run_id}/benchmark")
     def run_benchmark(run_id: str) -> str:

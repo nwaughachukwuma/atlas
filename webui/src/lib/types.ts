@@ -90,10 +90,7 @@ export interface RunListResponse {
   mode_filter?: RunMode | null;
 }
 
-export interface RunOutputResponse {
-  kind: "json" | "text";
-  content: unknown;
-}
+export type RunOutputResponse = Record<string, unknown> | string;
 
 // ── Search ────────────────────────────────────────────────────────────────────
 
