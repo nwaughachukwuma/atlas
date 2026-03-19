@@ -10,10 +10,10 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
+from ..settings import settings
+
 if TYPE_CHECKING:
     from rich.console import Console
-
-from ..settings import settings
 
 _console: Optional["Console"] = None
 
@@ -77,8 +77,11 @@ def format_elapsed(seconds: float) -> str:
 
 def validate_api_keys(require_gemini: bool = True, require_groq: bool = False) -> None:
     """Exit with a helpful message if required API keys are missing."""
-    if require_gemini and not settings.groq_api_key:
-        err("GEMINI_API_KEY environment variable is required.\nSet it with: export GEMINI_API_KEY=your-api-key")
+
+    if require_gemini and not settings.gemini_api_key:
+        err(
+            "GEMINI_API_KEY environment variable is required.\nSet it with: export GEMINI_API_KEY=your-api-key",
+        )
     if require_groq and not settings.groq_api_key:
         err(
             "GROQ_API_KEY environment variable is required for transcription.\n"
@@ -152,16 +155,15 @@ def print_queued_info(
     benchmark: bool = False,
 ) -> None:
     """Print standardised information about a queued task."""
-    from ..task_queue import benchmark_file_for, output_file_for, worker_log_file_for
+    from ..task_queue import worker_log_file_for
 
     print_run_info(
         console,
         task_id,
         command,
         queued=True,
-        output_path=str(output_file_for(task_id)),
-        benchmark_path=str(benchmark_file_for(task_id)) if benchmark else None,
         user_output_path=output_path,
+        benchmark=benchmark,
         log_path=str(worker_log_file_for(task_id)),
         task_id=task_id,
     )
@@ -173,9 +175,8 @@ def print_run_info(
     command: str,
     *,
     queued: bool,
-    output_path: str,
-    benchmark_path: str | None = None,
     user_output_path: str | None = None,
+    benchmark: bool = False,
     log_path: str | None = None,
     task_id: str | None = None,
 ) -> None:
@@ -185,11 +186,8 @@ def print_run_info(
     console.print(f"\n[bold green]{heading}[/bold green]")
     console.print(f"  [cyan]Run ID:[/cyan]     {run_id}")
     console.print(f"  [cyan]Command:[/cyan]    {command}")
-    console.print(f"  [cyan]Output:[/cyan]     {output_path}")
     if user_output_path:
-        console.print(f"  [cyan]Also at:[/cyan]    {user_output_path}")
-    if benchmark_path:
-        console.print(f"  [cyan]Benchmark:[/cyan]  {benchmark_path}")
+        console.print(f"  [cyan]Output:[/cyan]     {user_output_path}")
     if log_path:
         console.print(f"  [cyan]Worker log:[/cyan] {log_path}")
     if task_id:
@@ -198,7 +196,7 @@ def print_run_info(
         console.print("  [dim]View all tasks:[/dim]   atlas queue list")
     console.print(f"  [dim]Inspect this run:[/dim] atlas runs show --run-id {run_id}")
     console.print(f"  [dim]Get output:[/dim]      atlas runs output --run-id {run_id}")
-    if benchmark_path:
+    if benchmark:
         console.print(f"  [dim]Get benchmark:[/dim]   atlas runs benchmark --run-id {run_id}")
     console.print("  [dim]View all runs:[/dim]    atlas runs list")
     if queued:

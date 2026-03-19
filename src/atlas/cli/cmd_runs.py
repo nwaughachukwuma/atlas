@@ -6,11 +6,9 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
-from typing import Any
+from typing import Any, Dict, cast
 
-from ..run_history import parse_output_content
-from ..task_queue.store import RunStore
+from ..task_queue import RunStore
 
 
 def add_run_commands(subparsers: Any) -> None:
@@ -86,28 +84,32 @@ def cmd_runs_show(args: argparse.Namespace) -> dict[str, Any] | None:
     return run
 
 
-def cmd_runs_output(args: argparse.Namespace) -> None:
+def cmd_runs_output(args: argparse.Namespace) -> str | Dict | None:
     run = _get_run_or_error(args.run_id)
     if run is None:
         return
-    output_path = run.get("output_path")
-    if not output_path or not Path(output_path).exists():
+
+    output_text = run.get("output_text")
+    if not output_text:
         print(json.dumps({"error": f"No stored output found for run {args.run_id}"}))
         return
 
-    content, kind = parse_output_content(Path(output_path))
-    if kind == "json":
+    try:
+        content = json.loads(output_text)
         print(json.dumps(content, indent=2, default=str))
-    else:
-        print(content)
+        return content
+    except json.JSONDecodeError:
+        print(output_text)
+        return output_text
 
 
-def cmd_runs_benchmark(args: argparse.Namespace) -> None:
+def cmd_runs_benchmark(args: argparse.Namespace):
     run = _get_run_or_error(args.run_id)
     if run is None:
         return
-    benchmark_path = run.get("benchmark_path")
-    if not benchmark_path or not Path(benchmark_path).exists():
+    benchmark_text = run.get("benchmark_text")
+    if not benchmark_text:
         print(json.dumps({"error": f"No stored benchmark found for run {args.run_id}"}))
         return
-    print(Path(benchmark_path).read_text())
+    print(benchmark_text)
+    return cast(str, benchmark_text)

@@ -114,12 +114,6 @@
         </div>{/if}
     </div>
 
-    {#if task.output_path}
-      <div class="success-box mt-4">
-        Output: <code class="font-mono text-[0.78rem]">{task.output_path}</code>
-      </div>
-    {/if}
-
     {#if task.run_id}
       <div class="mt-3 text-[0.88rem]">
         <a href={toPath(`/runs/${task.run_id}`)} use:route

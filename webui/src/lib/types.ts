@@ -49,7 +49,6 @@ export interface Task {
   finished_at?: string;
   duration?: string | number;
   error?: string;
-  output_path?: string;
   run_id?: string;
   /** Present on some queue responses that mirror the task */
   task_id?: string;
@@ -74,9 +73,9 @@ export interface Run {
   started_at?: string;
   finished_at?: string;
   input_path?: string | null;
-  output_path?: string | null;
+  output_text?: string | null;
   user_output_path?: string | null;
-  benchmark_path?: string | null;
+  benchmark_text?: string | null;
   log_path?: string | null;
   format?: string | null;
   error?: string | null;
@@ -92,16 +91,8 @@ export interface RunListResponse {
 }
 
 export interface RunOutputResponse {
-  run_id: string;
-  path: string;
   kind: "json" | "text";
   content: unknown;
-}
-
-export interface RunBenchmarkResponse {
-  run_id: string;
-  path: string;
-  content: string;
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────
@@ -191,8 +182,6 @@ export interface TaskQueuedResult {
   run_id?: string;
   queued?: boolean;
   status?: TaskStatus;
-  output_path?: string;
-  benchmark_path?: string | null;
   task_id?: string;
   id?: string;
   error?: string;

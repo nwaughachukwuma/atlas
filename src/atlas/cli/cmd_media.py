@@ -21,7 +21,6 @@ from .helpers import (
     validate_video_path,
 )
 from ..run_history import complete_direct_run, fail_direct_run, start_direct_run
-from ..task_queue import output_file_for
 
 if TYPE_CHECKING:
     from ..utils import DescriptionAttr
@@ -64,7 +63,6 @@ def cmd_extract(args: argparse.Namespace) -> None:
             "queued": True,
             "status": "pending",
             "command": "extract",
-            "output_path": str(output_file_for(task_id)),
         }
         print_queued_info(
             console,
@@ -178,8 +176,6 @@ def cmd_extract(args: argparse.Namespace) -> None:
             args._response_payload["run_id"],
             "extract",
             queued=False,
-            output_path=args._response_payload["output_path"],
-            benchmark_path=args._response_payload.get("benchmark_path"),
             user_output_path=output_path,
         )
     except Exception as e:
@@ -232,7 +228,6 @@ def cmd_transcribe(args: argparse.Namespace) -> None:
             "queued": True,
             "status": "pending",
             "command": "transcribe",
-            "output_path": str(output_file_for(task_id)),
         }
         print_queued_info(
             console,
@@ -293,7 +288,10 @@ def cmd_transcribe(args: argparse.Namespace) -> None:
         args._response_payload = complete_direct_run(
             run_context,
             result,
-            metadata={"format": fmt, "transcript_length": len(full_text)},
+            metadata={
+                "format": fmt,
+                "transcript_length": len(full_text),
+            },
         )
         if output_path:
             Path(output_path).write_text(full_text)
@@ -305,8 +303,6 @@ def cmd_transcribe(args: argparse.Namespace) -> None:
             args._response_payload["run_id"],
             "transcribe",
             queued=False,
-            output_path=args._response_payload["output_path"],
-            benchmark_path=args._response_payload.get("benchmark_path"),
             user_output_path=output_path,
         )
     except Exception as e:
@@ -355,7 +351,6 @@ def cmd_index(args: argparse.Namespace) -> None:
             "queued": True,
             "status": "pending",
             "command": "index",
-            "output_path": str(output_file_for(task_id)),
         }
         print_queued_info(console, task_id, "index", benchmark=benchmark)
         return
@@ -423,7 +418,10 @@ def cmd_index(args: argparse.Namespace) -> None:
         args._response_payload = complete_direct_run(
             run_context,
             output,
-            metadata={"video_id": video_id, "indexed_count": indexed_count},
+            metadata={
+                "video_id": video_id,
+                "indexed_count": indexed_count,
+            },
         )
         print(json.dumps(output, indent=2))
         print_run_info(
@@ -431,8 +429,6 @@ def cmd_index(args: argparse.Namespace) -> None:
             args._response_payload["run_id"],
             "index",
             queued=False,
-            output_path=args._response_payload["output_path"],
-            benchmark_path=args._response_payload.get("benchmark_path"),
         )
     except Exception as e:
         args._response_payload = fail_direct_run(run_context, f"{type(e).__name__}: {e}")

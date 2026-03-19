@@ -15,7 +15,6 @@
   import CopyButton from "../components/CopyButton.svelte";
   import type {
     Run,
-    RunBenchmarkResponse,
     RunMode,
     RunOutputResponse,
     TaskStatus,
@@ -70,7 +69,7 @@
 
   let currentRun = $state<Run | null>(null);
   let outputData = $state<RunOutputResponse | null>(null);
-  let benchmarkData = $state<RunBenchmarkResponse | null>(null);
+  let benchmarkText = $state<string | null>(null);
 
   const statusOptions: (TaskStatus | "")[] = [
     "",
@@ -128,20 +127,16 @@
     return runDetail(runId)
       .then(async (data) => {
         currentRun = data;
-        outputData = null;
-        benchmarkData = null;
+        void runOutput(runId)
+          .then((d) => (outputData = d))
+          .catch(() => null);
 
-        if (data.output_path) {
-          outputData = await runOutput(runId).catch(() => null);
-        }
-        if (data.benchmark_path) {
-          benchmarkData = await runBenchmark(runId).catch(() => null);
-        }
+        await runBenchmark(runId)
+          .then((d) => (benchmarkText = d))
+          .catch(() => null);
       })
       .catch((e) =>
-        toast.error(`Error getting run ${runId}`, {
-          description: e.message,
-        }),
+        toast.error(`Error getting run ${runId}`, { description: e.message }),
       )
       .finally(() => (loading = false));
   }
@@ -249,16 +244,6 @@
               >{currentRun.format ?? "—"}</span
             >
           </div>
-          <div class="flex gap-4">
-            <span class="text-muted min-w-24">Output</span><span
-              class="break-all">{currentRun.output_path ?? "—"}</span
-            >
-          </div>
-          <div class="flex gap-4">
-            <span class="text-muted min-w-24">Benchmark</span><span
-              class="break-all">{currentRun.benchmark_path ?? "—"}</span
-            >
-          </div>
         </div>
 
         {#if currentRun.error}
@@ -302,13 +287,13 @@
             <h3 class="mb-0 flex items-center gap-2">
               <GaugeIcon size={16} strokeWidth={2} /> Benchmark
             </h3>
-            {#if benchmarkData}
-              <CopyButton text={benchmarkData.content} />
+            {#if benchmarkText}
+              <CopyButton text={benchmarkText} />
             {/if}
           </div>
-          {#if benchmarkData}
+          {#if benchmarkText}
             <pre
-              class="max-h-96 overflow-y-auto m-0 text-[0.78rem]">{benchmarkData.content}</pre>
+              class="max-h-96 overflow-y-auto m-0 text-[0.78rem]">{benchmarkText}</pre>
           {:else}
             <p class="text-muted mb-0 text-[0.85rem]">
               No stored benchmark available.
@@ -407,9 +392,6 @@
               <span class="text-muted text-[0.85rem]"
                 >{formatDate(run.created_at)}</span
               >
-              {#if run.benchmark_path}
-                <span class="text-muted text-[0.82rem]">benchmark</span>
-              {/if}
             </div>
           </a>
         {/each}

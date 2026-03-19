@@ -65,11 +65,10 @@ def progress_ctx():
 @pytest.fixture()
 def isolated_run_history(tmp_path, monkeypatch):
     db_path = tmp_path / "runs.db"
-    results_dir = tmp_path / "run_results"
+    work_dir = tmp_path / "run_results"
     monkeypatch.setattr("atlas.task_queue.store.DB_PATH", db_path)
     monkeypatch.setattr("atlas.run_history.RUNS_DIR", tmp_path / "runs")
-    monkeypatch.setattr("atlas.run_history.DIRECT_RESULTS_DIR", results_dir)
-    return {"db_path": db_path, "results_dir": results_dir}
+    return {"db_path": db_path, "work_dir": work_dir}
 
 
 # ---------------------------------------------------------------------------
@@ -351,18 +350,18 @@ class TestValidateApiKeys:
         validate_api_keys(require_gemini=True, require_groq=True)
 
     def test_exits_when_gemini_missing(self, monkeypatch):
-        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        monkeypatch.setattr("atlas.cli.helpers.settings.gemini_api_key", "")
         with pytest.raises(SystemExit):
             validate_api_keys(require_gemini=True, require_groq=False)
 
     def test_exits_when_groq_missing(self, monkeypatch):
-        monkeypatch.delenv("GROQ_API_KEY", raising=False)
+        monkeypatch.setattr("atlas.cli.helpers.settings.groq_api_key", "")
         with pytest.raises(SystemExit):
             validate_api_keys(require_gemini=False, require_groq=True)
 
     def test_no_requirements_always_passes(self, monkeypatch):
-        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-        monkeypatch.delenv("GROQ_API_KEY", raising=False)
+        monkeypatch.setattr("atlas.cli.helpers.settings.gemini_api_key", "")
+        monkeypatch.setattr("atlas.cli.helpers.settings.groq_api_key", "")
         validate_api_keys(require_gemini=False, require_groq=False)
 
 
@@ -402,7 +401,7 @@ class TestCmdIndex:
             cmd_index(args)
 
     def test_missing_api_key_exits(self, tmp_path, monkeypatch):
-        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        monkeypatch.setattr("atlas.cli.helpers.settings.gemini_api_key", "")
         video = tmp_path / "v.mp4"
         video.touch()
         with pytest.raises(SystemExit):
@@ -445,7 +444,7 @@ class TestCmdIndex:
         assert run is not None
         assert run["command"] == "index"
         assert run["status"] == "completed"
-        assert json.loads(Path(run["output_path"]).read_text())["video_id"] == "vid_001"
+        assert json.loads(run["output_text"])["video_id"] == "vid_001"
 
 
 # ---------------------------------------------------------------------------
@@ -499,7 +498,7 @@ class TestCmdSearch:
                 cmd_search(self._args())
 
     def test_missing_api_key_exits(self, monkeypatch):
-        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        monkeypatch.setattr("atlas.cli.helpers.settings.gemini_api_key", "")
         with pytest.raises(SystemExit):
             cmd_search(self._args())
 
@@ -522,7 +521,7 @@ class TestCmdChat:
             cmd_chat(self._args())
 
     def test_missing_api_key_exits(self, monkeypatch):
-        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        monkeypatch.setattr("atlas.cli.helpers.settings.gemini_api_key", "")
         with pytest.raises(SystemExit):
             cmd_chat(self._args())
 
@@ -734,8 +733,8 @@ class TestCmdTranscribe:
         assert run is not None
         assert run["command"] == "transcribe"
         assert run["status"] == "completed"
-        assert Path(run["output_path"]).exists()
-        assert json.loads(Path(run["output_path"]).read_text())["transcript"] == "Hello world transcript"
+        assert run["output_text"] is not None
+        assert json.loads(run["output_text"])["transcript"] == "Hello world transcript"
 
     def test_success_saves_to_file(self, tmp_path):
         video = tmp_path / "v.mp4"
@@ -757,7 +756,7 @@ class TestCmdTranscribe:
             cmd_transcribe(self._args(str(video), fmt="xml"))
 
     def test_missing_groq_key_exits(self, monkeypatch):
-        monkeypatch.delenv("GROQ_API_KEY", raising=False)
+        monkeypatch.setattr("atlas.cli.helpers.settings.groq_api_key", "")
         with pytest.raises(SystemExit):
             cmd_transcribe(self._args())
 
@@ -855,7 +854,7 @@ class TestCmdExtract:
         assert run is not None
         assert run["command"] == "extract"
         assert run["status"] == "completed"
-        assert json.loads(Path(run["output_path"]).read_text())["duration"] == 10.0
+        assert json.loads(run["output_text"])["duration"] == 10.0
 
     def test_invalid_attr_exits(self, tmp_path):
         video = tmp_path / "v.mp4"
@@ -1028,14 +1027,14 @@ class TestRunStore:
         store = RunStore(db_path=tmp_path / "runs.db")
         store.add("r1", "transcribe", "transcribe v.mp4", mode="direct", input_path="/tmp/v.mp4")
         store.mark_running("r1")
-        store.mark_completed("r1", output_path="/tmp/output.json")
+        store.mark_completed("r1", output_text='{"ok": true}')
 
         run = store.get("r1")
         assert run is not None
         assert run["id"] == "r1"
         assert run["command"] == "transcribe"
         assert run["status"] == "completed"
-        assert run["output_path"] == "/tmp/output.json"
+        assert run["output_text"] == '{"ok": true}'
 
 
 class TestTaskQueueSubmit:
@@ -1044,10 +1043,10 @@ class TestTaskQueueSubmit:
     def test_submit_returns_task_id(self, tmp_path, monkeypatch):
         from atlas.task_queue import TaskQueue
 
-        # Redirect RESULTS_DIR to tmp in every module that holds a binding
+        # Redirect WORK_DIR to tmp in every module that holds a binding
         results = tmp_path / "results"
-        monkeypatch.setattr("atlas.task_queue.queue.RESULTS_DIR", results)
-        monkeypatch.setattr("atlas.task_queue.helpers.RESULTS_DIR", results)
+        monkeypatch.setattr("atlas.task_queue.queue.WORK_DIR", results)
+        monkeypatch.setattr("atlas.task_queue.helpers.WORK_DIR", results)
 
         # Prevent real subprocess spawn
         monkeypatch.setattr("atlas.task_queue.queue.subprocess.Popen", lambda *a, **kw: None)
@@ -1065,27 +1064,26 @@ class TestTaskQueueSubmit:
         assert task is not None
         assert task["command"] == "transcribe"
 
-    def test_submit_creates_results_dir(self, tmp_path, monkeypatch):
+    def test_submit_creates_work_dir(self, tmp_path, monkeypatch):
         from atlas.task_queue import TaskQueue
 
-        results_dir = tmp_path / "results"
-        monkeypatch.setattr("atlas.task_queue.queue.RESULTS_DIR", results_dir)
-        monkeypatch.setattr("atlas.task_queue.helpers.RESULTS_DIR", results_dir)
+        work_dir = tmp_path / "results"
+        monkeypatch.setattr("atlas.task_queue.queue.WORK_DIR", work_dir)
+        monkeypatch.setattr("atlas.task_queue.helpers.WORK_DIR", work_dir)
         monkeypatch.setattr("atlas.task_queue.queue.subprocess.Popen", lambda *a, **kw: None)
 
         queue = TaskQueue(db_path=tmp_path / "q.db")
         task_id = queue.submit(argparse.Namespace(), command="test")
-        assert (results_dir / task_id).is_dir()
-        # Verify args.json was written
-        assert (results_dir / task_id / "args.json").exists()
+        # Verify work_dir was created (logs go there)
+        assert (work_dir / task_id).is_dir()
 
     def test_submit_creates_matching_run_record(self, tmp_path, monkeypatch):
         from atlas.task_queue import TaskQueue
         from atlas.task_queue.store import RunStore
 
-        results_dir = tmp_path / "results"
-        monkeypatch.setattr("atlas.task_queue.queue.RESULTS_DIR", results_dir)
-        monkeypatch.setattr("atlas.task_queue.helpers.RESULTS_DIR", results_dir)
+        work_dir = tmp_path / "results"
+        monkeypatch.setattr("atlas.task_queue.queue.WORK_DIR", work_dir)
+        monkeypatch.setattr("atlas.task_queue.helpers.WORK_DIR", work_dir)
         monkeypatch.setattr("atlas.task_queue.queue.subprocess.Popen", lambda *a, **kw: None)
 
         db_path = tmp_path / "q.db"
@@ -1102,19 +1100,19 @@ class TestTaskQueueSubmit:
         assert run["id"] == task_id
         assert run["mode"] == "queued"
         assert run["command"] == "transcribe"
-        assert run["benchmark_path"].endswith("benchmark.txt")
 
     def test_submit_stages_temp_upload_for_worker(self, tmp_path, monkeypatch):
         from atlas.task_queue import TaskQueue
+        from atlas.task_queue.store import TaskStore
 
-        results_dir = tmp_path / "results"
+        work_dir = tmp_path / "results"
         upload_dir = tmp_path / "atlas_upload_case"
         upload_dir.mkdir()
         source_video = upload_dir / "upload_test.mp4"
         source_video.write_bytes(b"video-bytes")
 
-        monkeypatch.setattr("atlas.task_queue.queue.RESULTS_DIR", results_dir)
-        monkeypatch.setattr("atlas.task_queue.helpers.RESULTS_DIR", results_dir)
+        monkeypatch.setattr("atlas.task_queue.queue.WORK_DIR", work_dir)
+        monkeypatch.setattr("atlas.task_queue.helpers.WORK_DIR", work_dir)
         monkeypatch.setattr("atlas.task_queue.queue.subprocess.Popen", lambda *a, **kw: None)
 
         queue = TaskQueue(db_path=tmp_path / "q.db")
@@ -1124,8 +1122,10 @@ class TestTaskQueueSubmit:
             label="transcribe upload_test.mp4",
         )
 
-        staged_input = results_dir / task_id / "input.mp4"
-        args_data = json.loads((results_dir / task_id / "args.json").read_text())
+        staged_input = work_dir / task_id / "input.mp4"
+        task = TaskStore(db_path=tmp_path / "q.db").get(task_id)
+        assert task is not None
+        args_data = json.loads(task["args_json"])
 
         assert not source_video.exists()
         assert staged_input.exists()
@@ -1207,7 +1207,6 @@ class TestQueueCLICommands:
     def test_queue_status_not_found(self, tmp_path, monkeypatch):
         from atlas.task_queue import TaskStore, cmd_queue_status
 
-        monkeypatch.setattr("atlas.task_queue.commands.RESULTS_DIR", tmp_path / "results")
         monkeypatch.setattr("atlas.task_queue.commands.TaskStore", lambda: TaskStore(db_path=tmp_path / "q.db"))
 
         args = argparse.Namespace(task_id="nonexistent")

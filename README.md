@@ -212,7 +212,7 @@ From the Web UI you can:
 
 ### Run history workflow
 
-`transcribe`, `extract`, and `index` now persist their outputs for both queued and `--no-queue` execution modes.
+`transcribe`, `extract`, and `index` now persist their outputs, arguments, and benchmarks directly to a local SQLite database for both queued and `--no-queue` execution modes.
 
 ```bash
 # inspect recent runs

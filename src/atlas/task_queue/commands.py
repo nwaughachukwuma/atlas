@@ -5,9 +5,8 @@ from __future__ import annotations
 import argparse
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 
-from .config import RESULTS_DIR
 from .store import TaskStore
 
 _STATUS_COLORS = {
@@ -96,7 +95,7 @@ def _parse_benchmark_file(path: Path) -> list[tuple[str, ...]]:
 # ── Handlers ──────────────────────────────────────────────────────────────────
 
 
-def cmd_queue_list(args: argparse.Namespace) -> None:
+def cmd_queue_list(args: argparse.Namespace) -> Dict:
     """Print a JSON list of tasks in the queue."""
     import json
 
@@ -111,30 +110,23 @@ def cmd_queue_list(args: argparse.Namespace) -> None:
     }
     print(json.dumps(output, indent=2, default=str))
 
+    return output
 
-def cmd_queue_status(args: argparse.Namespace) -> None:
+
+def cmd_queue_status(args: argparse.Namespace) -> Dict[str, Any] | None:
     """Print detailed status for a single task as JSON."""
     import json
 
     store = TaskStore()
     task = store.get(args.task_id)
-
     if not task:
         print(json.dumps({"error": f"Task {args.task_id} not found"}))
         return
 
-    results_dir = RESULTS_DIR / task["id"]
-    output_file = results_dir / "output.json"
-    benchmark_file = results_dir / "benchmark.txt"
-
-    output = dict(task)
-    output["run_id"] = task["id"]
+    output: dict[str, Any] = dict(task)
     output["duration"] = _duration_str(task.get("started_at"), task.get("finished_at")) or None
-
-    output["output_path"] = str(output_file)
-    # Expose benchmark path instead of inlining the table.
-    has_benchmark = bool(output.pop("benchmark", False))
-    if has_benchmark:
-        output["benchmark_path"] = str(benchmark_file)
+    output["run_id"] = task["id"]
 
     print(json.dumps(output, indent=2, default=str))
+
+    return output

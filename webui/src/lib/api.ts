@@ -9,7 +9,6 @@ import type {
   ListVideosResponse,
   QueueListResponse,
   Run,
-  RunBenchmarkResponse,
   RunListResponse,
   RunMode,
   RunOutputResponse,
@@ -162,8 +161,8 @@ export const runDetail = (id: string): Promise<Run> => get<Run>(`/runs/${id}`);
 export const runOutput = (id: string): Promise<RunOutputResponse> =>
   get<RunOutputResponse>(`/runs/${id}/output`);
 
-export const runBenchmark = (id: string): Promise<RunBenchmarkResponse> =>
-  get<RunBenchmarkResponse>(`/runs/${id}/benchmark`);
+export const runBenchmark = (id: string): Promise<string> =>
+  get<string>(`/runs/${id}/benchmark`);
 
 // ── SSE chat stream ───────────────────────────────────────────────────────────
 

@@ -30,7 +30,9 @@ CREATE TABLE IF NOT EXISTS tasks (
     started_at  TEXT,
     finished_at TEXT,
     error       TEXT,
-    output_path TEXT,
+    args_json   TEXT,
+    output_text TEXT,
+    benchmark_text TEXT,
     benchmark   INTEGER NOT NULL DEFAULT 0
 );
 """
@@ -47,12 +49,13 @@ CREATE TABLE IF NOT EXISTS runs (
     started_at       TEXT,
     finished_at      TEXT,
     input_path       TEXT,
-    output_path      TEXT,
     user_output_path TEXT,
-    benchmark_path   TEXT,
     log_path         TEXT,
     format           TEXT,
     error            TEXT,
+    args_json        TEXT,
+    output_text      TEXT,
+    benchmark_text   TEXT,
     metadata_json    TEXT
 );
 
@@ -113,15 +116,15 @@ class TaskStore(_SQLiteStoreBase):
         task_id: str,
         command: str,
         label: str,
-        output_path: Optional[str] = None,
+        args_json: Optional[str] = None,
         benchmark: bool = False,
     ) -> None:
         """Insert a new task row."""
         with self._tx() as conn:
             conn.execute(
-                "INSERT INTO tasks (id, command, label, status, created_at, output_path, benchmark)"
+                "INSERT INTO tasks (id, command, label, status, created_at, args_json, benchmark)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (task_id, command, label, TaskStatus.PENDING, now_iso(), output_path, int(benchmark)),
+                (task_id, command, label, TaskStatus.PENDING, now_iso(), args_json, int(benchmark)),
             )
 
     def mark_running(self, task_id: str) -> None:
@@ -246,20 +249,19 @@ class RunStore(_SQLiteStoreBase):
         status: str = TaskStatus.PENDING,
         task_id: str | None = None,
         input_path: str | None = None,
-        output_path: str | None = None,
         user_output_path: str | None = None,
-        benchmark_path: str | None = None,
         log_path: str | None = None,
         fmt: str | None = None,
+        args_json: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Insert a new run row."""
         with self._tx() as conn:
             conn.execute(
                 "INSERT INTO runs ("
-                "id, task_id, command, label, mode, status, created_at, input_path, output_path, "
-                "user_output_path, benchmark_path, log_path, format, metadata_json"
-                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "id, task_id, command, label, mode, status, created_at, input_path, "
+                "user_output_path, log_path, format, args_json, metadata_json"
+                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     run_id,
                     task_id,
@@ -269,11 +271,10 @@ class RunStore(_SQLiteStoreBase):
                     status,
                     now_iso(),
                     input_path,
-                    output_path,
                     user_output_path,
-                    benchmark_path,
                     log_path,
                     fmt,
+                    args_json,
                     json.dumps(metadata, default=str) if metadata is not None else None,
                 ),
             )
@@ -290,8 +291,8 @@ class RunStore(_SQLiteStoreBase):
         self,
         run_id: str,
         *,
-        output_path: str | None = None,
-        benchmark_path: str | None = None,
+        output_text: str | None = None,
+        benchmark_text: str | None = None,
         log_path: str | None = None,
         user_output_path: str | None = None,
         metadata: dict[str, Any] | None = None,
@@ -299,15 +300,15 @@ class RunStore(_SQLiteStoreBase):
         """mark completed"""
         with self._tx() as conn:
             conn.execute(
-                "UPDATE runs SET status=?, finished_at=?, output_path=COALESCE(?, output_path), "
-                "benchmark_path=COALESCE(?, benchmark_path), log_path=COALESCE(?, log_path), "
+                "UPDATE runs SET status=?, finished_at=?, output_text=COALESCE(?, output_text), "
+                "benchmark_text=COALESCE(?, benchmark_text), log_path=COALESCE(?, log_path), "
                 "user_output_path=COALESCE(?, user_output_path), metadata_json=COALESCE(?, metadata_json) "
                 "WHERE id=?",
                 (
                     TaskStatus.COMPLETED,
                     now_iso(),
-                    output_path,
-                    benchmark_path,
+                    output_text,
+                    benchmark_text,
                     log_path,
                     user_output_path,
                     json.dumps(metadata, default=str) if metadata is not None else None,
@@ -320,8 +321,8 @@ class RunStore(_SQLiteStoreBase):
         run_id: str,
         error: str,
         *,
-        output_path: str | None = None,
-        benchmark_path: str | None = None,
+        output_text: str | None = None,
+        benchmark_text: str | None = None,
         log_path: str | None = None,
         user_output_path: str | None = None,
         metadata: dict[str, Any] | None = None,
@@ -329,16 +330,16 @@ class RunStore(_SQLiteStoreBase):
         """mark failed"""
         with self._tx() as conn:
             conn.execute(
-                "UPDATE runs SET status=?, finished_at=?, error=?, output_path=COALESCE(?, output_path), "
-                "benchmark_path=COALESCE(?, benchmark_path), log_path=COALESCE(?, log_path), "
+                "UPDATE runs SET status=?, finished_at=?, error=?, output_text=COALESCE(?, output_text), "
+                "benchmark_text=COALESCE(?, benchmark_text), log_path=COALESCE(?, log_path), "
                 "user_output_path=COALESCE(?, user_output_path), metadata_json=COALESCE(?, metadata_json) "
                 "WHERE id=?",
                 (
                     TaskStatus.FAILED,
                     now_iso(),
                     error,
-                    output_path,
-                    benchmark_path,
+                    output_text,
+                    benchmark_text,
                     log_path,
                     user_output_path,
                     json.dumps(metadata, default=str) if metadata is not None else None,
@@ -351,23 +352,23 @@ class RunStore(_SQLiteStoreBase):
         run_id: str,
         error: str,
         *,
-        output_path: str | None = None,
-        benchmark_path: str | None = None,
+        output_text: str | None = None,
+        benchmark_text: str | None = None,
         log_path: str | None = None,
         user_output_path: str | None = None,
     ) -> None:
         """mark timeout"""
         with self._tx() as conn:
             conn.execute(
-                "UPDATE runs SET status=?, finished_at=?, error=?, output_path=COALESCE(?, output_path), "
-                "benchmark_path=COALESCE(?, benchmark_path), log_path=COALESCE(?, log_path), "
+                "UPDATE runs SET status=?, finished_at=?, error=?, output_text=COALESCE(?, output_text), "
+                "benchmark_text=COALESCE(?, benchmark_text), log_path=COALESCE(?, log_path), "
                 "user_output_path=COALESCE(?, user_output_path) WHERE id=?",
                 (
                     TaskStatus.TIMEOUT,
                     now_iso(),
                     error,
-                    output_path,
-                    benchmark_path,
+                    output_text,
+                    benchmark_text,
                     log_path,
                     user_output_path,
                     run_id,
@@ -410,7 +411,15 @@ class RunStore(_SQLiteStoreBase):
 
         rows = self._conn().execute(query, tuple(params)).fetchall()
         res = [self._decode_row(r) for r in rows]
-        return [v for v in res if v is not None]
+        return [
+            {
+                **v,
+                "output_text": f"Get output using <atlas runs output --run-id {v['id']}>",
+                "benchmark_text": f"Get benchmark using <atlas runs benchmark --run-id {v['id']}>",
+            }
+            for v in res
+            if v is not None
+        ]
 
     def _decode_row(self, row: sqlite3.Row | None) -> Optional[dict]:
         if row is None:
