@@ -61,6 +61,14 @@
     stored locally in a vector store for instant retrieval.
   </p>
 
+  <div class="mb-5 text-[0.9rem]">
+    <a
+      class="px-3 py-2 border-cobalt/40 border"
+      href={toPath("/index/runs")}
+      use:route>View Previous Runs →</a
+    >
+  </div>
+
   <div class="card mb-4">
     <VideoUpload
       bind:file

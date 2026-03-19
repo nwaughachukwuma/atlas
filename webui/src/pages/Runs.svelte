@@ -27,16 +27,19 @@
   const scopedCommand = $derived.by((): Run["command"] | "" => {
     if (originalPath.startsWith("/transcribe/runs")) return "transcribe";
     if (originalPath.startsWith("/extract/runs")) return "extract";
+    if (originalPath.startsWith("/index/runs")) return "index";
     return "";
   });
   const runsBasePath = $derived.by(() => {
     if (scopedCommand === "transcribe") return "/transcribe/runs";
     if (scopedCommand === "extract") return "/extract/runs";
+    if (scopedCommand === "index") return "/index/runs";
     return "/runs";
   });
   const listHeading = $derived.by(() => {
     if (scopedCommand === "transcribe") return "Transcribe Runs";
     if (scopedCommand === "extract") return "Extract Runs";
+    if (scopedCommand === "index") return "Index Runs";
     return "Runs";
   });
   const listDescription = $derived.by(() => {
@@ -46,17 +49,21 @@
     if (scopedCommand === "extract") {
       return "Persisted history for extract runs across queued and direct execution.";
     }
+    if (scopedCommand === "index") {
+      return "Persisted history for index runs across queued and direct execution.";
+    }
     return "Persisted history for queued and direct transcribe, extract, and index runs.";
   });
   const detailHeading = $derived.by(() => {
     if (scopedCommand === "transcribe") return "Transcribe Run Detail";
     if (scopedCommand === "extract") return "Extract Run Detail";
+    if (scopedCommand === "index") return "Index Run Detail";
     return "Run Detail";
   });
   const runId: string | null = $derived.by(
     () =>
       routeResult.result.path.params?.id ??
-      originalPath.match(/^\/(?:transcribe|extract)\/runs\/([^/]+)$/)?.[1] ??
+      originalPath.match(/^\/(?:transcribe|extract|index)\/runs\/([^/]+)$/)?.[1] ??
       originalPath.match(/^\/runs\/([^/]+)$/)?.[1] ??
       null,
   );
