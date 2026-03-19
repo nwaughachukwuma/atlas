@@ -65,12 +65,20 @@ def cmd_runs_list(args: argparse.Namespace) -> dict[str, Any]:
         mode=getattr(args, "mode", None),
         limit=getattr(args, "limit", None),
     )
+    _runs = [
+        {
+            **v,
+            "output_text": f"Get output using <atlas runs output --run-id {v['id']}>",
+            "benchmark_text": f"Get benchmark using <atlas runs benchmark --run-id {v['id']}>",
+        }
+        for v in runs
+    ]
     result = {
-        "count": len(runs),
+        "count": len(_runs),
         "status_filter": getattr(args, "status", None),
         "command_filter": getattr(args, "command", None),
         "mode_filter": getattr(args, "mode", None),
-        "runs": runs,
+        "runs": _runs,
     }
     print(json.dumps(result, indent=2, default=str))
     return result

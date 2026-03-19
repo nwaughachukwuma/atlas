@@ -411,15 +411,7 @@ class RunStore(_SQLiteStoreBase):
 
         rows = self._conn().execute(query, tuple(params)).fetchall()
         res = [self._decode_row(r) for r in rows]
-        return [
-            {
-                **v,
-                "output_text": f"Get output using <atlas runs output --run-id {v['id']}>",
-                "benchmark_text": f"Get benchmark using <atlas runs benchmark --run-id {v['id']}>",
-            }
-            for v in res
-            if v is not None
-        ]
+        return [v for v in res if v is not None]
 
     def _decode_row(self, row: sqlite3.Row | None) -> Optional[dict]:
         if row is None:

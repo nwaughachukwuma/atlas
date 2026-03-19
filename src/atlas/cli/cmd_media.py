@@ -177,6 +177,7 @@ def cmd_extract(args: argparse.Namespace) -> None:
             "extract",
             queued=False,
             user_output_path=output_path,
+            benchmark=benchmark,
         )
     except Exception as e:
         args._response_payload = fail_direct_run(run_context, f"{type(e).__name__}: {e}")
@@ -304,6 +305,7 @@ def cmd_transcribe(args: argparse.Namespace) -> None:
             "transcribe",
             queued=False,
             user_output_path=output_path,
+            benchmark=benchmark,
         )
     except Exception as e:
         args._response_payload = fail_direct_run(run_context, f"{type(e).__name__}: {e}")
@@ -429,6 +431,7 @@ def cmd_index(args: argparse.Namespace) -> None:
             args._response_payload["run_id"],
             "index",
             queued=False,
+            benchmark=benchmark,
         )
     except Exception as e:
         args._response_payload = fail_direct_run(run_context, f"{type(e).__name__}: {e}")
