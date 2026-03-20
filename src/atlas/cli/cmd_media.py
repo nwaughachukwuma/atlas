@@ -289,10 +289,7 @@ def cmd_transcribe(args: argparse.Namespace) -> None:
         args._response_payload = complete_direct_run(
             run_context,
             result,
-            metadata={
-                "format": fmt,
-                "transcript_length": len(full_text),
-            },
+            metadata={"format": fmt, "transcript_length": len(full_text)},
         )
         if output_path:
             Path(output_path).write_text(full_text)
@@ -420,10 +417,7 @@ def cmd_index(args: argparse.Namespace) -> None:
         args._response_payload = complete_direct_run(
             run_context,
             output,
-            metadata={
-                "video_id": video_id,
-                "indexed_count": indexed_count,
-            },
+            metadata={"video_id": video_id, "indexed_count": indexed_count},
         )
         print(json.dumps(output, indent=2))
         print_run_info(

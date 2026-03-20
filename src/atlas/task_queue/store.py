@@ -30,8 +30,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     started_at  TEXT,
     finished_at TEXT,
     error       TEXT,
-    args_json   TEXT,
     output_path TEXT,
+    args_json   TEXT,
     benchmark_text TEXT,
     benchmark   INTEGER NOT NULL DEFAULT 0
 );
@@ -49,13 +49,13 @@ CREATE TABLE IF NOT EXISTS runs (
     started_at       TEXT,
     finished_at      TEXT,
     input_path       TEXT,
+    output_path      TEXT,
     user_output_path TEXT,
+    benchmark_text   TEXT,
     log_path         TEXT,
     format           TEXT,
     error            TEXT,
     args_json        TEXT,
-    output_path      TEXT,
-    benchmark_text   TEXT,
     metadata_json    TEXT
 );
 

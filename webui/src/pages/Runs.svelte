@@ -259,6 +259,11 @@
               >{currentRun.format ?? "—"}</span
             >
           </div>
+          <div class="flex gap-4">
+            <span class="text-muted min-w-24">Output</span><span
+              class="break-all">{currentRun.output_path ?? "—"}</span
+            >
+          </div>
         </div>
 
         {#if currentRun.error}

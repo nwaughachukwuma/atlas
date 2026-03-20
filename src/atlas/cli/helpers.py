@@ -162,8 +162,8 @@ def print_queued_info(
         task_id,
         command,
         queued=True,
-        user_output_path=output_path,
         benchmark=benchmark,
+        user_output_path=output_path,
         log_path=str(worker_log_file_for(task_id)),
         task_id=task_id,
     )
@@ -181,6 +181,8 @@ def print_run_info(
     task_id: str | None = None,
 ) -> None:
     """Print standardised information about a persisted run."""
+    from ..run_history import output_file_for
+
     heading = "✓ Task queued" if queued else "✓ Run saved"
 
     console.print(f"\n[bold green]{heading}[/bold green]")
@@ -188,6 +190,8 @@ def print_run_info(
     console.print(f"  [cyan]Command:[/cyan]    {command}")
     if user_output_path:
         console.print(f"  [cyan]Output:[/cyan]     {user_output_path}")
+    else:
+        console.print(f"  [cyan]Output:[/cyan]     {str(output_file_for(run_id))}")
     if log_path:
         console.print(f"  [cyan]Worker log:[/cyan] {log_path}")
     if task_id:

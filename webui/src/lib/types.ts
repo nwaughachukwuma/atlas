@@ -49,6 +49,7 @@ export interface Task {
   finished_at?: string;
   duration?: string | number;
   error?: string;
+  output_path?: string;
   run_id?: string;
   /** Present on some queue responses that mirror the task */
   task_id?: string;

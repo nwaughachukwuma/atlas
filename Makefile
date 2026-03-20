@@ -62,7 +62,7 @@ docker-run:
 		-p 8000:8000 \
 		--env-file=.env \
 		-v atlas-data:/home/atlas/.atlas \
-		atlas-video-x2:latest
+		atlas-video-x1:latest
 
 # Usage: make docker-run CMD="extract /data/video.mp4"
 docker-run-cmd:

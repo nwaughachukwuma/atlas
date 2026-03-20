@@ -99,9 +99,11 @@ def run_task(task_id: str) -> None:
         sys.exit(1)
 
     command: str = task["command"]
+
     run_entry = run_store.get(task_id)
     user_output_path: str | None = run_entry.get("user_output_path") if run_entry else None
     benchmark: bool = bool(task.get("benchmark"))
+
     work_dir = WORK_DIR / task_id
     output_file = work_dir / "output.json"
 
@@ -114,7 +116,9 @@ def run_task(task_id: str) -> None:
 
     args_json = task.get("args_json")
     if not args_json:
-        store.mark_failed(task_id, "args_json missing from database — cannot reconstruct arguments", output_path=str(output_file))
+        store.mark_failed(
+            task_id, "args_json missing from database — cannot reconstruct arguments", output_path=str(output_file)
+        )
         return
 
     args_dict = json.loads(args_json)

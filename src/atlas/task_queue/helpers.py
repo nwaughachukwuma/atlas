@@ -37,7 +37,7 @@ def serialize_result(result: Any) -> str:
 
 
 def work_dir_for(task_id: str) -> Path:
-    """Return the results directory for a given task ID."""
+    """Return the worker directory for a given task ID."""
     return WORK_DIR / task_id
 
 

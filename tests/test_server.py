@@ -510,6 +510,7 @@ class TestMediaPostEndpoints:
 
     def test_transcribe_queued_real_queue_serializes_durable_path(self, monkeypatch, tmp_path):
         from atlas.task_queue import TaskQueue
+        from atlas.task_queue.store import TaskStore
 
         work_dir = tmp_path / "results"
         queue = TaskQueue(db_path=tmp_path / "queue.db")
@@ -529,7 +530,6 @@ class TestMediaPostEndpoints:
 
         assert resp.status_code == 200
         task_id = resp.json()["task_id"]
-        from atlas.task_queue.store import TaskStore
 
         task = TaskStore(db_path=tmp_path / "queue.db").get(task_id)
         assert task is not None
@@ -572,7 +572,6 @@ class TestRunEndpoints:
         assert resp.json()["id"] == "run1"
 
     def test_run_output(self, tmp_path):
-
         expected_result = {"path": "/fake/path", "content": {"ok": True}}
         with patch("atlas.cli.cmd_runs.cmd_runs_output", return_value=expected_result):
             client = TestClient(create_app())
