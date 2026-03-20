@@ -20,19 +20,15 @@ from .helpers import (
     validate_api_keys,
     validate_video_path,
 )
-from ..run_history import complete_direct_run, fail_direct_run, start_direct_run
-from ..task_queue import output_file_for
+from ..run_history import complete_direct_run, fail_direct_run, output_file_for, start_direct_run
 
 if TYPE_CHECKING:
     from ..utils import DescriptionAttr
 
 
-# ── extract ───────────────────────────────────────────────────────────────────
-
-
 def cmd_extract(args: argparse.Namespace) -> None:
     """Extract multimodal insights, optionally queuing the task."""
-    from . import get_console, get_logger
+    from .helpers import get_console, get_logger
 
     console = get_console()
     use_queue = not getattr(args, "no_queue", False)
@@ -181,9 +177,8 @@ def cmd_extract(args: argparse.Namespace) -> None:
             args._response_payload["run_id"],
             "extract",
             queued=False,
-            output_path=args._response_payload["output_path"],
-            benchmark_path=args._response_payload.get("benchmark_path"),
             user_output_path=output_path,
+            benchmark=benchmark,
         )
     except Exception as e:
         args._response_payload = fail_direct_run(run_context, f"{type(e).__name__}: {e}")
@@ -199,7 +194,7 @@ def cmd_extract(args: argparse.Namespace) -> None:
 
 def cmd_transcribe(args: argparse.Namespace) -> None:
     """Transcribe a video, optionally queuing the task."""
-    from . import get_console, get_logger
+    from .helpers import get_console, get_logger
     from ..utils import TempPath
 
     console = get_console()
@@ -308,9 +303,8 @@ def cmd_transcribe(args: argparse.Namespace) -> None:
             args._response_payload["run_id"],
             "transcribe",
             queued=False,
-            output_path=args._response_payload["output_path"],
-            benchmark_path=args._response_payload.get("benchmark_path"),
             user_output_path=output_path,
+            benchmark=benchmark,
         )
     except Exception as e:
         args._response_payload = fail_direct_run(run_context, f"{type(e).__name__}: {e}")
@@ -326,7 +320,7 @@ def cmd_transcribe(args: argparse.Namespace) -> None:
 
 def cmd_index(args: argparse.Namespace) -> None:
     """Index a video for semantic search, optionally queuing the task."""
-    from . import get_console, get_logger
+    from .helpers import get_console, get_logger
     from ..utils import TempPath
 
     console = get_console()
@@ -416,7 +410,7 @@ def cmd_index(args: argparse.Namespace) -> None:
 
     try:
         video_id, indexed_count, result = asyncio.run(_run())
-        # console.print(f"\n[green]Indexed {indexed_count} chunks for video ID:[/green] {video_id}\n")
+        console.print(f"\n[green]Indexed {indexed_count} chunks for video ID:[/green] {video_id}\n")
         # print(result.model_dump_json(indent=2))
         output = {
             "video_id": video_id,
@@ -434,8 +428,7 @@ def cmd_index(args: argparse.Namespace) -> None:
             args._response_payload["run_id"],
             "index",
             queued=False,
-            output_path=args._response_payload["output_path"],
-            benchmark_path=args._response_payload.get("benchmark_path"),
+            benchmark=benchmark,
         )
     except Exception as e:
         args._response_payload = fail_direct_run(run_context, f"{type(e).__name__}: {e}")

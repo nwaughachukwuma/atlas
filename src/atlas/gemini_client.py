@@ -5,7 +5,6 @@ Gemini API client for video analysis
 from __future__ import annotations
 
 import asyncio
-import os
 from typing import TYPE_CHECKING
 
 from google import genai
@@ -18,12 +17,9 @@ if TYPE_CHECKING:
     from google.genai import types as genai_types
 
 
-api_key = os.environ["GEMINI_API_KEY"]
-
-
 def get_gemini_client() -> genai.Client:
     """Create a Gemini client for the current call site."""
-    return genai.Client(api_key=api_key)
+    return genai.Client(api_key=settings.gemini_api_key)
 
 
 def get_gemini_aio_client():

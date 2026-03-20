@@ -87,7 +87,8 @@ class TestListVideosEndpoint:
 
     def test_list_videos_returns_structured_json(self):
         fake_video = MagicMock()
-        fake_video.model_dump.return_value = {"video_id": "vid1", "title": "Test"}
+        fake_video.video_id = "vid1"
+        fake_video.indexed_at = "2024-01-01T00:00:00Z"
 
         fake_index = MagicMock()
         fake_index.list_videos.return_value = [fake_video]
@@ -197,7 +198,7 @@ class TestQueueListEndpoint:
         fake_store = MagicMock()
         fake_store.list_all.return_value = [{"id": "t1", "status": "pending"}]
 
-        with patch("atlas.task_queue.store.TaskStore", return_value=fake_store):
+        with patch("atlas.task_queue.commands.TaskStore", return_value=fake_store):
             client = TestClient(create_app())
             resp = client.get("/queue/list")
 
@@ -212,7 +213,7 @@ class TestQueueListEndpoint:
         fake_store = MagicMock()
         fake_store.list_all.return_value = []
 
-        with patch("atlas.task_queue.store.TaskStore", return_value=fake_store):
+        with patch("atlas.task_queue.commands.TaskStore", return_value=fake_store):
             client = TestClient(create_app())
             resp = client.get("/queue/list", params={"status": "running"})
 
@@ -235,13 +236,12 @@ class TestQueueStatusEndpoint:
             "finished_at": "2024-01-01T00:01:00",
         }
 
-        results_dir = tmp_path / "queue_results"
-        results_dir.mkdir()
+        work_dir = tmp_path / "queue_results"
+        work_dir.mkdir()
 
         with (
-            patch("atlas.task_queue.store.TaskStore", return_value=fake_store),
+            patch("atlas.task_queue.commands.TaskStore", return_value=fake_store),
             patch("atlas.task_queue.commands._duration_str", return_value="60.0s"),
-            patch("atlas.task_queue.config.RESULTS_DIR", results_dir),
         ):
             client = TestClient(create_app())
             resp = client.get("/queue/status/abc123")
@@ -252,28 +252,29 @@ class TestQueueStatusEndpoint:
         assert body["status"] == "completed"
         assert body["run_id"] == "abc123"
 
-    def test_queue_status_found_with_output_json(self, tmp_path):
-        fake_store = MagicMock()
-        fake_store.get.return_value = {
+    def test_queue_status_found(self, tmp_path):
+        fake_task = {
             "id": "abc123",
             "status": "completed",
             "started_at": "2024-01-01T00:00:00",
             "finished_at": "2024-01-01T00:01:00",
         }
+        fake_run = {
+            "id": "abc123",
+            "status": "completed",
+            "output_path": str(tmp_path / "output.json"),
+            "benchmark_text": "|...|",
+        }
 
-        results_dir = tmp_path / "queue_results"
-        task_dir = results_dir / "abc123"
-        task_dir.mkdir(parents=True)
-        output_path = task_dir / "output.json"
-        output_path.write_text(json.dumps({"ok": True, "segments": 3}))
-
-        benchmark_path = task_dir / "benchmark.txt"
-        benchmark_path.write_text("|...|")
+        fake_store = MagicMock()
+        fake_store.get.return_value = fake_task
+        fake_run_store = MagicMock()
+        fake_run_store.get.return_value = fake_run
 
         with (
-            patch("atlas.task_queue.store.TaskStore", return_value=fake_store),
+            patch("atlas.task_queue.commands.TaskStore", return_value=fake_store),
+            patch("atlas.task_queue.store.RunStore", return_value=fake_run_store),
             patch("atlas.task_queue.commands._duration_str", return_value="60.0s"),
-            patch("atlas.task_queue.config.RESULTS_DIR", results_dir),
         ):
             client = TestClient(create_app())
             resp = client.get("/queue/status/abc123")
@@ -282,14 +283,8 @@ class TestQueueStatusEndpoint:
         body = resp.json()
         assert body["id"] == "abc123"
         assert body["status"] == "completed"
-        assert body["output_path"] == str(output_path)
-        assert body["benchmark_path"] == str(benchmark_path)
         assert body["run_id"] == "abc123"
-
-        # verify the content of output_path
-        output_content = json.loads(output_path.read_text())
-        assert output_content["ok"] is True
-        assert output_content["segments"] == 3
+        assert body["duration"] == "60.0s"
 
     def test_queue_status_not_found(self):
         fake_store = MagicMock()
@@ -515,13 +510,14 @@ class TestMediaPostEndpoints:
 
     def test_transcribe_queued_real_queue_serializes_durable_path(self, monkeypatch, tmp_path):
         from atlas.task_queue import TaskQueue
+        from atlas.task_queue.store import TaskStore
 
-        results_dir = tmp_path / "results"
+        work_dir = tmp_path / "results"
         queue = TaskQueue(db_path=tmp_path / "queue.db")
 
         monkeypatch.setattr("atlas.cli.cmd_media.validate_api_keys", lambda **_: None)
-        monkeypatch.setattr("atlas.task_queue.queue.RESULTS_DIR", results_dir)
-        monkeypatch.setattr("atlas.task_queue.helpers.RESULTS_DIR", results_dir)
+        monkeypatch.setattr("atlas.task_queue.queue.WORK_DIR", work_dir)
+        monkeypatch.setattr("atlas.task_queue.helpers.WORK_DIR", work_dir)
         monkeypatch.setattr("atlas.task_queue.queue.subprocess.Popen", lambda *a, **kw: None)
         monkeypatch.setattr("atlas.task_queue.get_queue", lambda: queue)
 
@@ -534,14 +530,16 @@ class TestMediaPostEndpoints:
 
         assert resp.status_code == 200
         task_id = resp.json()["task_id"]
-        args_file = results_dir / task_id / "args.json"
-        assert args_file.exists()
 
-        args_data = json.loads(args_file.read_text())
+        task = TaskStore(db_path=tmp_path / "queue.db").get(task_id)
+        assert task is not None
+        assert task["args_json"] is not None
+
+        args_data = json.loads(task["args_json"])
         serialized_path = Path(args_data["video_path"])
         resolved_path = Path(args_data["_video_path_resolved"])
         assert serialized_path.exists()
-        assert serialized_path.parent == results_dir / task_id
+        assert serialized_path.parent == work_dir / task_id
         assert serialized_path.name == "input.mp4"
         assert resolved_path == serialized_path.resolve()
         assert "atlas_upload_" not in str(serialized_path)
@@ -552,7 +550,7 @@ class TestRunEndpoints:
         fake_store = MagicMock()
         fake_store.list_all.return_value = [{"id": "run1", "command": "transcribe", "mode": "direct"}]
 
-        with patch("atlas.task_queue.store.RunStore", return_value=fake_store):
+        with patch("atlas.cli.cmd_runs.RunStore", return_value=fake_store):
             client = TestClient(create_app())
             resp = client.get("/runs/list", params={"command": "transcribe", "mode": "direct"})
 
@@ -566,7 +564,7 @@ class TestRunEndpoints:
         fake_store = MagicMock()
         fake_store.get.return_value = {"id": "run1", "command": "extract", "status": "completed"}
 
-        with patch("atlas.task_queue.store.RunStore", return_value=fake_store):
+        with patch("atlas.cli.cmd_runs.RunStore", return_value=fake_store):
             client = TestClient(create_app())
             resp = client.get("/runs/run1")
 
@@ -574,34 +572,22 @@ class TestRunEndpoints:
         assert resp.json()["id"] == "run1"
 
     def test_run_output(self, tmp_path):
-        output_path = tmp_path / "output.json"
-        output_path.write_text(json.dumps({"ok": True}))
-
-        fake_store = MagicMock()
-        fake_store.get.return_value = {"id": "run1", "output_path": str(output_path)}
-
-        with patch("atlas.task_queue.store.RunStore", return_value=fake_store):
+        expected_result = {"path": "/fake/path", "content": {"ok": True}}
+        with patch("atlas.cli.cmd_runs.cmd_runs_output", return_value=expected_result):
             client = TestClient(create_app())
             resp = client.get("/runs/run1/output")
 
         assert resp.status_code == 200
         body = resp.json()
-        assert body["run_id"] == "run1"
-        assert body["kind"] == "json"
-        assert body["content"]["ok"] is True
+        assert body["content"] == {"ok": True}
 
     def test_run_benchmark(self, tmp_path):
-        benchmark_path = tmp_path / "benchmark.txt"
-        benchmark_path.write_text("Benchmark Summary")
-
         fake_store = MagicMock()
-        fake_store.get.return_value = {"id": "run1", "benchmark_path": str(benchmark_path)}
+        fake_store.get.return_value = {"id": "run1", "benchmark_text": "Benchmark Summary"}
 
-        with patch("atlas.task_queue.store.RunStore", return_value=fake_store):
+        with patch("atlas.cli.cmd_runs.RunStore", return_value=fake_store):
             client = TestClient(create_app())
             resp = client.get("/runs/run1/benchmark")
 
         assert resp.status_code == 200
-        body = resp.json()
-        assert body["run_id"] == "run1"
-        assert body["content"] == "Benchmark Summary"
+        assert resp.json() == "Benchmark Summary"

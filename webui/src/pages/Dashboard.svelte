@@ -116,7 +116,9 @@
     </p>
   {:else}
     <!-- KPI row -->
-    <div class="grid grid-cols-4 gap-3 mb-4 max-sm:grid-cols-2">
+    <div
+      class="grid grid-cols-5 gap-3 mb-4 max-lg:grid-cols-3 max-sm:grid-cols-2"
+    >
       <div class="card flex flex-col gap-[0.35rem] px-5 py-4">
         <span
           class="text-[0.72rem] text-muted uppercase tracking-[0.06em] font-semibold"
@@ -140,7 +142,16 @@
       <div class="card flex flex-col gap-[0.35rem] px-5 py-4">
         <span
           class="text-[0.72rem] text-muted uppercase tracking-[0.06em] font-semibold"
-          >Total Tasks</span
+          >Total Runs</span
+        >
+        <span class="text-[1.5rem] font-bold leading-none text-fuchsia-700 font-mono"
+          >{runsData?.runs.length ?? 0}</span
+        >
+      </div>
+      <div class="card flex flex-col gap-[0.35rem] px-5 py-4">
+        <span
+          class="text-[0.72rem] text-muted uppercase tracking-[0.06em] font-semibold"
+          >Queued Tasks</span
         >
         <span class="text-[1.5rem] font-bold leading-none text-cobalt font-mono"
           >{totalTasks}</span
@@ -149,7 +160,7 @@
       <div class="card flex flex-col gap-[0.35rem] px-5 py-4">
         <span
           class="text-[0.72rem] text-muted uppercase tracking-[0.06em] font-semibold"
-          >Active</span
+          >Active Runs</span
         >
         <span
           class="text-[1.5rem] font-bold leading-none text-warning font-mono"

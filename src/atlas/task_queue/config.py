@@ -30,7 +30,7 @@ HEAVY_COMMANDS: frozenset[str] = frozenset({"extract", "index"})
 
 QUEUE_DIR = Path(settings.atlas_home) / "queue"
 DB_PATH = QUEUE_DIR / "tasks.db"
-RESULTS_DIR = QUEUE_DIR / "queued_tasks" / "results"
+WORK_DIR = QUEUE_DIR / "queued_tasks" / "results"
 
 # ── Retention limits ──────────────────────────────────────────────────────────
 

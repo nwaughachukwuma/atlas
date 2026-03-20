@@ -16,7 +16,7 @@ from .task_queue.store import RunStore
 from .uuid import uuid
 
 RUNS_DIR = Path(settings.atlas_home) / "runs"
-DIRECT_RESULTS_DIR = RUNS_DIR / "results"
+RESULTS_DIR = RUNS_DIR / "results"
 
 
 def create_run_id(size: int = 10) -> str:
@@ -24,28 +24,23 @@ def create_run_id(size: int = 10) -> str:
     return uuid(size)
 
 
-def direct_results_dir_for(run_id: str) -> Path:
+def results_dir_for(run_id: str) -> Path:
     """Return the persisted results directory for a direct run."""
-    return DIRECT_RESULTS_DIR / run_id
+    return RESULTS_DIR / run_id
 
 
-def direct_output_file_for(run_id: str) -> Path:
+def output_file_for(run_id: str) -> Path:
     """Return the canonical output file path for a direct run."""
-    return direct_results_dir_for(run_id) / "output.json"
+    return results_dir_for(run_id) / "output.json"
 
 
-def direct_benchmark_file_for(run_id: str) -> Path:
-    """Return the canonical benchmark file path for a direct run."""
-    return direct_results_dir_for(run_id) / "benchmark.txt"
-
-
-def parse_output_content(path: Path) -> tuple[Any, str]:
+def parse_output_content(path: Path):
     """Return stored output content and its content kind."""
     content = path.read_text()
     try:
-        return json.loads(content), "json"
+        return json.loads(content)
     except json.JSONDecodeError:
-        return content, "text"
+        return content
 
 
 def build_benchmark_summary(stats: list[BenchmarkStats], total_s: float | None = None) -> str:
@@ -95,7 +90,6 @@ class DirectRunContext:
     label: str
     input_path: str
     output_path: Path
-    benchmark_path: Path
     requested_output_path: str | None
     fmt: str | None
     benchmark_requested: bool
@@ -115,8 +109,7 @@ def start_direct_run(
 ) -> DirectRunContext:
     """Create and mark a new direct run as running."""
     run_id = create_run_id()
-    output_path = direct_output_file_for(run_id)
-    benchmark_path = direct_benchmark_file_for(run_id)
+    output_path = output_file_for(run_id)
     store = RunStore()
     store.add(
         run_id,
@@ -127,7 +120,6 @@ def start_direct_run(
         input_path=input_path,
         output_path=str(output_path),
         user_output_path=requested_output_path,
-        benchmark_path=str(benchmark_path) if benchmark else None,
         fmt=fmt,
         metadata=metadata,
     )
@@ -138,7 +130,6 @@ def start_direct_run(
         label=label,
         input_path=input_path,
         output_path=output_path,
-        benchmark_path=benchmark_path,
         requested_output_path=requested_output_path,
         fmt=fmt,
         benchmark_requested=benchmark,
@@ -159,18 +150,15 @@ def complete_direct_run(
     if context.requested_output_path:
         write_file(Path(context.requested_output_path), content)
 
-    benchmark_path: str | None = None
+    benchmark_content: str | None = None
     if context.benchmark_requested:
         stats = registry.delta_stats(context.benchmark_snapshot)
         benchmark_content = build_benchmark_summary(stats, total_s=perf_counter() - context.started_perf)
-        if benchmark_content:
-            write_file(context.benchmark_path, benchmark_content)
-            benchmark_path = str(context.benchmark_path)
 
     RunStore().mark_completed(
         context.run_id,
         output_path=str(context.output_path),
-        benchmark_path=benchmark_path,
+        benchmark_text=benchmark_content,
         user_output_path=context.requested_output_path,
         metadata=metadata,
     )
@@ -180,7 +168,6 @@ def complete_direct_run(
         "queued": False,
         "status": TaskStatus.COMPLETED,
         "output_path": str(context.output_path),
-        "benchmark_path": benchmark_path,
         "user_output_path": context.requested_output_path,
     }
 
@@ -210,7 +197,6 @@ def fail_direct_run(
         "queued": False,
         "status": TaskStatus.FAILED,
         "output_path": str(context.output_path),
-        "benchmark_path": None,
         "user_output_path": context.requested_output_path,
         "error": error,
     }

@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     finished_at TEXT,
     error       TEXT,
     output_path TEXT,
+    args_json   TEXT,
+    benchmark_text TEXT,
     benchmark   INTEGER NOT NULL DEFAULT 0
 );
 """
@@ -49,10 +51,11 @@ CREATE TABLE IF NOT EXISTS runs (
     input_path       TEXT,
     output_path      TEXT,
     user_output_path TEXT,
-    benchmark_path   TEXT,
+    benchmark_text   TEXT,
     log_path         TEXT,
     format           TEXT,
     error            TEXT,
+    args_json        TEXT,
     metadata_json    TEXT
 );
 
@@ -113,15 +116,15 @@ class TaskStore(_SQLiteStoreBase):
         task_id: str,
         command: str,
         label: str,
-        output_path: Optional[str] = None,
+        args_json: Optional[str] = None,
         benchmark: bool = False,
     ) -> None:
         """Insert a new task row."""
         with self._tx() as conn:
             conn.execute(
-                "INSERT INTO tasks (id, command, label, status, created_at, output_path, benchmark)"
+                "INSERT INTO tasks (id, command, label, status, created_at, args_json, benchmark)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (task_id, command, label, TaskStatus.PENDING, now_iso(), output_path, int(benchmark)),
+                (task_id, command, label, TaskStatus.PENDING, now_iso(), args_json, int(benchmark)),
             )
 
     def mark_running(self, task_id: str) -> None:
@@ -132,30 +135,30 @@ class TaskStore(_SQLiteStoreBase):
                 (TaskStatus.RUNNING, now_iso(), task_id),
             )
 
-    def mark_completed(self, task_id: str) -> None:
+    def mark_completed(self, task_id: str, output_path: str | None = None) -> None:
         """Transition task to completed; trim old records."""
         with self._tx() as conn:
             conn.execute(
-                "UPDATE tasks SET status=?, finished_at=? WHERE id=?",
-                (TaskStatus.COMPLETED, now_iso(), task_id),
+                "UPDATE tasks SET status=?, finished_at=?, output_path=COALESCE(?, output_path) WHERE id=?",
+                (TaskStatus.COMPLETED, now_iso(), output_path, task_id),
             )
             self._trim(conn)
 
-    def mark_failed(self, task_id: str, error: str) -> None:
+    def mark_failed(self, task_id: str, error: str, output_path: str | None = None) -> None:
         """Transition task to failed with error message; trim old records."""
         with self._tx() as conn:
             conn.execute(
-                "UPDATE tasks SET status=?, finished_at=?, error=? WHERE id=?",
-                (TaskStatus.FAILED, now_iso(), error, task_id),
+                "UPDATE tasks SET status=?, finished_at=?, error=?, output_path=COALESCE(?, output_path) WHERE id=?",
+                (TaskStatus.FAILED, now_iso(), error, output_path, task_id),
             )
             self._trim(conn)
 
-    def mark_timeout(self, task_id: str) -> None:
+    def mark_timeout(self, task_id: str, output_path: str | None = None) -> None:
         """Transition task to timeout."""
         with self._tx() as conn:
             conn.execute(
-                "UPDATE tasks SET status=?, finished_at=?, error=? WHERE id=?",
-                (TaskStatus.TIMEOUT, now_iso(), f"Exceeded {TASK_TIMEOUT}s timeout", task_id),
+                "UPDATE tasks SET status=?, finished_at=?, error=?, output_path=COALESCE(?, output_path) WHERE id=?",
+                (TaskStatus.TIMEOUT, now_iso(), f"Exceeded {TASK_TIMEOUT}s timeout", output_path, task_id),
             )
 
     # ── queries ───────────────────────────────────────────────────────
@@ -248,17 +251,17 @@ class RunStore(_SQLiteStoreBase):
         input_path: str | None = None,
         output_path: str | None = None,
         user_output_path: str | None = None,
-        benchmark_path: str | None = None,
         log_path: str | None = None,
         fmt: str | None = None,
+        args_json: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Insert a new run row."""
         with self._tx() as conn:
             conn.execute(
                 "INSERT INTO runs ("
-                "id, task_id, command, label, mode, status, created_at, input_path, output_path, "
-                "user_output_path, benchmark_path, log_path, format, metadata_json"
+                "id, task_id, command, label, mode, status, created_at, input_path, "
+                "user_output_path, log_path, format, args_json, output_path, metadata_json"
                 ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     run_id,
@@ -269,11 +272,11 @@ class RunStore(_SQLiteStoreBase):
                     status,
                     now_iso(),
                     input_path,
-                    output_path,
                     user_output_path,
-                    benchmark_path,
                     log_path,
                     fmt,
+                    args_json,
+                    output_path,
                     json.dumps(metadata, default=str) if metadata is not None else None,
                 ),
             )
@@ -291,7 +294,7 @@ class RunStore(_SQLiteStoreBase):
         run_id: str,
         *,
         output_path: str | None = None,
-        benchmark_path: str | None = None,
+        benchmark_text: str | None = None,
         log_path: str | None = None,
         user_output_path: str | None = None,
         metadata: dict[str, Any] | None = None,
@@ -300,14 +303,14 @@ class RunStore(_SQLiteStoreBase):
         with self._tx() as conn:
             conn.execute(
                 "UPDATE runs SET status=?, finished_at=?, output_path=COALESCE(?, output_path), "
-                "benchmark_path=COALESCE(?, benchmark_path), log_path=COALESCE(?, log_path), "
+                "benchmark_text=COALESCE(?, benchmark_text), log_path=COALESCE(?, log_path), "
                 "user_output_path=COALESCE(?, user_output_path), metadata_json=COALESCE(?, metadata_json) "
                 "WHERE id=?",
                 (
                     TaskStatus.COMPLETED,
                     now_iso(),
                     output_path,
-                    benchmark_path,
+                    benchmark_text,
                     log_path,
                     user_output_path,
                     json.dumps(metadata, default=str) if metadata is not None else None,
@@ -321,7 +324,7 @@ class RunStore(_SQLiteStoreBase):
         error: str,
         *,
         output_path: str | None = None,
-        benchmark_path: str | None = None,
+        benchmark_text: str | None = None,
         log_path: str | None = None,
         user_output_path: str | None = None,
         metadata: dict[str, Any] | None = None,
@@ -330,7 +333,7 @@ class RunStore(_SQLiteStoreBase):
         with self._tx() as conn:
             conn.execute(
                 "UPDATE runs SET status=?, finished_at=?, error=?, output_path=COALESCE(?, output_path), "
-                "benchmark_path=COALESCE(?, benchmark_path), log_path=COALESCE(?, log_path), "
+                "benchmark_text=COALESCE(?, benchmark_text), log_path=COALESCE(?, log_path), "
                 "user_output_path=COALESCE(?, user_output_path), metadata_json=COALESCE(?, metadata_json) "
                 "WHERE id=?",
                 (
@@ -338,7 +341,7 @@ class RunStore(_SQLiteStoreBase):
                     now_iso(),
                     error,
                     output_path,
-                    benchmark_path,
+                    benchmark_text,
                     log_path,
                     user_output_path,
                     json.dumps(metadata, default=str) if metadata is not None else None,
@@ -352,7 +355,7 @@ class RunStore(_SQLiteStoreBase):
         error: str,
         *,
         output_path: str | None = None,
-        benchmark_path: str | None = None,
+        benchmark_text: str | None = None,
         log_path: str | None = None,
         user_output_path: str | None = None,
     ) -> None:
@@ -360,14 +363,14 @@ class RunStore(_SQLiteStoreBase):
         with self._tx() as conn:
             conn.execute(
                 "UPDATE runs SET status=?, finished_at=?, error=?, output_path=COALESCE(?, output_path), "
-                "benchmark_path=COALESCE(?, benchmark_path), log_path=COALESCE(?, log_path), "
+                "benchmark_text=COALESCE(?, benchmark_text), log_path=COALESCE(?, log_path), "
                 "user_output_path=COALESCE(?, user_output_path) WHERE id=?",
                 (
                     TaskStatus.TIMEOUT,
                     now_iso(),
                     error,
                     output_path,
-                    benchmark_path,
+                    benchmark_text,
                     log_path,
                     user_output_path,
                     run_id,

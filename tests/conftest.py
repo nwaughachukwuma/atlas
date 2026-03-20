@@ -3,7 +3,9 @@ Pytest configuration and shared fixtures for Atlas tests
 """
 
 import json
+import os
 import sys
+import tempfile
 import warnings
 from contextlib import ExitStack
 from importlib import import_module
@@ -11,6 +13,9 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+test_home = tempfile.mkdtemp(prefix="atlas_test_home_")
+os.environ["ATLAS_HOME"] = test_home
 
 from src.atlas.utils import VideoAttrAnalysis
 from src.atlas.video_processor import VideoDescription, VideoProcessorResult, compile_transcript

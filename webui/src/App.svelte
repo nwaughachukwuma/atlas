@@ -23,6 +23,8 @@
     { path: "/extract/runs/(?<id>[^/]+)", component: Runs },
     { path: "/extract/runs", component: Runs },
     { path: "/index", component: Index },
+    { path: "/index/runs/(?<id>[^/]+)", component: Runs },
+    { path: "/index/runs", component: Runs },
     { path: "/video/(?<id>[^/]+)", component: VideoDetail },
     { path: "/videos", component: Videos },
     { path: "/queue/(?<id>[^/]+)", component: Queue },

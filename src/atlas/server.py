@@ -13,6 +13,7 @@ Design rules
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import shutil
 import tempfile
@@ -30,7 +31,6 @@ from pydantic import BaseModel
 from ._meta import DISPLAY_NAME, __version__
 from .cli.cmd_media import cmd_extract, cmd_index, cmd_transcribe
 from .file_extension import get_ext_from_mimetype
-from .run_history import parse_output_content
 from .ui_router import ui_router
 from .uuid import uuid
 
@@ -93,7 +93,7 @@ def _run_command(func, args: argparse.Namespace, *, tmp_dir: Path | None = None)
 
     # Force the shared CLI console to write to our stderr buffer so that Rich
     # progress bars / spinners don't pollute stdout (which we parse as JSON).
-    cli_module._console = Console(file=stderr)
+    cli_module.helpers._console = Console(file=stderr)
     try:
         with redirect_stdout(stdout), redirect_stderr(stderr):
             try:
@@ -111,7 +111,7 @@ def _run_command(func, args: argparse.Namespace, *, tmp_dir: Path | None = None)
                     },
                 ) from exc
     finally:
-        cli_module._console = None
+        cli_module.helpers._console = None
         if tmp_dir and tmp_dir.exists():
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
@@ -125,8 +125,11 @@ def _run_command(func, args: argparse.Namespace, *, tmp_dir: Path | None = None)
     except (json.JSONDecodeError, ValueError):
         pass
     if response_payload:
-        return {**CommandResult(ok=True, output=raw, error=stderr.getvalue()).model_dump(), **response_payload}
-    return CommandResult(ok=True, output=raw, error=stderr.getvalue())
+        return {
+            **CommandResult(ok=True, output=raw, error=stderr.getvalue()).model_dump(),
+            **response_payload,
+        }
+    return CommandResult(ok=True, output=raw, error=stderr.getvalue()).model_dump()
 
 
 # ── App factory ───────────────────────────────────────────────────────────────
@@ -237,15 +240,15 @@ def create_app() -> FastAPI:
 
     @app.post("/search")
     async def search(payload: SearchRequest) -> dict[str, Any]:
-        from .vector_store.video_index import search_video
+        from .cli.cmd_explore import cmd_search
 
-        video_id = payload.video_id
-        query = payload.query
-        results = await search_video(query, payload.top_k, video_id)
-        return {
-            "count": len(results),
-            "results": [r.model_dump() for r in results],
-        }
+        return await asyncio.to_thread(
+            cmd_search,
+            argparse.Namespace(
+                search_args=[payload.video_id, payload.query],
+                top_k=payload.top_k,
+            ),
+        )
 
     # ── chat — SSE stream ─────────────────────────────────────────────
 
@@ -258,44 +261,27 @@ def create_app() -> FastAPI:
 
     @app.get("/list-videos")
     def list_videos() -> dict[str, Any]:
-        from .vector_store.video_index import default_video_index
+        from .cli.cmd_explore import cmd_list_videos
 
-        vi = default_video_index()
-        videos = vi.list_videos()
-        return {
-            "count": len(videos),
-            "videos": [v.model_dump() for v in videos],
-        }
+        return cmd_list_videos(argparse.Namespace())
 
     @app.get("/list-chat/{video_id}")
     def list_chat(video_id: str, last_n: int = 20) -> dict[str, Any]:
-        from .vector_store.video_chat import default_video_chat
+        from .cli.cmd_explore import cmd_list_chat
 
-        vc = default_video_chat()
-        history = vc.get_history(video_id, last_n=last_n)
-        return {"count": len(history), "messages": history}
+        return cmd_list_chat(argparse.Namespace(video_id=video_id, last_n=last_n))
 
     @app.get("/stats")
     def stats() -> dict[str, Any]:
-        from .vector_store.video_chat import default_video_chat
-        from .vector_store.video_index import default_video_index
+        from .cli.cmd_explore import cmd_stats
 
-        vi = default_video_index()
-        vc = default_video_chat()
-        return {
-            "video_col_path": str(vi.col_path),
-            "video_index_stats": str(vi.stats),
-            "chat_col_path": str(vc.col_path),
-            "chat_index_stats": str(vc.stats),
-            "videos_indexed": len(vi.list_videos()),
-        }
+        return cmd_stats(argparse.Namespace())
 
     @app.get("/get-video/{video_id}")
     def get_video(video_id: str) -> dict[str, Any]:
-        from .vector_store.video_index import default_video_index
+        from .cli.cmd_explore import cmd_get_data
 
-        vi = default_video_index()
-        data = vi.get_video_data(video_id)
+        data = cmd_get_data(argparse.Namespace(video_id=video_id))
         if not data:
             raise HTTPException(404, f"No data found for video_id={video_id}")
         return {"data": data}
@@ -304,43 +290,19 @@ def create_app() -> FastAPI:
     def queue_list(
         status: Literal["pending", "running", "completed", "failed", "timeout"] | None = None,
     ) -> dict[str, Any]:
-        from .task_queue.store import TaskStore
+        from .task_queue.commands import cmd_queue_list
 
-        store = TaskStore()
-        tasks = store.list_all(status)
-        return {
-            "status_filter": status,
-            "count": len(tasks),
-            "tasks": [{**task, "run_id": task["id"]} for task in tasks],
-        }
+        return cmd_queue_list(argparse.Namespace(status=status))
 
     @app.get("/queue/status/{task_id}")
     def queue_status(task_id: str) -> dict[str, Any]:
-        from .task_queue.commands import _duration_str
-        from .task_queue.config import RESULTS_DIR
-        from .task_queue.store import TaskStore
+        from .task_queue.commands import cmd_queue_status
 
-        store = TaskStore()
-        task = store.get(task_id)
-        if not task:
-            raise HTTPException(404, detail=f"Task {task_id} not found")
+        result = cmd_queue_status(argparse.Namespace(task_id=task_id))
+        if not result:
+            raise HTTPException(404, f"Task {task_id} not found")
 
-        output: dict[str, Any] = dict(task)
-        output["duration"] = _duration_str(task.get("started_at"), task.get("finished_at")) or None
-
-        results_dir = RESULTS_DIR / task_id
-        output_file = results_dir / "output.json"
-        benchmark_file = results_dir / "benchmark.txt"
-
-        if output_file.exists():
-            output["output_path"] = str(output_file)
-
-        if benchmark_file.exists():
-            output["benchmark_path"] = str(benchmark_file)
-
-        output["run_id"] = task_id
-
-        return output
+        return result
 
     @app.get("/runs/list")
     def runs_list(
@@ -349,63 +311,43 @@ def create_app() -> FastAPI:
         mode: Literal["queued", "direct"] | None = None,
         limit: int = 50,
     ) -> dict[str, Any]:
-        from .task_queue.store import RunStore
+        from .cli.cmd_runs import cmd_runs_list
 
-        runs = RunStore().list_all(status=status, command=command, mode=mode, limit=limit)
-        return {
-            "status_filter": status,
-            "command_filter": command,
-            "mode_filter": mode,
-            "count": len(runs),
-            "runs": runs,
-        }
+        return cmd_runs_list(
+            argparse.Namespace(
+                status=status,
+                command=command,
+                mode=mode,
+                limit=limit,
+            )
+        )
 
     @app.get("/runs/{run_id}")
     def run_detail(run_id: str) -> dict[str, Any]:
-        from .task_queue.store import RunStore
+        from .cli.cmd_runs import cmd_runs_show
 
-        run = RunStore().get(run_id)
+        run = cmd_runs_show(argparse.Namespace(run_id=run_id))
         if not run:
             raise HTTPException(404, detail=f"Run {run_id} not found")
         return run
 
     @app.get("/runs/{run_id}/output")
-    def run_output(run_id: str) -> dict[str, Any]:
-        from .task_queue.store import RunStore
+    def run_output(run_id: str) -> str | dict[str, Any]:
+        from .cli.cmd_runs import cmd_runs_output
 
-        run = RunStore().get(run_id)
-        if not run:
-            raise HTTPException(404, detail=f"Run {run_id} not found")
-
-        output_path = run.get("output_path")
-        if not output_path or not Path(output_path).exists():
-            raise HTTPException(404, detail=f"No stored output found for run {run_id}")
-
-        content, kind = parse_output_content(Path(output_path))
-        return {
-            "run_id": run_id,
-            "path": output_path,
-            "kind": kind,
-            "content": content,
-        }
+        result = cmd_runs_output(argparse.Namespace(run_id=run_id))
+        if not result:
+            raise HTTPException(404, f"No stored output found for run {run_id}")
+        return result
 
     @app.get("/runs/{run_id}/benchmark")
-    def run_benchmark(run_id: str) -> dict[str, Any]:
-        from .task_queue.store import RunStore
+    def run_benchmark(run_id: str) -> str:
+        from .cli.cmd_runs import cmd_runs_benchmark
 
-        run = RunStore().get(run_id)
-        if not run:
-            raise HTTPException(404, detail=f"Run {run_id} not found")
-
-        benchmark_path = run.get("benchmark_path")
-        if not benchmark_path or not Path(benchmark_path).exists():
-            raise HTTPException(404, detail=f"No stored benchmark found for run {run_id}")
-
-        return {
-            "run_id": run_id,
-            "path": benchmark_path,
-            "content": Path(benchmark_path).read_text(),
-        }
+        benchmark_text = cmd_runs_benchmark(argparse.Namespace(run_id=run_id))
+        if not benchmark_text:
+            raise HTTPException(404, f"No stored benchmark found for run {run_id}")
+        return benchmark_text
 
     ui_router(app)
     return app

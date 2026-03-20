@@ -1,22 +1,24 @@
-"""CLI sub-commands for inspecting persisted run history."""
+"""
+CLI sub-commands for inspecting transcribe/extract/index run
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, cast
 
 from ..run_history import parse_output_content
-from ..task_queue.store import RunStore
+from ..task_queue import RunStore
 
 
 def add_run_commands(subparsers: Any) -> None:
     """Register atlas runs list/show/output/benchmark sub-commands."""
     p_runs = subparsers.add_parser(
         "runs",
-        help="Inspect persisted transcribe/extract/index runs.",
-        description="View persisted run history and retrieve stored output or benchmarks.",
+        help="Inspect transcribe/extract/index runs.",
+        description="View run history and retrieve stored output and benchmarks.",
         epilog=(
             "Examples:\n"
             "  atlas runs list\n"
@@ -30,7 +32,7 @@ def add_run_commands(subparsers: Any) -> None:
     sub = p_runs.add_subparsers(dest="runs_command", metavar="<action>")
     sub.required = True
 
-    p_list = sub.add_parser("list", help="List persisted runs.")
+    p_list = sub.add_parser("list", help="List all runs.")
     p_list.add_argument("--status", choices=["pending", "running", "completed", "failed", "timeout"])
     p_list.add_argument("--command", choices=["transcribe", "extract", "index"])
     p_list.add_argument("--mode", choices=["queued", "direct"])
@@ -58,57 +60,65 @@ def _get_run_or_error(run_id: str) -> dict | None:
     return run
 
 
-def cmd_runs_list(args: argparse.Namespace) -> None:
+def cmd_runs_list(args: argparse.Namespace) -> dict[str, Any]:
     runs = RunStore().list_all(
         status=getattr(args, "status", None),
         command=getattr(args, "command", None),
         mode=getattr(args, "mode", None),
         limit=getattr(args, "limit", None),
     )
-    print(
-        json.dumps(
-            {
-                "count": len(runs),
-                "status_filter": getattr(args, "status", None),
-                "command_filter": getattr(args, "command", None),
-                "mode_filter": getattr(args, "mode", None),
-                "runs": runs,
-            },
-            indent=2,
-            default=str,
-        )
-    )
+    _runs = [
+        {
+            **v,
+            "benchmark_text": f"Get benchmark using <atlas runs benchmark --run-id {v['id']}>",
+        }
+        for v in runs
+    ]
+    result = {
+        "count": len(_runs),
+        "status_filter": getattr(args, "status", None),
+        "command_filter": getattr(args, "command", None),
+        "mode_filter": getattr(args, "mode", None),
+        "runs": _runs,
+    }
+    print(json.dumps(result, indent=2, default=str))
+    return result
 
 
-def cmd_runs_show(args: argparse.Namespace) -> None:
+def cmd_runs_show(args: argparse.Namespace) -> dict[str, Any] | None:
     run = _get_run_or_error(args.run_id)
     if run is None:
         return
     print(json.dumps(run, indent=2, default=str))
+    return run
 
 
-def cmd_runs_output(args: argparse.Namespace) -> None:
+def cmd_runs_output(args: argparse.Namespace) -> str | Dict | None:
     run = _get_run_or_error(args.run_id)
     if run is None:
         return
+
     output_path = run.get("output_path")
     if not output_path or not Path(output_path).exists():
         print(json.dumps({"error": f"No stored output found for run {args.run_id}"}))
         return
 
-    content, kind = parse_output_content(Path(output_path))
-    if kind == "json":
-        print(json.dumps(content, indent=2, default=str))
+    content = parse_output_content(Path(output_path))
+    result = {"path": output_path, "content": content}
+    if isinstance(content, dict):
+        print(json.dumps(result, indent=2, default=str))
     else:
-        print(content)
+        print(result)
+    return result
 
 
-def cmd_runs_benchmark(args: argparse.Namespace) -> None:
+def cmd_runs_benchmark(args: argparse.Namespace):
     run = _get_run_or_error(args.run_id)
     if run is None:
         return
-    benchmark_path = run.get("benchmark_path")
-    if not benchmark_path or not Path(benchmark_path).exists():
+    benchmark_text = run.get("benchmark_text")
+    if not benchmark_text:
         print(json.dumps({"error": f"No stored benchmark found for run {args.run_id}"}))
         return
-    print(Path(benchmark_path).read_text())
+    print(benchmark_text)
+    return cast(str, benchmark_text)

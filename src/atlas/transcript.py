@@ -5,7 +5,6 @@ Transcript processing using Groq Whisper API
 from __future__ import annotations
 
 import asyncio
-import os
 from dataclasses import dataclass
 from typing import Callable, Literal, Optional, TypedDict
 
@@ -60,10 +59,9 @@ ReturnValue = Literal["text", "vtt", "srt"]
 
 def get_groq_api_key() -> str:
     """Get Groq API key from environment"""
-    api_key = os.environ.get("GROQ_API_KEY")
-    if not api_key:
+    if not settings.groq_api_key:
         raise ValueError("GROQ_API_KEY environment variable is required for transcription")
-    return api_key
+    return settings.groq_api_key
 
 
 class ProcessTranscript(MediaFileManager):

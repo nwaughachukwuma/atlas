@@ -76,7 +76,7 @@ export interface Run {
   input_path?: string | null;
   output_path?: string | null;
   user_output_path?: string | null;
-  benchmark_path?: string | null;
+  benchmark_text?: string | null;
   log_path?: string | null;
   format?: string | null;
   error?: string | null;
@@ -92,16 +92,8 @@ export interface RunListResponse {
 }
 
 export interface RunOutputResponse {
-  run_id: string;
   path: string;
-  kind: "json" | "text";
-  content: unknown;
-}
-
-export interface RunBenchmarkResponse {
-  run_id: string;
-  path: string;
-  content: string;
+  content: Record<string, unknown> | string;
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────
@@ -191,8 +183,6 @@ export interface TaskQueuedResult {
   run_id?: string;
   queued?: boolean;
   status?: TaskStatus;
-  output_path?: string;
-  benchmark_path?: string | null;
   task_id?: string;
   id?: string;
   error?: string;

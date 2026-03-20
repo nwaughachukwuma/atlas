@@ -57,9 +57,17 @@
     /> Index Video
   </h2>
   <p class="text-muted mb-5">
-    Index your video for semantic search and conversational chat. Chunks are
-    stored locally in a vector store for instant retrieval.
+    Index your video for semantic search and AI chat — stored locally for
+    instant retrieval.
   </p>
+
+  <div class="mb-5 text-[0.9rem]">
+    <a
+      class="px-3 py-2 border-cobalt/40 border"
+      href={toPath("/index/runs")}
+      use:route>View Previous Runs →</a
+    >
+  </div>
 
   <div class="card mb-4">
     <VideoUpload

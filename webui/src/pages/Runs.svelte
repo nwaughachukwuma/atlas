@@ -15,7 +15,6 @@
   import CopyButton from "../components/CopyButton.svelte";
   import type {
     Run,
-    RunBenchmarkResponse,
     RunMode,
     RunOutputResponse,
     TaskStatus,
@@ -28,16 +27,19 @@
   const scopedCommand = $derived.by((): Run["command"] | "" => {
     if (originalPath.startsWith("/transcribe/runs")) return "transcribe";
     if (originalPath.startsWith("/extract/runs")) return "extract";
+    if (originalPath.startsWith("/index/runs")) return "index";
     return "";
   });
   const runsBasePath = $derived.by(() => {
     if (scopedCommand === "transcribe") return "/transcribe/runs";
     if (scopedCommand === "extract") return "/extract/runs";
+    if (scopedCommand === "index") return "/index/runs";
     return "/runs";
   });
   const listHeading = $derived.by(() => {
     if (scopedCommand === "transcribe") return "Transcribe Runs";
     if (scopedCommand === "extract") return "Extract Runs";
+    if (scopedCommand === "index") return "Index Runs";
     return "Runs";
   });
   const listDescription = $derived.by(() => {
@@ -47,17 +49,23 @@
     if (scopedCommand === "extract") {
       return "Persisted history for extract runs across queued and direct execution.";
     }
+    if (scopedCommand === "index") {
+      return "Persisted history for index runs across queued and direct execution.";
+    }
     return "Persisted history for queued and direct transcribe, extract, and index runs.";
   });
   const detailHeading = $derived.by(() => {
     if (scopedCommand === "transcribe") return "Transcribe Run Detail";
     if (scopedCommand === "extract") return "Extract Run Detail";
+    if (scopedCommand === "index") return "Index Run Detail";
     return "Run Detail";
   });
   const runId: string | null = $derived.by(
     () =>
       routeResult.result.path.params?.id ??
-      originalPath.match(/^\/(?:transcribe|extract)\/runs\/([^/]+)$/)?.[1] ??
+      originalPath.match(
+        /^\/(?:transcribe|extract|index)\/runs\/([^/]+)$/,
+      )?.[1] ??
       originalPath.match(/^\/runs\/([^/]+)$/)?.[1] ??
       null,
   );
@@ -70,7 +78,7 @@
 
   let currentRun = $state<Run | null>(null);
   let outputData = $state<RunOutputResponse | null>(null);
-  let benchmarkData = $state<RunBenchmarkResponse | null>(null);
+  let benchmarkText = $state<string | null>(null);
 
   const statusOptions: (TaskStatus | "")[] = [
     "",
@@ -128,20 +136,22 @@
     return runDetail(runId)
       .then(async (data) => {
         currentRun = data;
-        outputData = null;
-        benchmarkData = null;
+        const hasFinished =
+          data.status === "completed" ||
+          data.status === "failed" ||
+          data.status === "timeout";
+        if (!hasFinished) return;
 
-        if (data.output_path) {
-          outputData = await runOutput(runId).catch(() => null);
-        }
-        if (data.benchmark_path) {
-          benchmarkData = await runBenchmark(runId).catch(() => null);
-        }
+        void runOutput(runId)
+          .then((d) => (outputData = d))
+          .catch(() => null);
+
+        await runBenchmark(runId)
+          .then((d) => (benchmarkText = d))
+          .catch(() => null);
       })
       .catch((e) =>
-        toast.error(`Error getting run ${runId}`, {
-          description: e.message,
-        }),
+        toast.error(`Error getting run ${runId}`, { description: e.message }),
       )
       .finally(() => (loading = false));
   }
@@ -254,11 +264,6 @@
               class="break-all">{currentRun.output_path ?? "—"}</span
             >
           </div>
-          <div class="flex gap-4">
-            <span class="text-muted min-w-24">Benchmark</span><span
-              class="break-all">{currentRun.benchmark_path ?? "—"}</span
-            >
-          </div>
         </div>
 
         {#if currentRun.error}
@@ -277,19 +282,16 @@
               <FileTextIcon size={16} strokeWidth={2} /> Output
             </h3>
             {#if outputData}
-              <CopyButton
-                text={outputData.kind === "json"
-                  ? JSON.stringify(outputData.content, null, 2)
-                  : String(outputData.content)}
-              />
+              <CopyButton text={JSON.stringify(outputData.content, null, 2)} />
             {/if}
           </div>
           {#if outputData}
             <pre
-              class="max-h-96 overflow-y-auto m-0 text-[0.78rem]">{outputData.kind ===
-              "json"
-                ? JSON.stringify(outputData.content, null, 2)
-                : String(outputData.content)}</pre>
+              class="max-h-96 overflow-y-auto m-0 text-[0.78rem]">{JSON.stringify(
+                outputData.content,
+                null,
+                2,
+              )}</pre>
           {:else}
             <p class="text-muted mb-0 text-[0.85rem]">
               No stored output available.
@@ -302,13 +304,13 @@
             <h3 class="mb-0 flex items-center gap-2">
               <GaugeIcon size={16} strokeWidth={2} /> Benchmark
             </h3>
-            {#if benchmarkData}
-              <CopyButton text={benchmarkData.content} />
+            {#if benchmarkText}
+              <CopyButton text={benchmarkText} />
             {/if}
           </div>
-          {#if benchmarkData}
+          {#if benchmarkText}
             <pre
-              class="max-h-96 overflow-y-auto m-0 text-[0.78rem]">{benchmarkData.content}</pre>
+              class="max-h-96 overflow-y-auto m-0 text-[0.78rem]">{benchmarkText}</pre>
           {:else}
             <p class="text-muted mb-0 text-[0.85rem]">
               No stored benchmark available.
@@ -407,9 +409,6 @@
               <span class="text-muted text-[0.85rem]"
                 >{formatDate(run.created_at)}</span
               >
-              {#if run.benchmark_path}
-                <span class="text-muted text-[0.82rem]">benchmark</span>
-              {/if}
             </div>
           </a>
         {/each}

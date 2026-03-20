@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .config import RESULTS_DIR
+from .config import WORK_DIR
 from ..logger import get_logger
 
 logger = get_logger("atlas:queue")
@@ -36,26 +36,16 @@ def serialize_result(result: Any) -> str:
     return str(result)
 
 
-def results_dir_for(task_id: str) -> Path:
-    """Return the results directory for a given task ID."""
-    return RESULTS_DIR / task_id
+def work_dir_for(task_id: str) -> Path:
+    """Return the worker directory for a given task ID."""
+    return WORK_DIR / task_id
 
 
 def input_file_for(task_id: str, source_path: Path) -> Path:
     """Return the staged input file path for a queued task."""
-    return results_dir_for(task_id) / f"input{source_path.suffix}"
-
-
-def output_file_for(task_id: str) -> Path:
-    """Return the canonical stored output file for a given task/run ID."""
-    return results_dir_for(task_id) / "output.json"
-
-
-def benchmark_file_for(task_id: str) -> Path:
-    """Return the canonical stored benchmark file for a given task/run ID."""
-    return results_dir_for(task_id) / "benchmark.txt"
+    return work_dir_for(task_id) / f"input{source_path.suffix}"
 
 
 def worker_log_file_for(task_id: str) -> Path:
     """Return the worker log file path for a queued task."""
-    return results_dir_for(task_id) / "worker.log"
+    return work_dir_for(task_id) / "worker.log"

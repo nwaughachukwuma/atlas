@@ -17,7 +17,7 @@ from .config import (
     HEAVY_COMMANDS,
     HEAVY_CONCURRENCY,
     MAX_CONCURRENT,
-    RESULTS_DIR,
+    WORK_DIR,
     TASK_TIMEOUT,
     TRANSCRIBE_CONCURRENCY,
 )
@@ -81,8 +81,8 @@ class TaskQueue:
         label = label or command
 
         # Prepare the results directory and serialise arguments.
-        results_dir = RESULTS_DIR / task_id
-        results_dir.mkdir(parents=True, exist_ok=True)
+        work_dir = WORK_DIR / task_id
+        work_dir.mkdir(parents=True, exist_ok=True)
 
         video_path = getattr(args, "video_path", None)
         should_stage_input = bool(getattr(args, "_queue_stage_input", False))
@@ -94,11 +94,9 @@ class TaskQueue:
                 args.video_path = str(staged_input)
                 args._video_path_resolved = str(staged_input.resolve())
 
-        (results_dir / "args.json").write_text(
-            json.dumps(vars(args) if hasattr(args, "__dict__") else {}, default=str),
-        )
+        args_json = json.dumps(vars(args) if hasattr(args, "__dict__") else {}, default=str)
 
-        self._store.add(task_id, command, label, output_path, benchmark)
+        self._store.add(task_id, command, label, args_json=args_json, benchmark=benchmark)
         RunStore(db_path=self._store.db_path).add(
             task_id,
             command,
@@ -107,11 +105,10 @@ class TaskQueue:
             status="pending",
             task_id=task_id,
             input_path=getattr(args, "_video_path_resolved", getattr(args, "video_path", None)),
-            output_path=str(results_dir / "output.json"),
             user_output_path=output_path,
-            benchmark_path=str(results_dir / "benchmark.txt") if benchmark else None,
             log_path=str(worker_log_file_for(task_id)),
             fmt=getattr(args, "format", None),
+            args_json=args_json,
             metadata={
                 "include_summary": getattr(args, "include_summary", None),
                 "chunk_duration": getattr(args, "chunk_duration", None),

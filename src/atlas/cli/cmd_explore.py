@@ -7,17 +7,16 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
+from typing import Any
 
 from .helpers import make_progress, validate_api_keys
 
-# ── search ────────────────────────────────────────────────────────────────────
 
-
-def cmd_search(args: argparse.Namespace) -> None:
+def cmd_search(args: argparse.Namespace) -> dict[str, Any]:
     """Run a semantic search against previously indexed videos."""
     import json
 
-    from . import get_console, get_logger
+    from .helpers import get_console, get_logger
     from ..vector_store.video_index import search_video
 
     console = get_console()
@@ -39,18 +38,16 @@ def cmd_search(args: argparse.Namespace) -> None:
             "results": [r.model_dump() for r in results],
         }
         print(json.dumps(output, indent=2))
+        return output
     except Exception as e:
         console.print(f"[red]Error searching: {e}[/red]")
         get_logger().exception("Error in search command")
         sys.exit(1)
 
 
-# ── chat ──────────────────────────────────────────────────────────────────────
-
-
 def cmd_chat(args: argparse.Namespace) -> None:
     """Chat with an indexed video using semantic context and chat history."""
-    from . import get_console, get_logger
+    from .helpers import get_console, get_logger
     from ..chat_handler import chat_with_video
 
     console = get_console()
@@ -64,7 +61,7 @@ def cmd_chat(args: argparse.Namespace) -> None:
 
     async def _run() -> None:
         # Show a lightweight indicator while context retrieval runs (before first
-        # token arrives).  As soon as the model starts streaming we clear it and
+        # token arrives). As soon as the model starts streaming we clear it and
         # print the response prefix.
         sys.stdout.write("Thinking…")
         sys.stdout.flush()
@@ -95,10 +92,7 @@ def cmd_chat(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
-# ── list-videos ───────────────────────────────────────────────────────────────
-
-
-def cmd_list_videos(args: argparse.Namespace) -> None:
+def cmd_list_videos(args: argparse.Namespace) -> dict[str, Any]:
     """List all videos that have been indexed in the vector store."""
     import json
 
@@ -106,28 +100,20 @@ def cmd_list_videos(args: argparse.Namespace) -> None:
 
     vi = default_video_index()
     videos = vi.list_videos()
-    print(
-        json.dumps(
-            {
-                "count": len(videos),
-                "videos": [{"video_id": v.video_id, "indexed_at": v.indexed_at} for v in videos],
-            },
-            indent=2,
-        )
-    )
+    result = {
+        "count": len(videos),
+        "videos": [{"video_id": v.video_id, "indexed_at": v.indexed_at} for v in videos],
+    }
+    print(json.dumps(result, indent=2))
+    return result
 
 
-# ── list-chat ─────────────────────────────────────────────────────────────────
-
-
-def cmd_list_chat(args: argparse.Namespace) -> None:
+def cmd_list_chat(args: argparse.Namespace) -> dict[str, Any]:
     """List the chat history for a given video."""
     import json
 
-    from . import get_console
     from ..vector_store.video_chat import default_video_chat
 
-    console = get_console()
     video_id: str = args.video_id
     with make_progress() as progress:
         task = progress.add_task("Loading chat history...", total=None)
@@ -138,19 +124,16 @@ def cmd_list_chat(args: argparse.Namespace) -> None:
     output = {"count": len(history), "messages": history}
     print(json.dumps(output, indent=2))
 
+    return output
 
-# ── stats ─────────────────────────────────────────────────────────────────────
 
-
-def cmd_stats(args: argparse.Namespace) -> None:
+def cmd_stats(args: argparse.Namespace) -> dict[str, Any]:
     """Show statistics about the local vector store."""
     import json
 
-    from . import get_console
     from ..vector_store.video_chat import default_video_chat
     from ..vector_store.video_index import default_video_index
 
-    console = get_console()
     with make_progress() as progress:
         task = progress.add_task("Loading stats...", total=None)
         vi = default_video_index()
@@ -165,17 +148,15 @@ def cmd_stats(args: argparse.Namespace) -> None:
         "videos_indexed": len(vi.list_videos()),
     }
     print(json.dumps(output, indent=2))
+    return output
 
 
-# ── get-data ───────────────────────────────────────────────────────────────────────
-
-
-def cmd_get_data(args: argparse.Namespace) -> None:
-    """Retrieve all indexed data for a video in extract-command shape."""
+def cmd_get_data(args: argparse.Namespace) -> dict[str, Any] | None:
+    """Retrieve all indexed data for a video"""
     import json
     from pathlib import Path
 
-    from . import get_console
+    from .helpers import get_console
     from ..vector_store.video_index import default_video_index
 
     console = get_console()
@@ -191,7 +172,7 @@ def cmd_get_data(args: argparse.Namespace) -> None:
     if not data:
         console.print(f"[yellow]No data found for video_id=[/yellow][cyan]{video_id}[/cyan]")
         console.print("Make sure the video has been indexed with: [bold]atlas index video.mp4[/bold]")
-        return
+        return None
 
     output_str = json.dumps(data, indent=2)
     if output_path:
@@ -199,3 +180,5 @@ def cmd_get_data(args: argparse.Namespace) -> None:
         console.print(f"[green]Data saved to:[/green] {output_path}")
     else:
         print(output_str)
+
+    return data
