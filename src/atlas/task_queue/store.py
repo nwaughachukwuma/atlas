@@ -249,11 +249,11 @@ class RunStore(_SQLiteStoreBase):
         status: str = TaskStatus.PENDING,
         task_id: str | None = None,
         input_path: str | None = None,
+        output_path: str | None = None,
         user_output_path: str | None = None,
         log_path: str | None = None,
         fmt: str | None = None,
         args_json: str | None = None,
-        output_path: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Insert a new run row."""

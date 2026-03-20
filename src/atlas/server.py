@@ -269,12 +269,7 @@ def create_app() -> FastAPI:
     def list_chat(video_id: str, last_n: int = 20) -> dict[str, Any]:
         from .cli.cmd_explore import cmd_list_chat
 
-        return cmd_list_chat(
-            argparse.Namespace(
-                video_id=video_id,
-                last_n=last_n,
-            )
-        )
+        return cmd_list_chat(argparse.Namespace(video_id=video_id, last_n=last_n))
 
     @app.get("/stats")
     def stats() -> dict[str, Any]:

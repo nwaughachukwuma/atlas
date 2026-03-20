@@ -118,9 +118,9 @@ def start_direct_run(
         mode="direct",
         status=TaskStatus.PENDING,
         input_path=input_path,
+        output_path=str(output_path),
         user_output_path=requested_output_path,
         fmt=fmt,
-        output_path=str(output_path),
         metadata=metadata,
     )
     store.mark_running(run_id)
@@ -167,6 +167,7 @@ def complete_direct_run(
         "command": context.command,
         "queued": False,
         "status": TaskStatus.COMPLETED,
+        "output_path": str(context.output_path),
         "user_output_path": context.requested_output_path,
     }
 
@@ -195,6 +196,7 @@ def fail_direct_run(
         "command": context.command,
         "queued": False,
         "status": TaskStatus.FAILED,
+        "output_path": str(context.output_path),
         "user_output_path": context.requested_output_path,
         "error": error,
     }
