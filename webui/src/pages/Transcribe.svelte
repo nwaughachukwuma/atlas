@@ -52,8 +52,7 @@
     /> Transcribe Video
   </h2>
   <p class="text-muted mb-5">
-    Convert your video's audio to text. Supports plain text, WebVTT, and SRT
-    formats.
+    Get video transcript in plain text, VTT, or SRT format.
   </p>
 
   <div class="mb-5 text-[0.9rem]">

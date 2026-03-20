@@ -17,7 +17,7 @@
       path: "/transcribe",
       icon: MicIcon,
       title: "Transcribe",
-      desc: "Convert video audio to text in plain text, VTT, or SRT format.",
+      desc: "Get video transcript in plain text, VTT, or SRT format.",
     },
     {
       path: "/extract",
@@ -29,7 +29,7 @@
       path: "/index",
       icon: DatabaseIcon,
       title: "Index Video",
-      desc: "Index a video for semantic search and chat. Stored locally for instant retrieval.",
+      desc: "Index a video for semantic search and chat — stored locally for instant retrieval.",
     },
     {
       path: "/videos",
@@ -63,7 +63,7 @@
     </h1>
     <p class="text-muted text-[1.05rem] max-w-[580px] mb-0">
       Multimodal AI engine for video insights — transcription, semantic
-      extraction, semantic search, and conversational chat. All running locally.
+      extraction, semantic search, and AI chat. All running locally.
     </p>
   </header>
 
