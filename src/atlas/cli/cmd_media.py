@@ -410,7 +410,7 @@ def cmd_index(args: argparse.Namespace) -> None:
 
     try:
         video_id, indexed_count, result = asyncio.run(_run())
-        # console.print(f"\n[green]Indexed {indexed_count} chunks for video ID:[/green] {video_id}\n")
+        console.print(f"\n[green]Indexed {indexed_count} chunks for video ID:[/green] {video_id}\n")
         # print(result.model_dump_json(indent=2))
         output = {
             "video_id": video_id,
